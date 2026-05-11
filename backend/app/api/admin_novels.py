@@ -1,0 +1,96 @@
+from pathlib import Path
+
+from flask import Blueprint, current_app, jsonify, request
+from werkzeug.utils import secure_filename
+
+from app.models import Chapter, Novel, db
+from app.services.chapter_parser import split_txt_into_chapters
+
+
+admin_novels_bp = Blueprint("admin_novels", __name__)
+
+
+def success(data, status=200):
+    return jsonify({"data": data, "error": None}), status
+
+
+def failure(message, status=400):
+    return jsonify({"data": None, "error": message}), status
+
+
+@admin_novels_bp.post("/novels/upload")
+def upload_novel():
+    uploaded_file = request.files.get("file")
+    title = request.form.get("title", "").strip()
+
+    if not uploaded_file:
+        return failure("A .txt file is required.")
+
+    original_filename = secure_filename(uploaded_file.filename or "")
+
+    if not original_filename.lower().endswith(".txt"):
+        return failure("Only .txt files are supported in this MVP.")
+
+    raw_bytes = uploaded_file.read()
+
+    try:
+        text = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw_bytes.decode("utf-8-sig", errors="replace")
+
+    chapters = split_txt_into_chapters(text)
+
+    if not chapters:
+        return failure("No chapter text could be found in the uploaded file.")
+
+    upload_dir = Path(current_app.instance_path) / current_app.config["UPLOAD_FOLDER"]
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    stored_path = upload_dir / original_filename
+    stored_path.write_bytes(raw_bytes)
+
+    novel = Novel(
+        title=title or Path(original_filename).stem,
+        original_filename=original_filename,
+        file_type="txt",
+        status="ready",
+    )
+
+    for chapter_data in chapters:
+        novel.chapters.append(
+            Chapter(
+                chapter_number=chapter_data["chapter_number"],
+                title=chapter_data["title"],
+                content=chapter_data["content"],
+                character_count=len(chapter_data["content"]),
+            )
+        )
+
+    db.session.add(novel)
+    db.session.commit()
+
+    return success(
+        {
+            "novel": novel.to_admin_dict(),
+            "chapter_count": len(chapters),
+        },
+        status=201,
+    )
+
+
+@admin_novels_bp.get("/novels")
+def list_admin_novels():
+    novels = Novel.query.order_by(Novel.created_at.desc()).all()
+    return success([novel.to_admin_dict() for novel in novels])
+
+
+@admin_novels_bp.get("/novels/<int:novel_id>/chapters")
+def list_admin_chapters(novel_id):
+    novel = Novel.query.get_or_404(novel_id)
+    chapters = Chapter.query.filter_by(novel_id=novel.id).order_by(Chapter.chapter_number).all()
+
+    return success(
+        {
+            "novel": novel.to_admin_dict(),
+            "chapters": [chapter.to_admin_verification_dict() for chapter in chapters],
+        }
+    )
