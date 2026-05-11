@@ -15,6 +15,89 @@ async function fetchJson(url, options) {
   return body.data;
 }
 
+function ReviewRecord({ entityType, record, fields, onSaved }) {
+  const [formValues, setFormValues] = React.useState(() => {
+    const values = {};
+
+    fields.forEach((field) => {
+      values[field] = record[field] || "";
+    });
+
+    values.admin_notes = record.admin_notes || "";
+    return values;
+  });
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  async function saveRecord(extraValues = {}) {
+    setIsSaving(true);
+
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/admin/review/${entityType}/${record.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...formValues,
+          ...extraValues,
+        }),
+      });
+
+      onSaved(data);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <article className="mini-record review-record">
+      <div className="record-title-row">
+        <strong>{record.name || record.title || record.entity_type}</strong>
+        <span className={`status-pill ${record.review_status}`}>{record.review_status}</span>
+      </div>
+
+      {fields.map((field) => (
+        <label key={field}>
+          {field.replace("_", " ")}
+          {field === "description" ? (
+            <textarea
+              value={formValues[field]}
+              onChange={(event) => setFormValues({ ...formValues, [field]: event.target.value })}
+            />
+          ) : (
+            <input
+              type="text"
+              value={formValues[field]}
+              onChange={(event) => setFormValues({ ...formValues, [field]: event.target.value })}
+            />
+          )}
+        </label>
+      ))}
+
+      <label>
+        admin notes
+        <textarea
+          value={formValues.admin_notes}
+          onChange={(event) => setFormValues({ ...formValues, admin_notes: event.target.value })}
+          placeholder="Optional review notes"
+        />
+      </label>
+
+      <div className="review-actions">
+        <button type="button" disabled={isSaving} onClick={() => saveRecord()}>
+          Save
+        </button>
+        <button type="button" disabled={isSaving} onClick={() => saveRecord({ review_status: "approved" })}>
+          Approve
+        </button>
+        <button type="button" disabled={isSaving} onClick={() => saveRecord({ review_status: "rejected" })}>
+          Reject
+        </button>
+      </div>
+    </article>
+  );
+}
+
 function App() {
   const [novels, setNovels] = React.useState([]);
   const [selectedNovelId, setSelectedNovelId] = React.useState(null);
@@ -65,6 +148,22 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
+  }
+
+  function updateExtractedRecord(entityType, updatedRecord) {
+    setExtractedData((currentData) => {
+      if (!currentData) {
+        return currentData;
+      }
+
+      return {
+        ...currentData,
+        [entityType]: currentData[entityType].map((record) =>
+          record.id === updatedRecord.id ? updatedRecord : record
+        ),
+      };
+    });
+    setMessage("Review saved.");
   }
 
   async function handleUpload(event) {
@@ -202,40 +301,52 @@ function App() {
                 <section>
                   <h3>Characters</h3>
                   {extractedData.characters.map((character) => (
-                    <article className="mini-record" key={character.id}>
-                      <strong>{character.name}</strong>
-                      <p>{character.description}</p>
-                    </article>
+                    <ReviewRecord
+                      entityType="characters"
+                      fields={["name", "description"]}
+                      key={character.id}
+                      record={character}
+                      onSaved={(updatedRecord) => updateExtractedRecord("characters", updatedRecord)}
+                    />
                   ))}
                 </section>
 
                 <section>
                   <h3>Skills</h3>
                   {extractedData.skills.map((skill) => (
-                    <article className="mini-record" key={skill.id}>
-                      <strong>{skill.name}</strong>
-                      <p>{skill.description}</p>
-                    </article>
+                    <ReviewRecord
+                      entityType="skills"
+                      fields={["name", "category", "description"]}
+                      key={skill.id}
+                      record={skill}
+                      onSaved={(updatedRecord) => updateExtractedRecord("skills", updatedRecord)}
+                    />
                   ))}
                 </section>
 
                 <section>
                   <h3>Items</h3>
                   {extractedData.items.map((item) => (
-                    <article className="mini-record" key={item.id}>
-                      <strong>{item.name}</strong>
-                      <p>{item.description}</p>
-                    </article>
+                    <ReviewRecord
+                      entityType="items"
+                      fields={["name", "category", "description"]}
+                      key={item.id}
+                      record={item}
+                      onSaved={(updatedRecord) => updateExtractedRecord("items", updatedRecord)}
+                    />
                   ))}
                 </section>
 
                 <section>
                   <h3>Events</h3>
                   {extractedData.events.map((event) => (
-                    <article className="mini-record" key={event.id}>
-                      <strong>{event.title}</strong>
-                      <p>{event.description}</p>
-                    </article>
+                    <ReviewRecord
+                      entityType="events"
+                      fields={["event_type", "title", "description"]}
+                      key={event.id}
+                      record={event}
+                      onSaved={(updatedRecord) => updateExtractedRecord("events", updatedRecord)}
+                    />
                   ))}
                 </section>
 

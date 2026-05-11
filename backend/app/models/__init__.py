@@ -10,6 +10,17 @@ def utc_now():
     return datetime.now(timezone.utc)
 
 
+class ReviewMixin:
+    review_status = db.Column(db.String(50), nullable=False, default="pending")
+    admin_notes = db.Column(db.Text, nullable=True)
+
+    def review_dict(self):
+        return {
+            "review_status": self.review_status,
+            "admin_notes": self.admin_notes,
+        }
+
+
 class Novel(db.Model):
     __tablename__ = "novels"
 
@@ -76,7 +87,7 @@ class Chapter(db.Model):
         }
 
 
-class Character(db.Model):
+class Character(ReviewMixin, db.Model):
     __tablename__ = "characters"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -93,10 +104,11 @@ class Character(db.Model):
             "name": self.name,
             "description": self.description,
             "first_seen_chapter_id": self.first_seen_chapter_id,
+            **self.review_dict(),
         }
 
 
-class Skill(db.Model):
+class Skill(ReviewMixin, db.Model):
     __tablename__ = "skills"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -113,10 +125,11 @@ class Skill(db.Model):
             "name": self.name,
             "category": self.category,
             "description": self.description,
+            **self.review_dict(),
         }
 
 
-class Item(db.Model):
+class Item(ReviewMixin, db.Model):
     __tablename__ = "items"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -133,10 +146,11 @@ class Item(db.Model):
             "name": self.name,
             "category": self.category,
             "description": self.description,
+            **self.review_dict(),
         }
 
 
-class WikiEvent(db.Model):
+class WikiEvent(ReviewMixin, db.Model):
     __tablename__ = "wiki_events"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -155,6 +169,7 @@ class WikiEvent(db.Model):
             "event_type": self.event_type,
             "title": self.title,
             "description": self.description,
+            **self.review_dict(),
         }
 
 

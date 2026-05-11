@@ -73,6 +73,17 @@ input {
   background: #ffffff;
 }
 
+textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  border: 1px solid #c9d1dc;
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: #ffffff;
+  font: inherit;
+}
+
 button {
   min-height: 42px;
   border: 1px solid #1f6feb;
@@ -206,6 +217,43 @@ button:disabled {
   margin: 6px 0 0;
   color: #526171;
   line-height: 1.45;
+}
+
+.review-record {
+  display: grid;
+  gap: 12px;
+}
+
+.record-title-row,
+.review-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.review-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #eef2f6;
+  color: #526171;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-pill.approved {
+  background: #e8f7ee;
+  color: #137333;
+}
+
+.status-pill.rejected {
+  background: #fdecec;
+  color: #b42318;
 }
 
 .wide-record,
