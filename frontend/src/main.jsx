@@ -107,6 +107,7 @@ function App() {
   const [message, setMessage] = React.useState("");
   const [isUploading, setIsUploading] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [extractingChapterId, setExtractingChapterId] = React.useState(null);
   const [extractedData, setExtractedData] = React.useState(null);
 
   async function loadNovels() {
@@ -147,6 +148,33 @@ function App() {
       setMessage(error.message);
     } finally {
       setIsProcessing(false);
+    }
+  }
+
+  async function handleExtractChapter(chapterId) {
+    if (!selectedNovelId) {
+      setMessage("Select a novel first.");
+      return;
+    }
+
+    setExtractingChapterId(chapterId);
+    setMessage("");
+
+    try {
+      const data = await fetchJson(
+        `${API_BASE_URL}/admin/novels/${selectedNovelId}/chapters/${chapterId}/extract`,
+        {
+          method: "POST",
+        }
+      );
+
+      setExtractedData(data);
+      setMessage("AI extraction finished for one chapter. Review the pending records below.");
+      await loadNovels();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setExtractingChapterId(null);
     }
   }
 
@@ -277,7 +305,16 @@ function App() {
                         </strong>
                         <p>{chapter.preview}</p>
                       </div>
-                      <span>{chapter.character_count.toLocaleString()} chars</span>
+                      <div className="chapter-actions">
+                        <span>{chapter.character_count.toLocaleString()} chars</span>
+                        <button
+                          type="button"
+                          disabled={extractingChapterId === chapter.id}
+                          onClick={() => handleExtractChapter(chapter.id)}
+                        >
+                          {extractingChapterId === chapter.id ? "Extracting..." : "AI Extract"}
+                        </button>
+                      </div>
                     </article>
                   ))}
                 </div>

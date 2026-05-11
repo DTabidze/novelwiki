@@ -184,10 +184,21 @@ button:disabled {
   line-height: 1.45;
 }
 
-.chapter-row span {
+.chapter-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.chapter-actions span {
   flex: 0 0 auto;
   color: #66778a;
   font-size: 14px;
+}
+
+.chapter-actions button {
+  min-height: 34px;
+  padding: 6px 10px;
 }
 
 .extraction-grid {

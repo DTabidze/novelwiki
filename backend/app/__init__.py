@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from flask import Flask
 from flask_cors import CORS
+from dotenv import load_dotenv
 from sqlalchemy import text
 
 from app.api.admin_novels import admin_novels_bp
@@ -37,6 +40,9 @@ def ensure_development_schema(app):
 
 
 def create_app():
+    backend_dir = Path(__file__).resolve().parents[1]
+    load_dotenv(backend_dir / ".env")
+
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
         SQLALCHEMY_DATABASE_URI="sqlite:///novelwiki.db",

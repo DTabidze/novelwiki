@@ -1,9 +1,11 @@
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
+from openai import AuthenticationError, RateLimitError
 from werkzeug.utils import secure_filename
 
 from app.models import Chapter, Novel, db
+from app.services.ai_extraction_service import extract_chapter_with_ai
 from app.services.chapter_parser import split_txt_into_chapters
 from app.services.extraction_service import get_extracted_data, run_placeholder_extraction
 
@@ -107,4 +109,39 @@ def process_novel(novel_id):
 @admin_novels_bp.get("/novels/<int:novel_id>/extracted-data")
 def get_admin_extracted_data(novel_id):
     novel = Novel.query.get_or_404(novel_id)
+    return success(get_extracted_data(novel))
+
+
+@admin_novels_bp.post("/novels/<int:novel_id>/chapters/<int:chapter_id>/extract")
+def extract_single_chapter(novel_id, chapter_id):
+    novel = Novel.query.get_or_404(novel_id)
+    chapter = Chapter.query.filter_by(id=chapter_id, novel_id=novel.id).first_or_404()
+
+    try:
+        novel.status = "processing"
+        novel.error_message = None
+        db.session.commit()
+        extract_chapter_with_ai(novel, chapter)
+    except RuntimeError as error:
+        novel.status = "failed"
+        novel.error_message = str(error)
+        db.session.commit()
+        return failure(str(error), status=400)
+    except AuthenticationError:
+        novel.status = "failed"
+        novel.error_message = "OpenAI API key was rejected. Check backend/.env and restart Flask."
+        db.session.commit()
+        return failure(novel.error_message, status=401)
+    except RateLimitError:
+        novel.status = "failed"
+        novel.error_message = "OpenAI API quota is unavailable. Check project billing and usage limits."
+        db.session.commit()
+        return failure(novel.error_message, status=429)
+    except Exception as error:
+        novel.status = "failed"
+        novel.error_message = "AI extraction failed. Check backend logs for details."
+        db.session.commit()
+        current_app.logger.exception("AI extraction failed: %s", error)
+        return failure(novel.error_message, status=500)
+
     return success(get_extracted_data(novel))
