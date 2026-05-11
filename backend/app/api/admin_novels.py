@@ -121,7 +121,7 @@ def extract_single_chapter(novel_id, chapter_id):
         novel.status = "processing"
         novel.error_message = None
         db.session.commit()
-        extract_chapter_with_ai(novel, chapter)
+        summary = extract_chapter_with_ai(novel, chapter)
     except RuntimeError as error:
         novel.status = "failed"
         novel.error_message = str(error)
@@ -144,4 +144,7 @@ def extract_single_chapter(novel_id, chapter_id):
         current_app.logger.exception("AI extraction failed: %s", error)
         return failure(novel.error_message, status=500)
 
-    return success(get_extracted_data(novel))
+    data = get_extracted_data(novel)
+    data["summary"] = summary
+    data["extracted_chapter"] = chapter.to_reference_dict()
+    return success(data)

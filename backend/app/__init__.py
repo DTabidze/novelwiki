@@ -36,6 +36,19 @@ def ensure_development_schema(app):
             if "admin_notes" not in column_names:
                 connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN admin_notes TEXT"))
 
+        character_columns = connection.execute(text("PRAGMA table_info(characters)")).fetchall()
+        character_column_names = {column[1] for column in character_columns}
+
+        if "first_mentioned_chapter_id" not in character_column_names:
+            connection.execute(
+                text("ALTER TABLE characters ADD COLUMN first_mentioned_chapter_id INTEGER")
+            )
+
+        if "first_appeared_chapter_id" not in character_column_names:
+            connection.execute(
+                text("ALTER TABLE characters ADD COLUMN first_appeared_chapter_id INTEGER")
+            )
+
         connection.commit()
 
 

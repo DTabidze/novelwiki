@@ -1,4 +1,22 @@
-from app.models import Character, Chapter, Item, Novel, Skill, WikiEvent, WikiEvidence, db
+from app.models import Character, Chapter, Item, Skill, WikiEvent, WikiEvidence, db
+
+
+def evidence_match_key(evidence_text):
+    normalized_text = (
+        " ".join(evidence_text.split())
+        .replace("“", '"')
+        .replace("”", '"')
+        .replace("‘", "'")
+        .replace("’", "'")
+        .replace("…", "...")
+        .strip("\"'")
+    )
+
+    return "".join(
+        character.lower()
+        for character in normalized_text
+        if character.isalnum() or character.isspace()
+    )
 
 
 def run_placeholder_extraction(novel):
@@ -66,28 +84,63 @@ def run_placeholder_extraction(novel):
 
 
 def get_extracted_data(novel):
+    chapters = {
+        chapter.id: chapter.to_reference_dict()
+        for chapter in Chapter.query.filter_by(novel_id=novel.id).all()
+    }
+    evidence_by_entity = {}
+
+    evidence_rows = (
+        WikiEvidence.query.filter_by(novel_id=novel.id).order_by(WikiEvidence.id).all()
+    )
+
+    for evidence in evidence_rows:
+        key = (evidence.entity_type, evidence.entity_id)
+        evidence_by_entity.setdefault(key, []).append(evidence.to_admin_dict())
+
+    def with_source_and_evidence(entity_type, record):
+        data = record.to_admin_dict()
+        record_evidence = evidence_by_entity.get((entity_type, record.id), [])
+        unique_evidence = []
+        seen_evidence_text = set()
+
+        for evidence in record_evidence:
+            normalized_text = evidence_match_key(evidence["evidence_text"])
+
+            if normalized_text in seen_evidence_text:
+                continue
+
+            seen_evidence_text.add(normalized_text)
+            unique_evidence.append(evidence)
+
+        source_chapter_id = data.get("source_chapter_id")
+
+        if not source_chapter_id and unique_evidence:
+            source_chapter_id = unique_evidence[0]["chapter_id"]
+
+        data["source_chapter"] = chapters.get(source_chapter_id)
+        data["first_mentioned_chapter"] = chapters.get(data.get("first_mentioned_chapter_id"))
+        data["first_appeared_chapter"] = chapters.get(data.get("first_appeared_chapter_id"))
+        data["evidence"] = unique_evidence
+        return data
+
     return {
         "novel": novel.to_admin_dict(),
         "characters": [
-            character.to_admin_dict()
+            with_source_and_evidence("character", character)
             for character in Character.query.filter_by(novel_id=novel.id).order_by(Character.name).all()
         ],
         "skills": [
-            skill.to_admin_dict()
+            with_source_and_evidence("skill", skill)
             for skill in Skill.query.filter_by(novel_id=novel.id).order_by(Skill.name).all()
         ],
         "items": [
-            item.to_admin_dict()
+            with_source_and_evidence("item", item)
             for item in Item.query.filter_by(novel_id=novel.id).order_by(Item.name).all()
         ],
         "events": [
-            event.to_admin_dict()
+            with_source_and_evidence("event", event)
             for event in WikiEvent.query.filter_by(novel_id=novel.id).order_by(WikiEvent.id).all()
         ],
-        "evidence": [
-            evidence.to_admin_dict()
-            for evidence in WikiEvidence.query.filter_by(novel_id=novel.id)
-            .order_by(WikiEvidence.id)
-            .all()
-        ],
+        "evidence": [evidence.to_admin_dict() for evidence in evidence_rows],
     }

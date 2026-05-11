@@ -230,6 +230,41 @@ button:disabled {
   line-height: 1.45;
 }
 
+.source-line {
+  margin: 0;
+  color: #66778a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.meta-lines {
+  display: grid;
+  gap: 3px;
+  color: #66778a;
+  font-size: 13px;
+}
+
+.evidence-list {
+  border-left: 3px solid #9db8d8;
+  padding-left: 10px;
+}
+
+.evidence-list strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #344252;
+  font-size: 13px;
+}
+
+.evidence-list p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.evidence-list p + p {
+  margin-top: 6px;
+}
+
 .review-record {
   display: grid;
   gap: 12px;

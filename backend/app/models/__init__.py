@@ -86,6 +86,13 @@ class Chapter(db.Model):
             "preview": preview,
         }
 
+    def to_reference_dict(self):
+        return {
+            "id": self.id,
+            "chapter_number": self.chapter_number,
+            "title": self.title,
+        }
+
 
 class Character(ReviewMixin, db.Model):
     __tablename__ = "characters"
@@ -94,16 +101,27 @@ class Character(ReviewMixin, db.Model):
     novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    first_mentioned_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    first_appeared_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
     first_seen_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     def to_admin_dict(self):
+        source_chapter_id = (
+            self.first_appeared_chapter_id
+            or self.first_mentioned_chapter_id
+            or self.first_seen_chapter_id
+        )
+
         return {
             "id": self.id,
             "novel_id": self.novel_id,
             "name": self.name,
             "description": self.description,
+            "first_mentioned_chapter_id": self.first_mentioned_chapter_id,
+            "first_appeared_chapter_id": self.first_appeared_chapter_id,
             "first_seen_chapter_id": self.first_seen_chapter_id,
+            "source_chapter_id": source_chapter_id,
             **self.review_dict(),
         }
 
@@ -125,6 +143,7 @@ class Skill(ReviewMixin, db.Model):
             "name": self.name,
             "category": self.category,
             "description": self.description,
+            "source_chapter_id": None,
             **self.review_dict(),
         }
 
@@ -146,6 +165,7 @@ class Item(ReviewMixin, db.Model):
             "name": self.name,
             "category": self.category,
             "description": self.description,
+            "source_chapter_id": None,
             **self.review_dict(),
         }
 
@@ -166,6 +186,7 @@ class WikiEvent(ReviewMixin, db.Model):
             "id": self.id,
             "novel_id": self.novel_id,
             "chapter_id": self.chapter_id,
+            "source_chapter_id": self.chapter_id,
             "event_type": self.event_type,
             "title": self.title,
             "description": self.description,

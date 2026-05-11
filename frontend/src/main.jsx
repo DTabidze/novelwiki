@@ -56,6 +56,29 @@ function ReviewRecord({ entityType, record, fields, onSaved }) {
         <span className={`status-pill ${record.review_status}`}>{record.review_status}</span>
       </div>
 
+      {record.source_chapter ? (
+        <p className="source-line">
+          Source: Chapter {record.source_chapter.chapter_number}, {record.source_chapter.title}
+        </p>
+      ) : null}
+
+      {entityType === "characters" ? (
+        <div className="meta-lines">
+          <span>
+            First mentioned:{" "}
+            {record.first_mentioned_chapter
+              ? `Chapter ${record.first_mentioned_chapter.chapter_number}`
+              : "Unknown"}
+          </span>
+          <span>
+            First appeared:{" "}
+            {record.first_appeared_chapter
+              ? `Chapter ${record.first_appeared_chapter.chapter_number}`
+              : "Unknown"}
+          </span>
+        </div>
+      ) : null}
+
       {fields.map((field) => (
         <label key={field}>
           {field.replace("_", " ")}
@@ -82,6 +105,15 @@ function ReviewRecord({ entityType, record, fields, onSaved }) {
           placeholder="Optional review notes"
         />
       </label>
+
+      {record.evidence && record.evidence.length > 0 ? (
+        <div className="evidence-list">
+          <strong>Evidence</strong>
+          {record.evidence.map((evidence) => (
+            <p key={evidence.id}>{evidence.evidence_text}</p>
+          ))}
+        </div>
+      ) : null}
 
       <div className="review-actions">
         <button type="button" disabled={isSaving} onClick={() => saveRecord()}>
@@ -169,7 +201,7 @@ function App() {
       );
 
       setExtractedData(data);
-      setMessage("AI extraction finished for one chapter. Review the pending records below.");
+      setMessage(buildExtractionMessage(data));
       await loadNovels();
     } catch (error) {
       setMessage(error.message);
@@ -192,6 +224,24 @@ function App() {
       };
     });
     setMessage("Review saved.");
+  }
+
+  function buildExtractionMessage(data) {
+    if (!data.summary || !data.extracted_chapter) {
+      return "AI extraction finished for one chapter. Review the pending records below.";
+    }
+
+    const summary = data.summary;
+    const chapter = data.extracted_chapter;
+    const characterCount = summary.characters_created + summary.characters_updated;
+    const skillCount = summary.skills_created + summary.skills_updated;
+    const itemCount = summary.items_created + summary.items_updated;
+
+    return (
+      `Chapter ${chapter.chapter_number} extracted: ` +
+      `${characterCount} characters, ${skillCount} skills, ` +
+      `${itemCount} items, ${summary.events_created} events.`
+    );
   }
 
   async function handleUpload(event) {
@@ -375,7 +425,7 @@ function App() {
                 </section>
 
                 <section>
-                  <h3>Events</h3>
+                  <h3>Timeline Facts</h3>
                   {extractedData.events.map((event) => (
                     <ReviewRecord
                       entityType="events"
@@ -384,16 +434,6 @@ function App() {
                       record={event}
                       onSaved={(updatedRecord) => updateExtractedRecord("events", updatedRecord)}
                     />
-                  ))}
-                </section>
-
-                <section className="wide-record">
-                  <h3>Evidence</h3>
-                  {extractedData.evidence.map((evidence) => (
-                    <article className="mini-record" key={evidence.id}>
-                      <strong>{evidence.entity_type}</strong>
-                      <p>{evidence.evidence_text}</p>
-                    </article>
                   ))}
                 </section>
 
