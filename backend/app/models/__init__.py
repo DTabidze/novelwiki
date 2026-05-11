@@ -18,6 +18,7 @@ class Novel(db.Model):
     original_filename = db.Column(db.String(255), nullable=False)
     file_type = db.Column(db.String(20), nullable=False, default="txt")
     status = db.Column(db.String(50), nullable=False, default="ready")
+    error_message = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
     updated_at = db.Column(
         db.DateTime(timezone=True),
@@ -40,6 +41,7 @@ class Novel(db.Model):
             "original_filename": self.original_filename,
             "file_type": self.file_type,
             "status": self.status,
+            "error_message": self.error_message,
             "chapter_count": len(self.chapters),
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -71,4 +73,108 @@ class Chapter(db.Model):
             "title": self.title,
             "character_count": self.character_count,
             "preview": preview,
+        }
+
+
+class Character(db.Model):
+    __tablename__ = "characters"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    first_seen_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "name": self.name,
+            "description": self.description,
+            "first_seen_chapter_id": self.first_seen_chapter_id,
+        }
+
+
+class Skill(db.Model):
+    __tablename__ = "skills"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(100), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "name": self.name,
+            "category": self.category,
+            "description": self.description,
+        }
+
+
+class Item(db.Model):
+    __tablename__ = "items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(100), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "name": self.name,
+            "category": self.category,
+            "description": self.description,
+        }
+
+
+class WikiEvent(db.Model):
+    __tablename__ = "wiki_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    event_type = db.Column(db.String(100), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "chapter_id": self.chapter_id,
+            "event_type": self.event_type,
+            "title": self.title,
+            "description": self.description,
+        }
+
+
+class WikiEvidence(db.Model):
+    __tablename__ = "wiki_evidence"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
+    entity_type = db.Column(db.String(100), nullable=False)
+    entity_id = db.Column(db.Integer, nullable=False)
+    evidence_text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "chapter_id": self.chapter_id,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "evidence_text": self.evidence_text,
         }

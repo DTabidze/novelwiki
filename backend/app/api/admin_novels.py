@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 
 from app.models import Chapter, Novel, db
 from app.services.chapter_parser import split_txt_into_chapters
+from app.services.extraction_service import get_extracted_data, run_placeholder_extraction
 
 
 admin_novels_bp = Blueprint("admin_novels", __name__)
@@ -94,3 +95,16 @@ def list_admin_chapters(novel_id):
             "chapters": [chapter.to_admin_verification_dict() for chapter in chapters],
         }
     )
+
+
+@admin_novels_bp.post("/novels/<int:novel_id>/process")
+def process_novel(novel_id):
+    novel = Novel.query.get_or_404(novel_id)
+    run_placeholder_extraction(novel)
+    return success(get_extracted_data(novel))
+
+
+@admin_novels_bp.get("/novels/<int:novel_id>/extracted-data")
+def get_admin_extracted_data(novel_id):
+    novel = Novel.query.get_or_404(novel_id)
+    return success(get_extracted_data(novel))

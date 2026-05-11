@@ -23,6 +23,8 @@ function App() {
   const [file, setFile] = React.useState(null);
   const [message, setMessage] = React.useState("");
   const [isUploading, setIsUploading] = React.useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [extractedData, setExtractedData] = React.useState(null);
 
   async function loadNovels() {
     const data = await fetchJson(`${API_BASE_URL}/admin/novels`);
@@ -33,6 +35,36 @@ function App() {
     setSelectedNovelId(novelId);
     const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/chapters`);
     setChapterResult(data);
+    await loadExtractedData(novelId);
+  }
+
+  async function loadExtractedData(novelId) {
+    const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extracted-data`);
+    setExtractedData(data);
+  }
+
+  async function handleProcessNovel() {
+    if (!selectedNovelId) {
+      setMessage("Select a novel first.");
+      return;
+    }
+
+    setIsProcessing(true);
+    setMessage("");
+
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/admin/novels/${selectedNovelId}/process`, {
+        method: "POST",
+      });
+
+      setExtractedData(data);
+      setMessage(`Processed ${data.novel.title} with placeholder extraction.`);
+      await loadNovels();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsProcessing(false);
+    }
   }
 
   async function handleUpload(event) {
@@ -122,35 +154,111 @@ function App() {
             >
               <span>{novel.title}</span>
               <small>{novel.chapter_count} chapters</small>
+              <small>Status: {novel.status}</small>
             </button>
           ))}
         </aside>
 
-        <section className="panel chapter-panel">
-          <h2>Chapter Verification</h2>
-          {!chapterResult ? <p>Select a novel to inspect chapter metadata.</p> : null}
-          {chapterResult ? (
-            <>
-              <div className="summary-row">
-                <strong>{chapterResult.novel.title}</strong>
-                <span>{chapterResult.chapters.length} chapters</span>
+        <div className="content-stack">
+          <section className="panel chapter-panel">
+            <h2>Chapter Verification</h2>
+            {!chapterResult ? <p>Select a novel to inspect chapter metadata.</p> : null}
+            {chapterResult ? (
+              <>
+                <div className="summary-row">
+                  <strong>{chapterResult.novel.title}</strong>
+                  <span>{chapterResult.chapters.length} chapters</span>
+                </div>
+                <div className="chapter-table">
+                  {chapterResult.chapters.map((chapter) => (
+                    <article className="chapter-row" key={chapter.id}>
+                      <div>
+                        <strong>
+                          {chapter.chapter_number}. {chapter.title}
+                        </strong>
+                        <p>{chapter.preview}</p>
+                      </div>
+                      <span>{chapter.character_count.toLocaleString()} chars</span>
+                    </article>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </section>
+
+          <section className="panel extraction-panel">
+            <div className="panel-header">
+              <h2>Extraction Pipeline</h2>
+              <button type="button" disabled={!selectedNovelId || isProcessing} onClick={handleProcessNovel}>
+                {isProcessing ? "Processing..." : "Run Placeholder Processing"}
+              </button>
+            </div>
+
+            {!selectedNovelId ? <p>Select a novel to run placeholder extraction.</p> : null}
+            {selectedNovelId && !extractedData ? <p>No extracted data loaded yet.</p> : null}
+
+            {extractedData ? (
+              <div className="extraction-grid">
+                <section>
+                  <h3>Characters</h3>
+                  {extractedData.characters.map((character) => (
+                    <article className="mini-record" key={character.id}>
+                      <strong>{character.name}</strong>
+                      <p>{character.description}</p>
+                    </article>
+                  ))}
+                </section>
+
+                <section>
+                  <h3>Skills</h3>
+                  {extractedData.skills.map((skill) => (
+                    <article className="mini-record" key={skill.id}>
+                      <strong>{skill.name}</strong>
+                      <p>{skill.description}</p>
+                    </article>
+                  ))}
+                </section>
+
+                <section>
+                  <h3>Items</h3>
+                  {extractedData.items.map((item) => (
+                    <article className="mini-record" key={item.id}>
+                      <strong>{item.name}</strong>
+                      <p>{item.description}</p>
+                    </article>
+                  ))}
+                </section>
+
+                <section>
+                  <h3>Events</h3>
+                  {extractedData.events.map((event) => (
+                    <article className="mini-record" key={event.id}>
+                      <strong>{event.title}</strong>
+                      <p>{event.description}</p>
+                    </article>
+                  ))}
+                </section>
+
+                <section className="wide-record">
+                  <h3>Evidence</h3>
+                  {extractedData.evidence.map((evidence) => (
+                    <article className="mini-record" key={evidence.id}>
+                      <strong>{evidence.entity_type}</strong>
+                      <p>{evidence.evidence_text}</p>
+                    </article>
+                  ))}
+                </section>
+
+                {extractedData.characters.length === 0 &&
+                extractedData.skills.length === 0 &&
+                extractedData.items.length === 0 &&
+                extractedData.events.length === 0 ? (
+                  <p className="empty-state">No extracted records yet.</p>
+                ) : null}
               </div>
-              <div className="chapter-table">
-                {chapterResult.chapters.map((chapter) => (
-                  <article className="chapter-row" key={chapter.id}>
-                    <div>
-                      <strong>
-                        {chapter.chapter_number}. {chapter.title}
-                      </strong>
-                      <p>{chapter.preview}</p>
-                    </div>
-                    <span>{chapter.character_count.toLocaleString()} chars</span>
-                  </article>
-                ))}
-              </div>
-            </>
-          ) : null}
-        </section>
+            ) : null}
+          </section>
+        </div>
       </section>
     </main>
   );
