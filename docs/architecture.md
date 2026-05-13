@@ -4,7 +4,7 @@
 
 Build a simple web app that stores uploaded novels, splits them into chapters, and gradually produces wiki-style data.
 
-The MVP should avoid complex AI extraction at first. Treat extraction as a replaceable service that can start with placeholders and later become smarter.
+The MVP keeps AI extraction behind an admin review layer. Public pages should show only approved wiki data, not raw or unreviewed AI output.
 
 ## High-Level Shape
 
@@ -30,9 +30,10 @@ SQLite database
 
 ## Frontend Folders
 
-- `frontend/src/api/`: Functions like `getNovel(id)` and `uploadNovel(file)`.
-- `frontend/src/components/`: Reusable visual pieces.
-- `frontend/src/pages/`: Full pages such as `NovelOverviewPage` or `AdminUploadPage`.
+- `frontend/src/main.jsx`: Current MVP React app, including Admin and Wiki views.
+- `frontend/src/styles.css`: Current MVP styling.
+
+The frontend can be split into `api/`, `components/`, and `pages/` later when the UI grows.
 
 ## Service Boundaries
 
@@ -40,7 +41,8 @@ Start with these backend services:
 
 - `file_storage_service`: Saves uploaded files.
 - `chapter_parser_service`: Splits text into chapters.
-- `extraction_service`: Produces placeholder wiki facts for now.
+- `ai_extraction_service`: Extracts structured wiki facts from one chapter at a time.
+- `extraction_service`: Collects extracted records for admin review and still supports placeholder clearing/testing.
 
 This keeps routes simple and makes future AI extraction easier to add.
 
@@ -50,6 +52,16 @@ This keeps routes simple and makes future AI extraction easier to add.
 2. Backend creates a `novels` row.
 3. Backend stores the original file.
 4. Backend splits text into `chapters`.
-5. Backend runs placeholder extraction.
-6. User views generated wiki pages.
+5. Admin runs AI extraction on selected chapters.
+6. Backend stores pending characters, skills, items, progression, life events, aliases, and evidence.
+7. Admin reviews, edits, rejects, approves, or merges extracted records.
+8. Public Wiki view reads approved records through `/api/wiki/*`.
 
+## Public Data Boundary
+
+Public routes must:
+
+- Return approved records only.
+- Include short evidence snippets and chapter references.
+- Avoid exposing full chapter text.
+- Derive current character cultivation or position from approved progression events where possible.

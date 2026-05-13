@@ -1,4 +1,4 @@
-# First REST API Endpoints
+# REST API Endpoints
 
 Use `/api` as the API prefix.
 
@@ -12,35 +12,49 @@ Use `/api` as the API prefix.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/admin/novels` | Upload a novel file |
+| POST | `/api/admin/novels/upload` | Upload a `.txt` novel file |
 | GET | `/api/admin/novels` | List uploaded novels with processing status |
-| POST | `/api/admin/novels/:id/process` | Start or rerun processing |
+| GET | `/api/admin/novels/:id/chapters` | List chapters for admin verification |
+| GET | `/api/admin/novels/:id/extracted-data` | Load extracted review records |
+| POST | `/api/admin/novels/:id/process` | Run placeholder processing |
+| POST | `/api/admin/novels/:id/chapters/:chapter_id/extract` | Run AI extraction for one chapter |
 
-## User-Facing Novel API
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/api/novels` | List public novels |
-| GET | `/api/novels/:id` | Novel overview |
-| GET | `/api/novels/:id/chapters` | Chapter list |
-| GET | `/api/novels/:id/timeline` | Important events by chapter |
-
-## Wiki Entity API
+## Admin Review
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/novels/:id/characters` | List characters |
-| GET | `/api/characters/:id` | Character page |
-| GET | `/api/novels/:id/skills` | List skills and techniques |
-| GET | `/api/skills/:id` | Skill page |
-| GET | `/api/novels/:id/items` | List items |
-| GET | `/api/items/:id` | Item page |
+| PATCH | `/api/admin/review/:entity_type/:id` | Save, approve, or reject an extracted record |
+| POST | `/api/admin/review/characters/:source_id/merge` | Merge one character into another |
 
-## Search
+Supported review entity types:
+
+- `characters`
+- `skills`
+- `items`
+- `events`
+- `progression_events`
+- `life_events`
+
+## Public Wiki API
+
+Public endpoints return approved records only and never expose full chapter text.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/search?novel_id=&q=` | Search generated wiki content |
+| GET | `/api/wiki/novels` | List public novels |
+| GET | `/api/wiki/novels/:id` | Public novel overview |
+| GET | `/api/wiki/novels/:id/characters` | List approved characters |
+| GET | `/api/wiki/characters/:id` | Approved character page |
+| GET | `/api/wiki/novels/:id/skills` | List approved skills and techniques |
+| GET | `/api/wiki/skills/:id` | Approved skill page |
+| GET | `/api/wiki/novels/:id/items` | List approved items |
+| GET | `/api/wiki/items/:id` | Approved item page |
+
+## Future Search
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/search?novel_id=&q=` | Search approved wiki content |
 
 ## Response Style
 
@@ -61,4 +75,3 @@ For lists:
   "error": null
 }
 ```
-

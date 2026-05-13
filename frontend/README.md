@@ -1,6 +1,6 @@
 # Frontend
 
-React app for the admin upload flow and generated wiki pages.
+React app for the admin upload/review flow and approved public wiki pages.
 
 ## Folders
 
@@ -8,11 +8,11 @@ React app for the admin upload flow and generated wiki pages.
 - `src/components/`: Reusable UI pieces.
 - `src/pages/`: Page-level views such as novel overview and character pages.
 
-## First Goal
+## Current Shape
 
-Create a basic React app with:
+The current MVP has two top-level views:
 
-- Novel list page
-- Novel detail page
-- Admin upload page
+- Admin: upload novels, inspect chapters, run extraction, review extracted records.
+- Wiki: browse approved novels, characters, skills, and items.
 
+Public wiki pages only show reviewed data returned by `/api/wiki/*`.

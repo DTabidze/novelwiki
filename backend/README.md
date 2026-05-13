@@ -1,6 +1,6 @@
 # Backend
 
-Flask REST API for uploads, chapter storage, and generated wiki data.
+Flask REST API for uploads, chapter storage, AI extraction, admin review, and approved public wiki data.
 
 ## Folders
 
@@ -12,5 +12,10 @@ Flask REST API for uploads, chapter storage, and generated wiki data.
 
 ## First Goal
 
-Create a Flask app factory, connect SQLite, and add simple health and novel endpoints.
+The current backend supports:
 
+- Flask app factory and SQLite via SQLAlchemy.
+- Admin `.txt` upload and chapter splitting.
+- Per-chapter AI extraction.
+- Admin review endpoints for approval, rejection, edits, and character merges.
+- Public `/api/wiki/*` endpoints that expose approved data only.
