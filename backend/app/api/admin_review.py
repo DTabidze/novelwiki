@@ -5,6 +5,7 @@ from app.models import (
     CharacterAlias,
     CharacterLifeEvent,
     CharacterProgressionEvent,
+    Chapter,
     Item,
     Skill,
     WikiEvent,
@@ -51,6 +52,15 @@ ENTITY_CONFIG = {
     },
 }
 
+EVIDENCE_ENTITY_TYPES = {
+    "characters": "character",
+    "skills": "skill",
+    "items": "item",
+    "events": "event",
+    "progression_events": "progression",
+    "life_events": "life_event",
+}
+
 
 def success(data, status=200):
     return jsonify({"data": data, "error": None}), status
@@ -78,6 +88,67 @@ def earliest_chapter_id(*chapter_ids):
     return min(valid_ids) if valid_ids else None
 
 
+def chapter_reference(chapter_id):
+    if not chapter_id:
+        return None
+
+    chapter = Chapter.query.get(chapter_id)
+
+    if not chapter:
+        return None
+
+    return chapter.to_reference_dict()
+
+
+def admin_review_response(entity_type, record):
+    data = record.to_admin_dict()
+    evidence_entity_type = EVIDENCE_ENTITY_TYPES.get(entity_type)
+
+    if evidence_entity_type:
+        evidence_rows = (
+            WikiEvidence.query.filter_by(
+                entity_type=evidence_entity_type,
+                entity_id=record.id,
+            )
+            .order_by(WikiEvidence.id)
+            .all()
+        )
+    else:
+        evidence_rows = []
+
+    source_chapter_id = data.get("source_chapter_id")
+
+    if not source_chapter_id and evidence_rows:
+        source_chapter_id = evidence_rows[0].chapter_id
+
+    data["source_chapter"] = chapter_reference(source_chapter_id)
+    data["first_mentioned_chapter"] = chapter_reference(data.get("first_mentioned_chapter_id"))
+    data["first_appeared_chapter"] = chapter_reference(data.get("first_appeared_chapter_id"))
+    data["evidence"] = [evidence.to_admin_dict() for evidence in evidence_rows]
+
+    if entity_type == "characters":
+        aliases = []
+
+        for alias in record.aliases:
+            alias_data = alias.to_admin_dict()
+            alias_data["first_seen_chapter"] = chapter_reference(alias.first_seen_chapter_id)
+            aliases.append(alias_data)
+
+        data["aliases"] = aliases
+
+    if entity_type == "skills":
+        aliases = []
+
+        for alias in record.aliases:
+            alias_data = alias.to_admin_dict()
+            alias_data["first_seen_chapter"] = chapter_reference(alias.first_seen_chapter_id)
+            aliases.append(alias_data)
+
+        data["aliases"] = aliases
+
+    return data
+
+
 @admin_review_bp.patch("/<entity_type>/<int:entity_id>")
 def update_extracted_entity(entity_type, entity_id):
     config = ENTITY_CONFIG.get(entity_type)
@@ -97,7 +168,7 @@ def update_extracted_entity(entity_type, entity_id):
 
     db.session.commit()
 
-    return success(record.to_admin_dict())
+    return success(admin_review_response(entity_type, record))
 
 
 @admin_review_bp.post("/characters/<int:source_id>/merge")
@@ -191,4 +262,4 @@ def merge_character(source_id):
     db.session.delete(source)
     db.session.commit()
 
-    return success(target.to_admin_dict())
+    return success(admin_review_response("characters", target))

@@ -205,7 +205,273 @@ function ReviewRecord({ entityType, record, fields, mergeTargets = [], onMerged,
   );
 }
 
+function WikiRecordList({ emptyText, items, onSelect, selectedId }) {
+  if (items.length === 0) {
+    return <p className="empty-state">{emptyText}</p>;
+  }
+
+  return (
+    <div className="wiki-list">
+      {items.map((item) => (
+        <button
+          className={selectedId === item.id ? "wiki-list-button active" : "wiki-list-button"}
+          key={item.id}
+          type="button"
+          onClick={() => onSelect(item)}
+        >
+          <strong>{item.name}</strong>
+          {item.current_cultivation_level ? <small>{item.current_cultivation_level}</small> : null}
+          {item.current_position ? <small>{item.current_position}</small> : null}
+          {item.category ? <small>{item.category}</small> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function WikiEvidence({ evidence }) {
+  if (!evidence || evidence.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="evidence-list">
+      <strong>Evidence</strong>
+      {evidence.map((row) => (
+        <p key={row.id}>
+          {row.chapter ? `Chapter ${row.chapter.chapter_number}: ` : ""}
+          {row.evidence_text}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function WikiCharacterDetail({ character }) {
+  if (!character) {
+    return <p>Select a character to read their wiki page.</p>;
+  }
+
+  return (
+    <article className="wiki-detail">
+      <h3>{character.name}</h3>
+
+      <div className="meta-lines">
+        {character.current_cultivation_level ? (
+          <span>Current cultivation: {character.current_cultivation_level}</span>
+        ) : null}
+        {character.current_position ? <span>Current position: {character.current_position}</span> : null}
+        {character.first_mentioned_chapter ? (
+          <span>First mentioned: Chapter {character.first_mentioned_chapter.chapter_number}</span>
+        ) : null}
+        {character.first_appeared_chapter ? (
+          <span>First appeared: Chapter {character.first_appeared_chapter.chapter_number}</span>
+        ) : null}
+      </div>
+
+      {character.aliases && character.aliases.length > 0 ? (
+        <div className="alias-list">
+          <strong>Aliases</strong>
+          {character.aliases.map((alias) => (
+            <span key={alias.id}>{alias.alias}</span>
+          ))}
+        </div>
+      ) : null}
+
+      {character.description ? <p>{character.description}</p> : null}
+
+      <WikiEvidence evidence={character.evidence} />
+
+      <section className="wiki-subsection">
+        <h4>Progression</h4>
+        {character.progression_events.length === 0 ? <p>No approved progression yet.</p> : null}
+        {character.progression_events.map((event) => (
+          <article className="mini-record" key={event.id}>
+            <strong>{event.new_value}</strong>
+            <p>
+              {event.chapter ? `Chapter ${event.chapter.chapter_number}` : "Unknown chapter"}
+              {event.old_value ? `, from ${event.old_value}` : ""}
+            </p>
+            {event.description ? <p>{event.description}</p> : null}
+            <WikiEvidence evidence={event.evidence} />
+          </article>
+        ))}
+      </section>
+
+      {character.life_events.length > 0 ? (
+        <section className="wiki-subsection">
+          <h4>Life Events</h4>
+          {character.life_events.map((event) => (
+            <article className="mini-record" key={event.id}>
+              <strong>{event.event_type.replace("_", " ")}</strong>
+              {event.description ? <p>{event.description}</p> : null}
+              {event.reason ? <p>Reason: {event.reason}</p> : null}
+              <WikiEvidence evidence={event.evidence} />
+            </article>
+          ))}
+        </section>
+      ) : null}
+    </article>
+  );
+}
+
+function WikiSkillDetail({ skill }) {
+  if (!skill) {
+    return <p>Select a skill to read its wiki page.</p>;
+  }
+
+  return (
+    <article className="wiki-detail">
+      <h3>{skill.name}</h3>
+
+      {skill.category ? (
+        <div className="meta-lines">
+          <span>Category: {skill.category}</span>
+        </div>
+      ) : null}
+
+      {skill.aliases && skill.aliases.length > 0 ? (
+        <div className="alias-list">
+          <strong>Aliases</strong>
+          {skill.aliases.map((alias) => (
+            <span key={alias.id}>{alias.alias}</span>
+          ))}
+        </div>
+      ) : null}
+
+      {skill.description ? <p>{skill.description}</p> : null}
+
+      <WikiEvidence evidence={skill.evidence} />
+    </article>
+  );
+}
+
+function WikiItemDetail({ item }) {
+  if (!item) {
+    return <p>Select an item to read its wiki page.</p>;
+  }
+
+  return (
+    <article className="wiki-detail">
+      <h3>{item.name}</h3>
+
+      {item.category ? (
+        <div className="meta-lines">
+          <span>Category: {item.category}</span>
+        </div>
+      ) : null}
+
+      {item.description ? <p>{item.description}</p> : null}
+
+      <WikiEvidence evidence={item.evidence} />
+    </article>
+  );
+}
+
+function WikiPanel({
+  characters,
+  items,
+  loading,
+  novel,
+  novels,
+  onLoadNovel,
+  onSelectCharacter,
+  onSelectItem,
+  onSelectSkill,
+  selectedCharacter,
+  selectedItem,
+  selectedNovelId,
+  selectedSkill,
+  skills,
+}) {
+  return (
+    <section className="layout wiki-layout">
+      <aside className="panel novel-list">
+        <h2>Wiki Novels</h2>
+        {novels.length === 0 ? <p>No novels available.</p> : null}
+        {novels.map((wikiNovel) => (
+          <button
+            className={selectedNovelId === wikiNovel.id ? "novel-button active" : "novel-button"}
+            key={wikiNovel.id}
+            type="button"
+            onClick={() => onLoadNovel(wikiNovel.id)}
+          >
+            <span>{wikiNovel.title}</span>
+            <small>{wikiNovel.chapter_count} chapters</small>
+            <small>{wikiNovel.approved_character_count} approved characters</small>
+          </button>
+        ))}
+      </aside>
+
+      <div className="content-stack">
+        <section className="panel">
+          <h2>{novel ? novel.title : "Public Wiki"}</h2>
+          {!novel ? <p>Select a novel to view approved wiki data.</p> : null}
+          {loading ? <p>Loading wiki data...</p> : null}
+          {novel ? (
+            <div className="summary-row">
+              <span>{novel.approved_character_count} characters</span>
+              <span>{novel.approved_skill_count} skills</span>
+              <span>{novel.approved_item_count} items</span>
+            </div>
+          ) : null}
+        </section>
+
+        {novel ? (
+          <section className="wiki-grid">
+            <div className="panel">
+              <h2>Characters</h2>
+              <WikiRecordList
+                emptyText="No approved characters yet."
+                items={characters}
+                onSelect={onSelectCharacter}
+                selectedId={selectedCharacter ? selectedCharacter.id : null}
+              />
+            </div>
+
+            <div className="panel">
+              <h2>Character Page</h2>
+              <WikiCharacterDetail character={selectedCharacter} />
+            </div>
+
+            <div className="panel">
+              <h2>Skills</h2>
+              <WikiRecordList
+                emptyText="No approved skills yet."
+                items={skills}
+                onSelect={onSelectSkill}
+                selectedId={selectedSkill ? selectedSkill.id : null}
+              />
+            </div>
+
+            <div className="panel">
+              <h2>Skill Page</h2>
+              <WikiSkillDetail skill={selectedSkill} />
+            </div>
+
+            <div className="panel">
+              <h2>Items</h2>
+              <WikiRecordList
+                emptyText="No approved items yet."
+                items={items}
+                onSelect={onSelectItem}
+                selectedId={selectedItem ? selectedItem.id : null}
+              />
+            </div>
+
+            <div className="panel">
+              <h2>Item Page</h2>
+              <WikiItemDetail item={selectedItem} />
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function App() {
+  const [activeView, setActiveView] = React.useState("admin");
   const [novels, setNovels] = React.useState([]);
   const [selectedNovelId, setSelectedNovelId] = React.useState(null);
   const [chapterResult, setChapterResult] = React.useState(null);
@@ -216,10 +482,90 @@ function App() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [extractingChapterId, setExtractingChapterId] = React.useState(null);
   const [extractedData, setExtractedData] = React.useState(null);
+  const [wikiCharacters, setWikiCharacters] = React.useState([]);
+  const [wikiItems, setWikiItems] = React.useState([]);
+  const [wikiLoading, setWikiLoading] = React.useState(false);
+  const [wikiNovel, setWikiNovel] = React.useState(null);
+  const [wikiNovels, setWikiNovels] = React.useState([]);
+  const [wikiSelectedCharacter, setWikiSelectedCharacter] = React.useState(null);
+  const [wikiSelectedItem, setWikiSelectedItem] = React.useState(null);
+  const [wikiSelectedNovelId, setWikiSelectedNovelId] = React.useState(null);
+  const [wikiSelectedSkill, setWikiSelectedSkill] = React.useState(null);
+  const [wikiSkills, setWikiSkills] = React.useState([]);
 
   async function loadNovels() {
     const data = await fetchJson(`${API_BASE_URL}/admin/novels`);
     setNovels(data);
+  }
+
+  async function loadWikiNovels() {
+    const data = await fetchJson(`${API_BASE_URL}/wiki/novels`);
+    setWikiNovels(data);
+  }
+
+  async function loadWikiNovel(novelId) {
+    setWikiLoading(true);
+    setWikiSelectedNovelId(novelId);
+    setWikiSelectedCharacter(null);
+    setWikiSelectedSkill(null);
+    setWikiSelectedItem(null);
+
+    try {
+      const [novelData, charactersData, skillsData, itemsData] = await Promise.all([
+        fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}`),
+        fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}/characters`),
+        fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}/skills`),
+        fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}/items`),
+      ]);
+
+      setWikiNovel(novelData);
+      setWikiCharacters(charactersData);
+      setWikiSkills(skillsData);
+      setWikiItems(itemsData);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setWikiLoading(false);
+    }
+  }
+
+  async function loadWikiCharacter(character) {
+    setWikiLoading(true);
+
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/wiki/characters/${character.id}`);
+      setWikiSelectedCharacter(data);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setWikiLoading(false);
+    }
+  }
+
+  async function loadWikiSkill(skill) {
+    setWikiLoading(true);
+
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/wiki/skills/${skill.id}`);
+      setWikiSelectedSkill(data);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setWikiLoading(false);
+    }
+  }
+
+  async function loadWikiItem(item) {
+    setWikiLoading(true);
+
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/wiki/items/${item.id}`);
+      setWikiSelectedItem(data);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setWikiLoading(false);
+    }
   }
 
   async function loadChapters(novelId) {
@@ -364,206 +710,248 @@ function App() {
 
   React.useEffect(() => {
     loadNovels().catch((error) => setMessage(error.message));
+    loadWikiNovels().catch((error) => setMessage(error.message));
   }, []);
 
   return (
     <main className="app-shell">
       <section className="page-header">
-        <p className="eyebrow">Admin MVP</p>
-        <h1>NovelWiki Upload Verification</h1>
-      </section>
-
-      <section className="panel">
-        <h2>Upload .txt Novel</h2>
-        <form className="upload-form" onSubmit={handleUpload}>
-          <label>
-            Novel title
-            <input
-              type="text"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Optional, defaults to file name"
-            />
-          </label>
-
-          <label>
-            Novel file
-            <input
-              type="file"
-              accept=".txt,text/plain"
-              onChange={(event) => setFile(event.target.files[0])}
-            />
-          </label>
-
-          <button type="submit" disabled={isUploading}>
-            {isUploading ? "Uploading..." : "Upload and Split"}
+        <p className="eyebrow">{activeView === "admin" ? "Admin MVP" : "Public Wiki"}</p>
+        <h1>{activeView === "admin" ? "NovelWiki Upload Verification" : "NovelWiki"}</h1>
+        <div className="view-toggle">
+          <button
+            className={activeView === "admin" ? "active" : ""}
+            type="button"
+            onClick={() => setActiveView("admin")}
+          >
+            Admin
           </button>
-        </form>
-        {message ? <p className="message">{message}</p> : null}
-      </section>
-
-      <section className="layout">
-        <aside className="panel novel-list">
-          <h2>Uploaded Novels</h2>
-          {novels.length === 0 ? <p>No novels uploaded yet.</p> : null}
-          {novels.map((novel) => (
-            <button
-              className={selectedNovelId === novel.id ? "novel-button active" : "novel-button"}
-              key={novel.id}
-              type="button"
-              onClick={() => loadChapters(novel.id).catch((error) => setMessage(error.message))}
-            >
-              <span>{novel.title}</span>
-              <small>{novel.chapter_count} chapters</small>
-              <small>Status: {novel.status}</small>
-            </button>
-          ))}
-        </aside>
-
-        <div className="content-stack">
-          <section className="panel chapter-panel">
-            <h2>Chapter Verification</h2>
-            {!chapterResult ? <p>Select a novel to inspect chapter metadata.</p> : null}
-            {chapterResult ? (
-              <>
-                <div className="summary-row">
-                  <strong>{chapterResult.novel.title}</strong>
-                  <span>{chapterResult.chapters.length} chapters</span>
-                </div>
-                <div className="chapter-table">
-                  {chapterResult.chapters.map((chapter) => (
-                    <article className="chapter-row" key={chapter.id}>
-                      <div>
-                        <strong>
-                          {chapter.chapter_number}. {chapter.title}
-                        </strong>
-                        <p>{chapter.preview}</p>
-                      </div>
-                      <div className="chapter-actions">
-                        <span>{chapter.character_count.toLocaleString()} chars</span>
-                        <button
-                          type="button"
-                          disabled={extractingChapterId === chapter.id}
-                          onClick={() => handleExtractChapter(chapter.id)}
-                        >
-                          {extractingChapterId === chapter.id ? "Extracting..." : "AI Extract"}
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </section>
-
-          <section className="panel extraction-panel">
-            <div className="panel-header">
-              <h2>Extraction Pipeline</h2>
-              <button type="button" disabled={!selectedNovelId || isProcessing} onClick={handleProcessNovel}>
-                {isProcessing ? "Processing..." : "Run Placeholder Processing"}
-              </button>
-            </div>
-
-            {!selectedNovelId ? <p>Select a novel to run placeholder extraction.</p> : null}
-            {selectedNovelId && !extractedData ? <p>No extracted data loaded yet.</p> : null}
-
-            {extractedData ? (
-              <div className="extraction-grid">
-                <section>
-                  <h3>Characters</h3>
-                  {extractedData.characters.map((character) => (
-                    <ReviewRecord
-                      entityType="characters"
-                      fields={["name", "description"]}
-                      key={character.id}
-                      mergeTargets={extractedData.characters.filter((target) => target.id !== character.id)}
-                      record={character}
-                      onMerged={handleMergedCharacter}
-                      onSaved={(updatedRecord) => updateExtractedRecord("characters", updatedRecord)}
-                    />
-                  ))}
-                </section>
-
-                <section>
-                  <h3>Skills</h3>
-                  {extractedData.skills.map((skill) => (
-                    <ReviewRecord
-                      entityType="skills"
-                      fields={["name", "category", "description"]}
-                      key={skill.id}
-                      record={skill}
-                      onSaved={(updatedRecord) => updateExtractedRecord("skills", updatedRecord)}
-                    />
-                  ))}
-                </section>
-
-                <section>
-                  <h3>Items</h3>
-                  {extractedData.items.map((item) => (
-                    <ReviewRecord
-                      entityType="items"
-                      fields={["name", "category", "description"]}
-                      key={item.id}
-                      record={item}
-                      onSaved={(updatedRecord) => updateExtractedRecord("items", updatedRecord)}
-                    />
-                  ))}
-                </section>
-
-                <section>
-                  <h3>Timeline Facts</h3>
-                  {extractedData.events.map((event) => (
-                    <ReviewRecord
-                      entityType="events"
-                      fields={["event_type", "title", "description"]}
-                      key={event.id}
-                      record={event}
-                      onSaved={(updatedRecord) => updateExtractedRecord("events", updatedRecord)}
-                    />
-                  ))}
-                </section>
-
-                <section>
-                  <h3>Progression</h3>
-                  {extractedData.progression_events.map((event) => (
-                    <ReviewRecord
-                      entityType="progression_events"
-                      fields={["progression_type", "old_value", "new_value", "description"]}
-                      key={event.id}
-                      record={event}
-                      onSaved={(updatedRecord) =>
-                        updateExtractedRecord("progression_events", updatedRecord)
-                      }
-                    />
-                  ))}
-                </section>
-
-                <section>
-                  <h3>Life Events</h3>
-                  {extractedData.life_events.map((event) => (
-                    <ReviewRecord
-                      entityType="life_events"
-                      fields={["event_type", "description", "reason"]}
-                      key={event.id}
-                      record={event}
-                      onSaved={(updatedRecord) => updateExtractedRecord("life_events", updatedRecord)}
-                    />
-                  ))}
-                </section>
-
-                {extractedData.characters.length === 0 &&
-                extractedData.skills.length === 0 &&
-                extractedData.items.length === 0 &&
-                extractedData.events.length === 0 &&
-                extractedData.progression_events.length === 0 &&
-                extractedData.life_events.length === 0 ? (
-                  <p className="empty-state">No extracted records yet.</p>
-                ) : null}
-              </div>
-            ) : null}
-          </section>
+          <button
+            className={activeView === "wiki" ? "active" : ""}
+            type="button"
+            onClick={() => {
+              setActiveView("wiki");
+              loadWikiNovels().catch((error) => setMessage(error.message));
+            }}
+          >
+            Wiki
+          </button>
         </div>
       </section>
+
+      {message ? <p className="message">{message}</p> : null}
+
+      {activeView === "wiki" ? (
+        <WikiPanel
+          characters={wikiCharacters}
+          items={wikiItems}
+          loading={wikiLoading}
+          novel={wikiNovel}
+          novels={wikiNovels}
+          onLoadNovel={loadWikiNovel}
+          onSelectCharacter={loadWikiCharacter}
+          onSelectItem={loadWikiItem}
+          onSelectSkill={loadWikiSkill}
+          selectedCharacter={wikiSelectedCharacter}
+          selectedItem={wikiSelectedItem}
+          selectedNovelId={wikiSelectedNovelId}
+          selectedSkill={wikiSelectedSkill}
+          skills={wikiSkills}
+        />
+      ) : (
+        <>
+          <section className="panel">
+            <h2>Upload .txt Novel</h2>
+            <form className="upload-form" onSubmit={handleUpload}>
+              <label>
+                Novel title
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Optional, defaults to file name"
+                />
+              </label>
+
+              <label>
+                Novel file
+                <input
+                  type="file"
+                  accept=".txt,text/plain"
+                  onChange={(event) => setFile(event.target.files[0])}
+                />
+              </label>
+
+              <button type="submit" disabled={isUploading}>
+                {isUploading ? "Uploading..." : "Upload and Split"}
+              </button>
+            </form>
+          </section>
+
+          <section className="layout">
+            <aside className="panel novel-list">
+              <h2>Uploaded Novels</h2>
+              {novels.length === 0 ? <p>No novels uploaded yet.</p> : null}
+              {novels.map((novel) => (
+                <button
+                  className={selectedNovelId === novel.id ? "novel-button active" : "novel-button"}
+                  key={novel.id}
+                  type="button"
+                  onClick={() => loadChapters(novel.id).catch((error) => setMessage(error.message))}
+                >
+                  <span>{novel.title}</span>
+                  <small>{novel.chapter_count} chapters</small>
+                  <small>Status: {novel.status}</small>
+                </button>
+              ))}
+            </aside>
+
+            <div className="content-stack">
+              <section className="panel chapter-panel">
+                <h2>Chapter Verification</h2>
+                {!chapterResult ? <p>Select a novel to inspect chapter metadata.</p> : null}
+                {chapterResult ? (
+                  <>
+                    <div className="summary-row">
+                      <strong>{chapterResult.novel.title}</strong>
+                      <span>{chapterResult.chapters.length} chapters</span>
+                    </div>
+                    <div className="chapter-table">
+                      {chapterResult.chapters.map((chapter) => (
+                        <article className="chapter-row" key={chapter.id}>
+                          <div>
+                            <strong>
+                              {chapter.chapter_number}. {chapter.title}
+                            </strong>
+                            <p>{chapter.preview}</p>
+                          </div>
+                          <div className="chapter-actions">
+                            <span>{chapter.character_count.toLocaleString()} chars</span>
+                            <button
+                              type="button"
+                              disabled={extractingChapterId === chapter.id}
+                              onClick={() => handleExtractChapter(chapter.id)}
+                            >
+                              {extractingChapterId === chapter.id ? "Extracting..." : "AI Extract"}
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+              </section>
+
+              <section className="panel extraction-panel">
+                <div className="panel-header">
+                  <h2>Extraction Pipeline</h2>
+                  <button type="button" disabled={!selectedNovelId || isProcessing} onClick={handleProcessNovel}>
+                    {isProcessing ? "Processing..." : "Run Placeholder Processing"}
+                  </button>
+                </div>
+
+                {!selectedNovelId ? <p>Select a novel to run placeholder extraction.</p> : null}
+                {selectedNovelId && !extractedData ? <p>No extracted data loaded yet.</p> : null}
+
+                {extractedData ? (
+                  <div className="extraction-grid">
+                    <section>
+                      <h3>Characters</h3>
+                      {extractedData.characters.map((character) => (
+                        <ReviewRecord
+                          entityType="characters"
+                          fields={["name", "description"]}
+                          key={character.id}
+                          mergeTargets={extractedData.characters.filter((target) => target.id !== character.id)}
+                          record={character}
+                          onMerged={handleMergedCharacter}
+                          onSaved={(updatedRecord) => updateExtractedRecord("characters", updatedRecord)}
+                        />
+                      ))}
+                    </section>
+
+                    <section>
+                      <h3>Skills</h3>
+                      {extractedData.skills.map((skill) => (
+                        <ReviewRecord
+                          entityType="skills"
+                          fields={["name", "category", "description"]}
+                          key={skill.id}
+                          record={skill}
+                          onSaved={(updatedRecord) => updateExtractedRecord("skills", updatedRecord)}
+                        />
+                      ))}
+                    </section>
+
+                    <section>
+                      <h3>Items</h3>
+                      {extractedData.items.map((item) => (
+                        <ReviewRecord
+                          entityType="items"
+                          fields={["name", "category", "description"]}
+                          key={item.id}
+                          record={item}
+                          onSaved={(updatedRecord) => updateExtractedRecord("items", updatedRecord)}
+                        />
+                      ))}
+                    </section>
+
+                    <section>
+                      <h3>Timeline Facts</h3>
+                      {extractedData.events.map((event) => (
+                        <ReviewRecord
+                          entityType="events"
+                          fields={["event_type", "title", "description"]}
+                          key={event.id}
+                          record={event}
+                          onSaved={(updatedRecord) => updateExtractedRecord("events", updatedRecord)}
+                        />
+                      ))}
+                    </section>
+
+                    <section>
+                      <h3>Progression</h3>
+                      {extractedData.progression_events.map((event) => (
+                        <ReviewRecord
+                          entityType="progression_events"
+                          fields={["progression_type", "old_value", "new_value", "description"]}
+                          key={event.id}
+                          record={event}
+                          onSaved={(updatedRecord) =>
+                            updateExtractedRecord("progression_events", updatedRecord)
+                          }
+                        />
+                      ))}
+                    </section>
+
+                    <section>
+                      <h3>Life Events</h3>
+                      {extractedData.life_events.map((event) => (
+                        <ReviewRecord
+                          entityType="life_events"
+                          fields={["event_type", "description", "reason"]}
+                          key={event.id}
+                          record={event}
+                          onSaved={(updatedRecord) => updateExtractedRecord("life_events", updatedRecord)}
+                        />
+                      ))}
+                    </section>
+
+                    {extractedData.characters.length === 0 &&
+                    extractedData.skills.length === 0 &&
+                    extractedData.items.length === 0 &&
+                    extractedData.events.length === 0 &&
+                    extractedData.progression_events.length === 0 &&
+                    extractedData.life_events.length === 0 ? (
+                      <p className="empty-state">No extracted records yet.</p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+            </div>
+          </section>
+        </>
+      )}
     </main>
   );
 }

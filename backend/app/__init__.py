@@ -8,6 +8,7 @@ from sqlalchemy import text
 from app.api.admin_novels import admin_novels_bp
 from app.api.admin_review import admin_review_bp
 from app.api.health import health_bp
+from app.api.wiki import wiki_bp
 from app.models import db
 
 
@@ -92,6 +93,7 @@ def create_app():
     app.register_blueprint(health_bp, url_prefix="/api")
     app.register_blueprint(admin_novels_bp, url_prefix="/api/admin")
     app.register_blueprint(admin_review_bp, url_prefix="/api/admin/review")
+    app.register_blueprint(wiki_bp, url_prefix="/api/wiki")
 
     with app.app_context():
         db.create_all()
