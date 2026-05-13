@@ -104,7 +104,18 @@ class Character(ReviewMixin, db.Model):
     first_mentioned_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
     first_appeared_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
     first_seen_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    current_cultivation_level = db.Column(db.String(255), nullable=True)
+    current_position = db.Column(db.String(255), nullable=True)
+    current_class_rank = db.Column(db.String(255), nullable=True)
+    current_power_rank = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    aliases = db.relationship(
+        "CharacterAlias",
+        back_populates="character",
+        cascade="all, delete-orphan",
+        order_by="CharacterAlias.alias",
+    )
 
     def to_admin_dict(self):
         source_chapter_id = (
@@ -121,8 +132,39 @@ class Character(ReviewMixin, db.Model):
             "first_mentioned_chapter_id": self.first_mentioned_chapter_id,
             "first_appeared_chapter_id": self.first_appeared_chapter_id,
             "first_seen_chapter_id": self.first_seen_chapter_id,
+            "current_cultivation_level": self.current_cultivation_level,
+            "current_position": self.current_position,
+            "current_class_rank": self.current_class_rank,
+            "current_power_rank": self.current_power_rank,
             "source_chapter_id": source_chapter_id,
+            "aliases": [alias.to_admin_dict() for alias in self.aliases],
             **self.review_dict(),
+        }
+
+
+class CharacterAlias(db.Model):
+    __tablename__ = "character_aliases"
+
+    id = db.Column(db.Integer, primary_key=True)
+    character_id = db.Column(db.Integer, db.ForeignKey("characters.id"), nullable=False)
+    alias = db.Column(db.String(255), nullable=False)
+    first_seen_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    evidence = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    character = db.relationship("Character", back_populates="aliases")
+
+    __table_args__ = (
+        db.UniqueConstraint("character_id", "alias", name="uq_character_alias"),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "character_id": self.character_id,
+            "alias": self.alias,
+            "first_seen_chapter_id": self.first_seen_chapter_id,
+            "evidence": self.evidence,
         }
 
 
@@ -136,6 +178,13 @@ class Skill(ReviewMixin, db.Model):
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
+    aliases = db.relationship(
+        "SkillAlias",
+        back_populates="skill",
+        cascade="all, delete-orphan",
+        order_by="SkillAlias.alias",
+    )
+
     def to_admin_dict(self):
         return {
             "id": self.id,
@@ -144,7 +193,34 @@ class Skill(ReviewMixin, db.Model):
             "category": self.category,
             "description": self.description,
             "source_chapter_id": None,
+            "aliases": [alias.to_admin_dict() for alias in self.aliases],
             **self.review_dict(),
+        }
+
+
+class SkillAlias(db.Model):
+    __tablename__ = "skill_aliases"
+
+    id = db.Column(db.Integer, primary_key=True)
+    skill_id = db.Column(db.Integer, db.ForeignKey("skills.id"), nullable=False)
+    alias = db.Column(db.String(255), nullable=False)
+    first_seen_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    evidence = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    skill = db.relationship("Skill", back_populates="aliases")
+
+    __table_args__ = (
+        db.UniqueConstraint("skill_id", "alias", name="uq_skill_alias"),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "skill_id": self.skill_id,
+            "alias": self.alias,
+            "first_seen_chapter_id": self.first_seen_chapter_id,
+            "evidence": self.evidence,
         }
 
 
@@ -213,4 +289,64 @@ class WikiEvidence(db.Model):
             "entity_type": self.entity_type,
             "entity_id": self.entity_id,
             "evidence_text": self.evidence_text,
+        }
+
+
+class CharacterProgressionEvent(ReviewMixin, db.Model):
+    __tablename__ = "character_progression_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    character_id = db.Column(db.Integer, db.ForeignKey("characters.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
+    progression_type = db.Column(db.String(100), nullable=False)
+    old_value = db.Column(db.String(255), nullable=True)
+    new_value = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    character = db.relationship("Character")
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "character_id": self.character_id,
+            "character_name": self.character.name if self.character else None,
+            "chapter_id": self.chapter_id,
+            "source_chapter_id": self.chapter_id,
+            "progression_type": self.progression_type,
+            "old_value": self.old_value,
+            "new_value": self.new_value,
+            "description": self.description,
+            **self.review_dict(),
+        }
+
+
+class CharacterLifeEvent(ReviewMixin, db.Model):
+    __tablename__ = "character_life_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    character_id = db.Column(db.Integer, db.ForeignKey("characters.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
+    event_type = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    reason = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    character = db.relationship("Character")
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "character_id": self.character_id,
+            "character_name": self.character.name if self.character else None,
+            "chapter_id": self.chapter_id,
+            "source_chapter_id": self.chapter_id,
+            "event_type": self.event_type,
+            "description": self.description,
+            "reason": self.reason,
+            **self.review_dict(),
         }

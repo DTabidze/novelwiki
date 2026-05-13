@@ -49,6 +49,28 @@ def ensure_development_schema(app):
                 text("ALTER TABLE characters ADD COLUMN first_appeared_chapter_id INTEGER")
             )
 
+        character_summary_columns = {
+            "current_cultivation_level": "VARCHAR(255)",
+            "current_position": "VARCHAR(255)",
+            "current_class_rank": "VARCHAR(255)",
+            "current_power_rank": "VARCHAR(255)",
+        }
+
+        for column_name, column_type in character_summary_columns.items():
+            if column_name not in character_column_names:
+                connection.execute(
+                    text(f"ALTER TABLE characters ADD COLUMN {column_name} {column_type}")
+                )
+
+        if "current_sect_rank" in character_column_names:
+            connection.execute(
+                text(
+                    "UPDATE characters "
+                    "SET current_position = current_sect_rank "
+                    "WHERE current_position IS NULL AND current_sect_rank IS NOT NULL"
+                )
+            )
+
         connection.commit()
 
 

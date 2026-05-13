@@ -84,6 +84,15 @@ textarea {
   font: inherit;
 }
 
+select {
+  min-height: 42px;
+  border: 1px solid #c9d1dc;
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: #ffffff;
+  font: inherit;
+}
+
 button {
   min-height: 42px;
   border: 1px solid #1f6feb;
@@ -244,6 +253,28 @@ button:disabled {
   font-size: 13px;
 }
 
+.alias-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.alias-list strong {
+  width: 100%;
+  color: #344252;
+  font-size: 13px;
+}
+
+.alias-list span {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #eef2f6;
+  color: #526171;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .evidence-list {
   border-left: 3px solid #9db8d8;
   padding-left: 10px;
@@ -281,6 +312,12 @@ button:disabled {
 .review-actions {
   justify-content: flex-start;
   flex-wrap: wrap;
+}
+
+.merge-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
 }
 
 .status-pill {

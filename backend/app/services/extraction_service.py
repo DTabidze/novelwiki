@@ -1,4 +1,16 @@
-from app.models import Character, Chapter, Item, Skill, WikiEvent, WikiEvidence, db
+from app.models import (
+    Character,
+    CharacterAlias,
+    CharacterLifeEvent,
+    CharacterProgressionEvent,
+    Chapter,
+    Item,
+    Skill,
+    SkillAlias,
+    WikiEvent,
+    WikiEvidence,
+    db,
+)
 
 
 def evidence_match_key(evidence_text):
@@ -24,11 +36,26 @@ def run_placeholder_extraction(novel):
         Chapter.query.filter_by(novel_id=novel.id).order_by(Chapter.chapter_number).first()
     )
 
+    character_ids = [character.id for character in Character.query.filter_by(novel_id=novel.id).all()]
+    skill_ids = [skill.id for skill in Skill.query.filter_by(novel_id=novel.id).all()]
+
+    if character_ids:
+        CharacterAlias.query.filter(CharacterAlias.character_id.in_(character_ids)).delete(
+            synchronize_session=False
+        )
+
+    if skill_ids:
+        SkillAlias.query.filter(SkillAlias.skill_id.in_(skill_ids)).delete(
+            synchronize_session=False
+        )
+
+    CharacterProgressionEvent.query.filter_by(novel_id=novel.id).delete()
+    CharacterLifeEvent.query.filter_by(novel_id=novel.id).delete()
+    WikiEvent.query.filter_by(novel_id=novel.id).delete()
+    WikiEvidence.query.filter_by(novel_id=novel.id).delete()
     Character.query.filter_by(novel_id=novel.id).delete()
     Skill.query.filter_by(novel_id=novel.id).delete()
     Item.query.filter_by(novel_id=novel.id).delete()
-    WikiEvent.query.filter_by(novel_id=novel.id).delete()
-    WikiEvidence.query.filter_by(novel_id=novel.id).delete()
 
     novel.status = "processing"
     novel.error_message = None
@@ -122,6 +149,27 @@ def get_extracted_data(novel):
         data["first_mentioned_chapter"] = chapters.get(data.get("first_mentioned_chapter_id"))
         data["first_appeared_chapter"] = chapters.get(data.get("first_appeared_chapter_id"))
         data["evidence"] = unique_evidence
+
+        if entity_type == "character":
+            aliases = []
+
+            for alias in record.aliases:
+                alias_data = alias.to_admin_dict()
+                alias_data["first_seen_chapter"] = chapters.get(alias.first_seen_chapter_id)
+                aliases.append(alias_data)
+
+            data["aliases"] = aliases
+
+        if entity_type == "skill":
+            aliases = []
+
+            for alias in record.aliases:
+                alias_data = alias.to_admin_dict()
+                alias_data["first_seen_chapter"] = chapters.get(alias.first_seen_chapter_id)
+                aliases.append(alias_data)
+
+            data["aliases"] = aliases
+
         return data
 
     return {
@@ -141,6 +189,18 @@ def get_extracted_data(novel):
         "events": [
             with_source_and_evidence("event", event)
             for event in WikiEvent.query.filter_by(novel_id=novel.id).order_by(WikiEvent.id).all()
+        ],
+        "progression_events": [
+            with_source_and_evidence("progression", progression)
+            for progression in CharacterProgressionEvent.query.filter_by(novel_id=novel.id)
+            .order_by(CharacterProgressionEvent.id)
+            .all()
+        ],
+        "life_events": [
+            with_source_and_evidence("life_event", life_event)
+            for life_event in CharacterLifeEvent.query.filter_by(novel_id=novel.id)
+            .order_by(CharacterLifeEvent.id)
+            .all()
         ],
         "evidence": [evidence.to_admin_dict() for evidence in evidence_rows],
     }

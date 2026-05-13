@@ -15,7 +15,7 @@ async function fetchJson(url, options) {
   return body.data;
 }
 
-function ReviewRecord({ entityType, record, fields, onSaved }) {
+function ReviewRecord({ entityType, record, fields, mergeTargets = [], onMerged, onSaved }) {
   const [formValues, setFormValues] = React.useState(() => {
     const values = {};
 
@@ -27,6 +27,7 @@ function ReviewRecord({ entityType, record, fields, onSaved }) {
     return values;
   });
   const [isSaving, setIsSaving] = React.useState(false);
+  const [mergeTargetId, setMergeTargetId] = React.useState("");
 
   async function saveRecord(extraValues = {}) {
     setIsSaving(true);
@@ -49,12 +50,47 @@ function ReviewRecord({ entityType, record, fields, onSaved }) {
     }
   }
 
+  async function mergeCharacter() {
+    if (!mergeTargetId) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/admin/review/characters/${record.id}/merge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          target_character_id: Number(mergeTargetId),
+        }),
+      });
+
+      onMerged(record.id, data);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <article className="mini-record review-record">
       <div className="record-title-row">
-        <strong>{record.name || record.title || record.entity_type}</strong>
+        <strong>
+          {record.name ||
+            record.title ||
+            record.new_value ||
+            record.character_name ||
+            record.entity_type ||
+            entityType}
+        </strong>
         <span className={`status-pill ${record.review_status}`}>{record.review_status}</span>
       </div>
+
+      {record.character_name && entityType !== "characters" ? (
+        <p className="source-line">Character: {record.character_name}</p>
+      ) : null}
 
       {record.source_chapter ? (
         <p className="source-line">
@@ -76,6 +112,25 @@ function ReviewRecord({ entityType, record, fields, onSaved }) {
               ? `Chapter ${record.first_appeared_chapter.chapter_number}`
               : "Unknown"}
           </span>
+          {record.current_cultivation_level ? (
+            <span>Current cultivation: {record.current_cultivation_level}</span>
+          ) : null}
+          {record.current_position ? <span>Current position: {record.current_position}</span> : null}
+          {record.current_class_rank ? (
+            <span>Current class rank: {record.current_class_rank}</span>
+          ) : null}
+          {record.current_power_rank ? <span>Current power rank: {record.current_power_rank}</span> : null}
+        </div>
+      ) : null}
+
+      {(entityType === "characters" || entityType === "skills") &&
+      record.aliases &&
+      record.aliases.length > 0 ? (
+        <div className="alias-list">
+          <strong>Aliases</strong>
+          {record.aliases.map((alias) => (
+            <span key={alias.id}>{alias.alias}</span>
+          ))}
         </div>
       ) : null}
 
@@ -126,6 +181,26 @@ function ReviewRecord({ entityType, record, fields, onSaved }) {
           Reject
         </button>
       </div>
+
+      {entityType === "characters" && mergeTargets.length > 0 ? (
+        <div className="merge-row">
+          <select
+            value={mergeTargetId}
+            onChange={(event) => setMergeTargetId(event.target.value)}
+            disabled={isSaving}
+          >
+            <option value="">Merge into...</option>
+            {mergeTargets.map((target) => (
+              <option key={target.id} value={target.id}>
+                {target.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" disabled={isSaving || !mergeTargetId} onClick={mergeCharacter}>
+            Merge
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -226,6 +301,14 @@ function App() {
     setMessage("Review saved.");
   }
 
+  async function handleMergedCharacter() {
+    if (selectedNovelId) {
+      await loadExtractedData(selectedNovelId);
+    }
+
+    setMessage("Characters merged.");
+  }
+
   function buildExtractionMessage(data) {
     if (!data.summary || !data.extracted_chapter) {
       return "AI extraction finished for one chapter. Review the pending records below.";
@@ -240,7 +323,8 @@ function App() {
     return (
       `Chapter ${chapter.chapter_number} extracted: ` +
       `${characterCount} characters, ${skillCount} skills, ` +
-      `${itemCount} items, ${summary.events_created} events.`
+      `${itemCount} items, ${summary.progression_events_created} progression, ` +
+      `${summary.life_events_created} life events, ${summary.events_created} timeline facts.`
     );
   }
 
@@ -392,7 +476,9 @@ function App() {
                       entityType="characters"
                       fields={["name", "description"]}
                       key={character.id}
+                      mergeTargets={extractedData.characters.filter((target) => target.id !== character.id)}
                       record={character}
+                      onMerged={handleMergedCharacter}
                       onSaved={(updatedRecord) => updateExtractedRecord("characters", updatedRecord)}
                     />
                   ))}
@@ -437,10 +523,40 @@ function App() {
                   ))}
                 </section>
 
+                <section>
+                  <h3>Progression</h3>
+                  {extractedData.progression_events.map((event) => (
+                    <ReviewRecord
+                      entityType="progression_events"
+                      fields={["progression_type", "old_value", "new_value", "description"]}
+                      key={event.id}
+                      record={event}
+                      onSaved={(updatedRecord) =>
+                        updateExtractedRecord("progression_events", updatedRecord)
+                      }
+                    />
+                  ))}
+                </section>
+
+                <section>
+                  <h3>Life Events</h3>
+                  {extractedData.life_events.map((event) => (
+                    <ReviewRecord
+                      entityType="life_events"
+                      fields={["event_type", "description", "reason"]}
+                      key={event.id}
+                      record={event}
+                      onSaved={(updatedRecord) => updateExtractedRecord("life_events", updatedRecord)}
+                    />
+                  ))}
+                </section>
+
                 {extractedData.characters.length === 0 &&
                 extractedData.skills.length === 0 &&
                 extractedData.items.length === 0 &&
-                extractedData.events.length === 0 ? (
+                extractedData.events.length === 0 &&
+                extractedData.progression_events.length === 0 &&
+                extractedData.life_events.length === 0 ? (
                   <p className="empty-state">No extracted records yet.</p>
                 ) : null}
               </div>
