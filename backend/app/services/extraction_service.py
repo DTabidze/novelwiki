@@ -1,8 +1,10 @@
 from app.models import (
     Character,
     CharacterAlias,
+    CharacterItem,
     CharacterLifeEvent,
     CharacterProgressionEvent,
+    CharacterSkill,
     Chapter,
     Item,
     Skill,
@@ -50,6 +52,8 @@ def run_placeholder_extraction(novel):
         )
 
     CharacterProgressionEvent.query.filter_by(novel_id=novel.id).delete()
+    CharacterSkill.query.filter_by(novel_id=novel.id).delete()
+    CharacterItem.query.filter_by(novel_id=novel.id).delete()
     CharacterLifeEvent.query.filter_by(novel_id=novel.id).delete()
     WikiEvent.query.filter_by(novel_id=novel.id).delete()
     WikiEvidence.query.filter_by(novel_id=novel.id).delete()
@@ -194,6 +198,18 @@ def get_extracted_data(novel):
             with_source_and_evidence("progression", progression)
             for progression in CharacterProgressionEvent.query.filter_by(novel_id=novel.id)
             .order_by(CharacterProgressionEvent.id)
+            .all()
+        ],
+        "character_skills": [
+            with_source_and_evidence("character_skill", relationship)
+            for relationship in CharacterSkill.query.filter_by(novel_id=novel.id)
+            .order_by(CharacterSkill.id)
+            .all()
+        ],
+        "character_items": [
+            with_source_and_evidence("character_item", relationship)
+            for relationship in CharacterItem.query.filter_by(novel_id=novel.id)
+            .order_by(CharacterItem.id)
             .all()
         ],
         "life_events": [

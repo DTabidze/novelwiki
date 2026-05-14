@@ -13,7 +13,14 @@ from app.models import db
 
 
 def ensure_development_schema(app):
-    review_tables = {"characters", "skills", "items", "wiki_events"}
+    review_tables = {
+        "characters",
+        "skills",
+        "items",
+        "wiki_events",
+        "character_skills",
+        "character_items",
+    }
 
     with db.engine.connect() as connection:
         columns = connection.execute(text("PRAGMA table_info(novels)")).fetchall()

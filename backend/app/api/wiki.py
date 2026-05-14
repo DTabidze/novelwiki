@@ -2,8 +2,10 @@ from flask import Blueprint, jsonify
 
 from app.models import (
     Character,
+    CharacterItem,
     CharacterLifeEvent,
     CharacterProgressionEvent,
+    CharacterSkill,
     Chapter,
     Item,
     Novel,
@@ -133,6 +135,34 @@ def public_life_event(life_event):
     }
 
 
+def public_character_skill(relationship):
+    return {
+        "id": relationship.id,
+        "character_id": relationship.character_id,
+        "character_name": relationship.character.name if relationship.character else None,
+        "skill_id": relationship.skill_id,
+        "skill": public_skill(relationship.skill) if relationship.skill else None,
+        "chapter": chapter_reference(relationship.chapter_id),
+        "relationship_type": relationship.relationship_type,
+        "description": relationship.description,
+        "evidence": evidence_for("character_skill", relationship.id),
+    }
+
+
+def public_character_item(relationship):
+    return {
+        "id": relationship.id,
+        "character_id": relationship.character_id,
+        "character_name": relationship.character.name if relationship.character else None,
+        "item_id": relationship.item_id,
+        "item": public_item(relationship.item) if relationship.item else None,
+        "chapter": chapter_reference(relationship.chapter_id),
+        "relationship_type": relationship.relationship_type,
+        "description": relationship.description,
+        "evidence": evidence_for("character_item", relationship.id),
+    }
+
+
 def public_skill(skill):
     return {
         "id": skill.id,
@@ -214,6 +244,22 @@ def get_public_character(character_id):
         review_status=APPROVED,
     ).first_or_404()
     progression_rows = approved_progression_for_character(character.id)
+    character_skill_rows = (
+        CharacterSkill.query.filter_by(
+            character_id=character.id,
+            review_status=APPROVED,
+        )
+        .order_by(CharacterSkill.id)
+        .all()
+    )
+    character_item_rows = (
+        CharacterItem.query.filter_by(
+            character_id=character.id,
+            review_status=APPROVED,
+        )
+        .order_by(CharacterItem.id)
+        .all()
+    )
     life_event_rows = (
         CharacterLifeEvent.query.filter_by(
             character_id=character.id,
@@ -227,6 +273,12 @@ def get_public_character(character_id):
     data["evidence"] = evidence_for("character", character.id)
     data["progression_events"] = [
         public_progression(progression) for progression in progression_rows
+    ]
+    data["skills"] = [
+        public_character_skill(relationship) for relationship in character_skill_rows
+    ]
+    data["items"] = [
+        public_character_item(relationship) for relationship in character_item_rows
     ]
     data["life_events"] = [public_life_event(life_event) for life_event in life_event_rows]
 

@@ -323,6 +323,86 @@ class CharacterProgressionEvent(ReviewMixin, db.Model):
         }
 
 
+class CharacterSkill(ReviewMixin, db.Model):
+    __tablename__ = "character_skills"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    character_id = db.Column(db.Integer, db.ForeignKey("characters.id"), nullable=False)
+    skill_id = db.Column(db.Integer, db.ForeignKey("skills.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
+    relationship_type = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    character = db.relationship("Character")
+    skill = db.relationship("Skill")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "character_id",
+            "skill_id",
+            "relationship_type",
+            name="uq_character_skill_relationship",
+        ),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "character_id": self.character_id,
+            "character_name": self.character.name if self.character else None,
+            "skill_id": self.skill_id,
+            "skill_name": self.skill.name if self.skill else None,
+            "chapter_id": self.chapter_id,
+            "source_chapter_id": self.chapter_id,
+            "relationship_type": self.relationship_type,
+            "description": self.description,
+            **self.review_dict(),
+        }
+
+
+class CharacterItem(ReviewMixin, db.Model):
+    __tablename__ = "character_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    character_id = db.Column(db.Integer, db.ForeignKey("characters.id"), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey("items.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
+    relationship_type = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    character = db.relationship("Character")
+    item = db.relationship("Item")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "character_id",
+            "item_id",
+            "relationship_type",
+            name="uq_character_item_relationship",
+        ),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "character_id": self.character_id,
+            "character_name": self.character.name if self.character else None,
+            "item_id": self.item_id,
+            "item_name": self.item.name if self.item else None,
+            "chapter_id": self.chapter_id,
+            "source_chapter_id": self.chapter_id,
+            "relationship_type": self.relationship_type,
+            "description": self.description,
+            **self.review_dict(),
+        }
+
+
 class CharacterLifeEvent(ReviewMixin, db.Model):
     __tablename__ = "character_life_events"
 

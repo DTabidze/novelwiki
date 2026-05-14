@@ -3,8 +3,10 @@ from flask import Blueprint, jsonify, request
 from app.models import (
     Character,
     CharacterAlias,
+    CharacterItem,
     CharacterLifeEvent,
     CharacterProgressionEvent,
+    CharacterSkill,
     Chapter,
     Item,
     Skill,
@@ -46,6 +48,14 @@ ENTITY_CONFIG = {
             "admin_notes",
         },
     },
+    "character_skills": {
+        "model": CharacterSkill,
+        "fields": {"relationship_type", "description", "review_status", "admin_notes"},
+    },
+    "character_items": {
+        "model": CharacterItem,
+        "fields": {"relationship_type", "description", "review_status", "admin_notes"},
+    },
     "life_events": {
         "model": CharacterLifeEvent,
         "fields": {"event_type", "description", "reason", "review_status", "admin_notes"},
@@ -58,6 +68,8 @@ EVIDENCE_ENTITY_TYPES = {
     "items": "item",
     "events": "event",
     "progression_events": "progression",
+    "character_skills": "character_skill",
+    "character_items": "character_item",
     "life_events": "life_event",
 }
 
@@ -253,6 +265,12 @@ def merge_character(source_id):
         {"entity_id": target.id}
     )
     CharacterProgressionEvent.query.filter_by(character_id=source.id).update(
+        {"character_id": target.id}
+    )
+    CharacterSkill.query.filter_by(character_id=source.id).update(
+        {"character_id": target.id}
+    )
+    CharacterItem.query.filter_by(character_id=source.id).update(
         {"character_id": target.id}
     )
     CharacterLifeEvent.query.filter_by(character_id=source.id).update(

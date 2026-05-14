@@ -92,6 +92,9 @@ function ReviewRecord({ entityType, record, fields, mergeTargets = [], onMerged,
         <p className="source-line">Character: {record.character_name}</p>
       ) : null}
 
+      {record.skill_name ? <p className="source-line">Skill: {record.skill_name}</p> : null}
+      {record.item_name ? <p className="source-line">Item: {record.item_name}</p> : null}
+
       {record.source_chapter ? (
         <p className="source-line">
           Source: Chapter {record.source_chapter.chapter_number}, {record.source_chapter.title}
@@ -284,8 +287,10 @@ function WikiCharacterDetail({ character }) {
 
       <section className="wiki-subsection">
         <h4>Progression</h4>
-        {character.progression_events.length === 0 ? <p>No approved progression yet.</p> : null}
-        {character.progression_events.map((event) => (
+        {character.progression_events && character.progression_events.length === 0 ? (
+          <p>No approved progression yet.</p>
+        ) : null}
+        {(character.progression_events || []).map((event) => (
           <article className="mini-record" key={event.id}>
             <strong>{event.new_value}</strong>
             <p>
@@ -298,7 +303,41 @@ function WikiCharacterDetail({ character }) {
         ))}
       </section>
 
-      {character.life_events.length > 0 ? (
+      {character.skills && character.skills.length > 0 ? (
+        <section className="wiki-subsection">
+          <h4>Skills</h4>
+          {character.skills.map((relationship) => (
+            <article className="mini-record" key={relationship.id}>
+              <strong>{relationship.skill ? relationship.skill.name : "Unknown skill"}</strong>
+              <p>
+                {relationship.relationship_type.replace("_", " ")}
+                {relationship.chapter ? `, Chapter ${relationship.chapter.chapter_number}` : ""}
+              </p>
+              {relationship.description ? <p>{relationship.description}</p> : null}
+              <WikiEvidence evidence={relationship.evidence} />
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {character.items && character.items.length > 0 ? (
+        <section className="wiki-subsection">
+          <h4>Items</h4>
+          {character.items.map((relationship) => (
+            <article className="mini-record" key={relationship.id}>
+              <strong>{relationship.item ? relationship.item.name : "Unknown item"}</strong>
+              <p>
+                {relationship.relationship_type.replace("_", " ")}
+                {relationship.chapter ? `, Chapter ${relationship.chapter.chapter_number}` : ""}
+              </p>
+              {relationship.description ? <p>{relationship.description}</p> : null}
+              <WikiEvidence evidence={relationship.evidence} />
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {character.life_events && character.life_events.length > 0 ? (
         <section className="wiki-subsection">
           <h4>Life Events</h4>
           {character.life_events.map((event) => (
@@ -670,6 +709,8 @@ function App() {
       `Chapter ${chapter.chapter_number} extracted: ` +
       `${characterCount} characters, ${skillCount} skills, ` +
       `${itemCount} items, ${summary.progression_events_created} progression, ` +
+      `${summary.character_skills_created} character skills, ` +
+      `${summary.character_items_created} character items, ` +
       `${summary.life_events_created} life events, ${summary.events_created} timeline facts.`
     );
   }
@@ -925,6 +966,36 @@ function App() {
                     </section>
 
                     <section>
+                      <h3>Character Skills</h3>
+                      {extractedData.character_skills.map((relationship) => (
+                        <ReviewRecord
+                          entityType="character_skills"
+                          fields={["relationship_type", "description"]}
+                          key={relationship.id}
+                          record={relationship}
+                          onSaved={(updatedRecord) =>
+                            updateExtractedRecord("character_skills", updatedRecord)
+                          }
+                        />
+                      ))}
+                    </section>
+
+                    <section>
+                      <h3>Character Items</h3>
+                      {extractedData.character_items.map((relationship) => (
+                        <ReviewRecord
+                          entityType="character_items"
+                          fields={["relationship_type", "description"]}
+                          key={relationship.id}
+                          record={relationship}
+                          onSaved={(updatedRecord) =>
+                            updateExtractedRecord("character_items", updatedRecord)
+                          }
+                        />
+                      ))}
+                    </section>
+
+                    <section>
                       <h3>Life Events</h3>
                       {extractedData.life_events.map((event) => (
                         <ReviewRecord
@@ -942,6 +1013,8 @@ function App() {
                     extractedData.items.length === 0 &&
                     extractedData.events.length === 0 &&
                     extractedData.progression_events.length === 0 &&
+                    extractedData.character_skills.length === 0 &&
+                    extractedData.character_items.length === 0 &&
                     extractedData.life_events.length === 0 ? (
                       <p className="empty-state">No extracted records yet.</p>
                     ) : null}

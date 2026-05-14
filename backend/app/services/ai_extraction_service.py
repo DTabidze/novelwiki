@@ -3,8 +3,10 @@ import os
 from app.models import (
     Character,
     CharacterAlias,
+    CharacterItem,
     CharacterLifeEvent,
     CharacterProgressionEvent,
+    CharacterSkill,
     Chapter,
     Item,
     Novel,
@@ -37,6 +39,8 @@ Before returning JSON, perform this workflow:
 classes, jobs, titles, and promotions.
 4. Attach every confirmed progression fact to the canonical character name from step 2.
 5. Extract important skills and important items only after characters/progression are handled.
+6. Scan once more for clear character-skill and character-item relationships involving those
+important characters, skills, and items.
 Progression extraction is mandatory. For every important character, extract confirmed current or
 changed cultivation/power/status facts. Use the chapter's exact terminology.
 Save a progression_event when the chapter confirms:
@@ -117,6 +121,20 @@ resurrection, sealing, or another long-term status change.
 level, rank, position, class, or power value must be output as a progression_event.
 - Do not output a known skill/item when it is merely used again. Output it only if it gains a new
 durable property, name, owner, or significance.
+- Extract character-skill and character-item relationships only when the chapter clearly supports
+the relationship. Examples: a character learns, knows, uses, creates, teaches, owns, receives,
+loses, steals, carries, or gives a named skill/item. Do not infer ownership from nearby mentions.
+- Character-skill relationships are important. If a chapter says or clearly shows that a character
+uses, learns, knows, masters, creates, or teaches a named technique/skill, output a
+character_skills entry even when the skill itself already exists in memory.
+- Before returning JSON, perform a relationship consistency check: if a skill description or skill
+evidence names the character who uses/learns/knows it, there must be a matching character_skills
+entry for that character and skill.
+- Character-item relationships should be durable or plot-important. Do not output "uses" for
+single-use pills, medicine, food, temporary supplies, or ordinary consumables unless the item is
+unique, recurring, owned long-term, stolen, lost, received as a notable reward, or plot-critical.
+- Do not output a relationship if the same character-skill or character-item relationship already
+appears in memory unless the relationship type is new.
 - Do not repeat progression values already listed in memory.
 """
 
@@ -206,6 +224,25 @@ def extract_chapter_with_ai(novel, chapter):
         reason: str = Field(description="Cause or reason if known")
         evidence: str = Field(description="Short supporting snippet proving the event happened here")
 
+    class ExtractedCharacterSkill(BaseModel):
+        character_name: str = Field(description="Canonical character name")
+        skill_name: str = Field(description="Canonical skill name")
+        relationship_type: str = Field(description="learns, knows, uses, creates, teaches, or masters")
+        description: str = Field(description="Brief description of the character-skill relationship")
+        evidence: str = Field(description="Short supporting snippet proving the relationship")
+
+    class ExtractedCharacterItem(BaseModel):
+        character_name: str = Field(description="Canonical character name")
+        item_name: str = Field(description="Canonical item name")
+        relationship_type: str = Field(
+            description=(
+                "owns, receives, loses, steals, creates, carries, gives, or uses. "
+                "Avoid uses for ordinary single-use consumables."
+            )
+        )
+        description: str = Field(description="Brief description of the character-item relationship")
+        evidence: str = Field(description="Short supporting snippet proving the relationship")
+
     class ChapterExtraction(BaseModel):
         characters: list[ExtractedCharacter]
         skills: list[ExtractedSkill]
@@ -213,6 +250,8 @@ def extract_chapter_with_ai(novel, chapter):
         events: list[ExtractedEvent]
         progression_events: list[ExtractedProgressionEvent]
         life_events: list[ExtractedLifeEvent]
+        character_skills: list[ExtractedCharacterSkill]
+        character_items: list[ExtractedCharacterItem]
 
     api_key = os.getenv("OPENAI_API_KEY")
 
@@ -315,6 +354,42 @@ def build_extraction_memory(novel):
     else:
         lines.append("- None yet")
 
+    lines.extend(["", "Known character-skill relationships:"])
+    character_skill_rows = (
+        CharacterSkill.query.filter_by(novel_id=novel.id)
+        .order_by(CharacterSkill.id.desc())
+        .limit(120)
+        .all()
+    )
+
+    if character_skill_rows:
+        for relationship in character_skill_rows:
+            character_name = relationship.character.name if relationship.character else "Unknown"
+            skill_name = relationship.skill.name if relationship.skill else "Unknown"
+            lines.append(
+                f"- {character_name}: {relationship.relationship_type} {skill_name}"
+            )
+    else:
+        lines.append("- None yet")
+
+    lines.extend(["", "Known character-item relationships:"])
+    character_item_rows = (
+        CharacterItem.query.filter_by(novel_id=novel.id)
+        .order_by(CharacterItem.id.desc())
+        .limit(120)
+        .all()
+    )
+
+    if character_item_rows:
+        for relationship in character_item_rows:
+            character_name = relationship.character.name if relationship.character else "Unknown"
+            item_name = relationship.item.name if relationship.item else "Unknown"
+            lines.append(
+                f"- {character_name}: {relationship.relationship_type} {item_name}"
+            )
+    else:
+        lines.append("- None yet")
+
     lines.extend(
         [
             "",
@@ -323,6 +398,7 @@ def build_extraction_memory(novel):
             "- If a known character/skill/item is merely mentioned or used again, do not output it.",
             "- If a known skill reveals a new durable property, output the canonical skill name with the new detail.",
             "- If a known progression value is repeated, do not output it.",
+            "- If a known character-skill or character-item relationship is repeated, do not output it.",
             "- Only output new facts from the current chapter.",
         ]
     )
@@ -1189,6 +1265,55 @@ def find_existing_life_event(character, chapter, event_type):
     ).first()
 
 
+def normalize_relationship_type(relationship_type):
+    return relationship_type.strip().lower().replace(" ", "_")
+
+
+def find_existing_character_skill(character, skill, relationship_type):
+    return CharacterSkill.query.filter_by(
+        character_id=character.id,
+        skill_id=skill.id,
+        relationship_type=relationship_type,
+    ).first()
+
+
+def find_existing_character_item(character, item, relationship_type):
+    return CharacterItem.query.filter_by(
+        character_id=character.id,
+        item_id=item.id,
+        relationship_type=relationship_type,
+    ).first()
+
+
+def is_noisy_character_item_relationship(item, relationship_type):
+    item_text = f"{item.name} {item.category} {item.description}".lower()
+
+    if relationship_type != "uses":
+        return False
+
+    consumable_terms = {
+        "pill",
+        "medicine",
+        "medicinal",
+        "elixir",
+        "food",
+        "consumable",
+    }
+
+    durable_exception_terms = {
+        "unique",
+        "artifact",
+        "treasure",
+        "recurring",
+        "plot-critical",
+        "plot critical",
+    }
+
+    return any(term in item_text for term in consumable_terms) and not any(
+        term in item_text for term in durable_exception_terms
+    )
+
+
 def merge_description(existing_description, new_description):
     if not existing_description:
         return new_description
@@ -1209,6 +1334,8 @@ def save_chapter_extraction(novel, chapter, extraction):
         "items_updated": 0,
         "events_created": 0,
         "progression_events_created": 0,
+        "character_skills_created": 0,
+        "character_items_created": 0,
         "life_events_created": 0,
         "evidence_created": 0,
     }
@@ -1379,6 +1506,104 @@ def save_chapter_extraction(novel, chapter, extraction):
         db.session.flush()
         if add_evidence(novel, chapter, "item", item.id, extracted_item.evidence):
             summary["evidence_created"] += 1
+
+    for extracted_relationship in extraction.character_skills:
+        if not has_meaningful_evidence(extracted_relationship.evidence):
+            continue
+
+        character = find_existing_character(novel, extracted_relationship.character_name)
+        skill = find_existing_skill(novel, extracted_relationship.skill_name)
+
+        if not character or not skill:
+            continue
+
+        relationship_type = normalize_relationship_type(extracted_relationship.relationship_type)
+        existing_relationship = find_existing_character_skill(
+            character,
+            skill,
+            relationship_type,
+        )
+
+        if existing_relationship:
+            existing_relationship.description = merge_description(
+                existing_relationship.description,
+                extracted_relationship.description,
+            )
+            continue
+
+        relationship = CharacterSkill(
+            novel_id=novel.id,
+            character_id=character.id,
+            skill_id=skill.id,
+            chapter_id=chapter.id,
+            relationship_type=relationship_type,
+            description=extracted_relationship.description,
+            review_status="pending",
+        )
+        db.session.add(relationship)
+        db.session.flush()
+
+        if add_evidence(
+            novel,
+            chapter,
+            "character_skill",
+            relationship.id,
+            extracted_relationship.evidence,
+        ):
+            summary["evidence_created"] += 1
+
+        summary["character_skills_created"] += 1
+
+    for extracted_relationship in extraction.character_items:
+        if not has_meaningful_evidence(extracted_relationship.evidence):
+            continue
+
+        character = find_existing_character(novel, extracted_relationship.character_name)
+        item = find_existing_by_name(Item, novel, extracted_relationship.item_name)
+
+        if not character or not item:
+            continue
+
+        relationship_type = normalize_relationship_type(extracted_relationship.relationship_type)
+
+        if is_noisy_character_item_relationship(item, relationship_type):
+            continue
+
+        existing_relationship = find_existing_character_item(
+            character,
+            item,
+            relationship_type,
+        )
+
+        if existing_relationship:
+            existing_relationship.description = merge_description(
+                existing_relationship.description,
+                extracted_relationship.description,
+            )
+            continue
+
+        relationship = CharacterItem(
+            novel_id=novel.id,
+            character_id=character.id,
+            item_id=item.id,
+            chapter_id=chapter.id,
+            relationship_type=relationship_type,
+            description=extracted_relationship.description,
+            review_status="pending",
+        )
+        db.session.add(relationship)
+        db.session.flush()
+
+        if add_evidence(
+            novel,
+            chapter,
+            "character_item",
+            relationship.id,
+            extracted_relationship.evidence,
+        ):
+            summary["evidence_created"] += 1
+
+        summary["character_items_created"] += 1
 
     for extracted_event in extraction.events:
         # Timeline events are intentionally disabled for this MVP phase.
