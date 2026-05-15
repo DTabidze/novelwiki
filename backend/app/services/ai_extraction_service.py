@@ -3,10 +3,9 @@ import os
 from app.models import (
     Character,
     CharacterAlias,
-    CharacterItem,
+    CharacterSkill,
     CharacterLifeEvent,
     CharacterProgressionEvent,
-    CharacterSkill,
     Chapter,
     Item,
     Novel,
@@ -39,8 +38,19 @@ Before returning JSON, perform this workflow:
 classes, jobs, titles, and promotions.
 4. Attach every confirmed progression fact to the canonical character name from step 2.
 5. Extract important skills and important items only after characters/progression are handled.
-6. Scan once more for clear character-skill and character-item relationships involving those
-important characters, skills, and items.
+6. Extract clear character-skill relationships for important characters and named skills.
+7. Final progression audit: scan the chapter text literally for every phrase like
+"first/second/third/fourth/fifth level", "level of Qi Condensation", "Foundation Establishment",
+"Core Formation", "Nascent Soul", or any similar rank/realm phrase. For each match, identify the
+nearby character and decide whether it is a confirmed current level, breakthrough, repeated known
+value, or near-breakthrough. Output every confirmed current level or breakthrough that is not a
+repeated known value.
+If a named technique/skill is learned, known, used, mastered, created, or taught in this chapter,
+it is an important skill. If you output a character_skills entry for a skill that is not already
+listed in memory, also output that skill in skills.
+Do not put manuals, pills, artifacts, medicines, treasures, resources, or physical objects in
+skills. A manual or scroll is an item; only a named technique inside it is a skill. A pill or
+medicine is an item even if it helps cultivation.
 Progression extraction is mandatory. For every important character, extract confirmed current or
 changed cultivation/power/status facts. Use the chapter's exact terminology.
 Save a progression_event when the chapter confirms:
@@ -49,21 +59,35 @@ Save a progression_event when the chapter confirms:
 or status is stated for the first time
 - a level/rank is stated as a standalone realization or exclamation after training, meditation,
 resource use, battle, recovery, or breakthrough context
+A standalone exclamation such as "The third level of Qi condensation!" after cultivation,
+meditation, pill/resource use, spiritual energy changes, awakening, or breakthrough context is a
+confirmed progression fact. Do not skip it because it is short or lacks the character name in the
+same sentence; use the active viewpoint/nearby character from context.
+Position/class/job/title progression is only for durable role or status changes. Do not output
+item rewards, gifts, purchases, pill receipts, resource gains, or temporary possessions as
+progression_events.
 Extract every confirmed progression fact in the chapter. Do not stop after finding one person's
 level if another important character's level or breakthrough is also confirmed.
 Before returning JSON, perform a consistency check: if any character description mentions a
 confirmed cultivation level, power level, realm, rank, stage, position, class, job, title, or
 promotion, there must be a matching progression_event for that same character. Do not leave
 confirmed power/status facts only inside character descriptions.
+Also check skill descriptions, character_skills descriptions, and all evidence snippets. If any
+of them say a character has reached, was at, is at, or currently has a cultivation/power level,
+realm, stage, rank, layer, grade, class, job, title, or position, output a matching
+progression_event for that character. Do not leave confirmed power/status facts only inside skill
+or relationship text.
 Do not save:
 - almost/near/close to a breakthrough
 - plans, hopes, requirements, guesses, instructions, or future possibilities
+- statements that the character remains/stays at the same known level or has no change
 - repeated known values from memory
 Examples of confirmed progression wording include, but are not limited to:
 - "broke through into the second level"
 - "has reached the seventh level"
 - "his cultivation base was at the third level"
-- "The third level!" after a clear breakthrough/training context
+- "The third level!" or "The fourth level of Qi Condensation!" after a clear breakthrough/training context
+- "The third level of Qi condensation!" after consuming cultivation resources
 - "became an Outer Sect disciple"
 - "advanced to Foundation Establishment"
 These examples are only examples. Always preserve the chapter's exact power-system terms.
@@ -77,6 +101,10 @@ characters can be extracted when they have a stable label and meaningful story p
 They should have dialogue, recurring presence, conflict role, mentor role, useful information, or
 a relationship to a major character. Skip generic unnamed background people such as "a servant",
 "one disciple", "a monk", "a guard", "the young man", "the woman", or "one of the crowd".
+Extract nickname-first or descriptive-label recurring characters when they act in the scene, speak,
+travel with the protagonist, are remembered by the protagonist, or are later revealed to have a
+real name. Labels like "Fat Teenager", "Fatty", "Horse-faced Young Man", and similar stable story
+labels are characters, not generic background people.
 Do not create numbered or ordinal placeholder characters such as "Cultivation Monk 1",
 "First Cultivation Monk", "Second Cultivation Monk", "First Guard", or "Guard 2".
 Do not create group characters such as "Cultivation monks", "guards", "disciples", or "servants".
@@ -121,21 +149,40 @@ resurrection, sealing, or another long-term status change.
 level, rank, position, class, or power value must be output as a progression_event.
 - Do not output a known skill/item when it is merely used again. Output it only if it gains a new
 durable property, name, owner, or significance.
-- Extract character-skill and character-item relationships only when the chapter clearly supports
-the relationship. Examples: a character learns, knows, uses, creates, teaches, owns, receives,
-loses, steals, carries, or gives a named skill/item. Do not infer ownership from nearby mentions.
 - Character-skill relationships are important. If a chapter says or clearly shows that a character
 uses, learns, knows, masters, creates, or teaches a named technique/skill, output a
 character_skills entry even when the skill itself already exists in memory.
-- Before returning JSON, perform a relationship consistency check: if a skill description or skill
-evidence names the character who uses/learns/knows it, there must be a matching character_skills
-entry for that character and skill.
-- Character-item relationships should be durable or plot-important. Do not output "uses" for
-single-use pills, medicine, food, temporary supplies, or ordinary consumables unless the item is
-unique, recurring, owned long-term, stolen, lost, received as a notable reward, or plot-critical.
-- Do not output a relationship if the same character-skill or character-item relationship already
-appears in memory unless the relationship type is new.
+- If the character_skills entry uses a skill that is not listed in memory, output that same skill
+in skills with direct evidence from the chapter.
+- Never output pills, medicines, manuals, scrolls, artifacts, treasures, resources, or physical
+objects in skills or character_skills. Put those in items instead.
+- Do not repeat a known character-skill relationship from memory unless the relationship type is new.
 - Do not repeat progression values already listed in memory.
+"""
+
+PROGRESSION_AUDIT_PROMPT = """
+You perform a second-pass audit focused only on character power progression.
+Return only confirmed progression_events. Do not extract characters, skills, items, relationships,
+life events, or timeline events.
+
+Your job is to catch every confirmed cultivation/power/rank level in the chapter.
+Scan the chapter text literally for phrases such as:
+- first/second/third/fourth/fifth level
+- level of Qi Condensation, Foundation Establishment, Core Formation, Nascent Soul
+- cultivation foundation/base was, has reached, achieved, broke through, advanced to
+- short exclamations such as "The third level of Qi condensation!"
+
+For each match:
+- identify the character from nearby context or the active viewpoint character
+- output progression_type "cultivation_level" for cultivation realms/levels
+- use the chapter's exact level/realm wording in new_value
+- include old_value only when explicitly stated nearby
+- include short direct evidence
+
+Output confirmed current levels and breakthroughs even if the level appears as a short realization,
+thought, or exclamation after training, meditation, pill/resource use, or spiritual energy changes.
+Do not output near-breakthroughs, requirements, hopes, plans, guesses, or unchanged "still/remains"
+statements.
 """
 
 ALLOWED_EVENT_TYPES = {
@@ -231,18 +278,6 @@ def extract_chapter_with_ai(novel, chapter):
         description: str = Field(description="Brief description of the character-skill relationship")
         evidence: str = Field(description="Short supporting snippet proving the relationship")
 
-    class ExtractedCharacterItem(BaseModel):
-        character_name: str = Field(description="Canonical character name")
-        item_name: str = Field(description="Canonical item name")
-        relationship_type: str = Field(
-            description=(
-                "owns, receives, loses, steals, creates, carries, gives, or uses. "
-                "Avoid uses for ordinary single-use consumables."
-            )
-        )
-        description: str = Field(description="Brief description of the character-item relationship")
-        evidence: str = Field(description="Short supporting snippet proving the relationship")
-
     class ChapterExtraction(BaseModel):
         characters: list[ExtractedCharacter]
         skills: list[ExtractedSkill]
@@ -251,7 +286,9 @@ def extract_chapter_with_ai(novel, chapter):
         progression_events: list[ExtractedProgressionEvent]
         life_events: list[ExtractedLifeEvent]
         character_skills: list[ExtractedCharacterSkill]
-        character_items: list[ExtractedCharacterItem]
+
+    class ProgressionAuditExtraction(BaseModel):
+        progression_events: list[ExtractedProgressionEvent]
 
     api_key = os.getenv("OPENAI_API_KEY")
 
@@ -281,6 +318,27 @@ def extract_chapter_with_ai(novel, chapter):
     )
 
     extraction = response.output_parsed
+    progression_audit_response = client.responses.parse(
+        model=model,
+        input=[
+            {"role": "system", "content": PROGRESSION_AUDIT_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"Novel: {novel.title}\n"
+                    f"Chapter {chapter.chapter_number}: {chapter.title}\n\n"
+                    f"{memory_context}\n\n"
+                    "Current chapter text:\n"
+                    f"{chapter.content}"
+                ),
+            },
+        ],
+        text_format=ProgressionAuditExtraction,
+    )
+    extraction.progression_events.extend(
+        progression_audit_response.output_parsed.progression_events
+    )
+
     return save_chapter_extraction(novel, chapter, extraction)
 
 
@@ -372,24 +430,6 @@ def build_extraction_memory(novel):
     else:
         lines.append("- None yet")
 
-    lines.extend(["", "Known character-item relationships:"])
-    character_item_rows = (
-        CharacterItem.query.filter_by(novel_id=novel.id)
-        .order_by(CharacterItem.id.desc())
-        .limit(120)
-        .all()
-    )
-
-    if character_item_rows:
-        for relationship in character_item_rows:
-            character_name = relationship.character.name if relationship.character else "Unknown"
-            item_name = relationship.item.name if relationship.item else "Unknown"
-            lines.append(
-                f"- {character_name}: {relationship.relationship_type} {item_name}"
-            )
-    else:
-        lines.append("- None yet")
-
     lines.extend(
         [
             "",
@@ -398,7 +438,7 @@ def build_extraction_memory(novel):
             "- If a known character/skill/item is merely mentioned or used again, do not output it.",
             "- If a known skill reveals a new durable property, output the canonical skill name with the new detail.",
             "- If a known progression value is repeated, do not output it.",
-            "- If a known character-skill or character-item relationship is repeated, do not output it.",
+            "- If a known character-skill relationship is repeated, do not output it.",
             "- Only output new facts from the current chapter.",
         ]
     )
@@ -624,6 +664,21 @@ def add_character_alias(character, alias, chapter, evidence, allow_generic=False
     if not normalized_alias or normalized_alias.lower() == character.name.lower():
         return False
 
+    alias_label_key = descriptive_label_key(normalized_alias)
+
+    if alias_label_key:
+        normalized_evidence = normalize_evidence_text(evidence or "").lower()
+        normalized_label = normalized_alias.lower()
+        normalized_character_name = normalize_alias(character.name).lower()
+
+        if normalized_label not in normalized_evidence:
+            return False
+
+        if descriptive_label_key(character.name) == alias_label_key:
+            pass
+        elif normalized_character_name not in normalized_evidence:
+            return False
+
     if not allow_generic and normalized_alias.lower() in GENERIC_PERSON_LABELS:
         return False
 
@@ -817,6 +872,50 @@ def normalize_importance(importance):
         return "minor"
 
     return normalized_importance
+
+
+def is_wiki_significant_skill(name, category, description):
+    skill_text = f"{name} {category} {description}".lower()
+    blocked_terms = {
+        "artifact",
+        "bag",
+        "bottle",
+        "elixir",
+        "essence",
+        "gourd",
+        "jade slip",
+        "manual",
+        "medicine",
+        "mirror",
+        "pendant",
+        "pill",
+        "robe",
+        "scroll",
+        "spirit stone",
+        "stone",
+        "tablet",
+        "treasure",
+        "weapon",
+    }
+
+    if any(term in skill_text for term in blocked_terms):
+        return False
+
+    skill_terms = {
+        "ability",
+        "art",
+        "breathing",
+        "cultivation method",
+        "form",
+        "magic",
+        "method",
+        "power",
+        "skill",
+        "spell",
+        "technique",
+    }
+
+    return any(term in skill_text for term in skill_terms)
 
 
 def is_wiki_significant_item(name, category, description):
@@ -1127,6 +1226,113 @@ def normalize_value(value):
     return " ".join(value.lower().split())
 
 
+ORDINAL_WORDS = {
+    "first": 1,
+    "1st": 1,
+    "one": 1,
+    "second": 2,
+    "2nd": 2,
+    "two": 2,
+    "third": 3,
+    "3rd": 3,
+    "three": 3,
+    "fourth": 4,
+    "4th": 4,
+    "four": 4,
+    "fifth": 5,
+    "5th": 5,
+    "five": 5,
+    "sixth": 6,
+    "6th": 6,
+    "six": 6,
+    "seventh": 7,
+    "7th": 7,
+    "seven": 7,
+    "eighth": 8,
+    "8th": 8,
+    "eight": 8,
+    "ninth": 9,
+    "9th": 9,
+    "nine": 9,
+    "tenth": 10,
+    "10th": 10,
+    "ten": 10,
+}
+
+
+def progression_compare_key(progression_type, value):
+    normalized_value = normalize_value(value)
+
+    if progression_type != "cultivation_level":
+        return normalized_value
+
+    words = normalized_value.replace("-", " ").split()
+    level_number = None
+
+    for word in words:
+        clean_word = word.strip(".,:;!?()[]")
+
+        if clean_word in ORDINAL_WORDS:
+            level_number = ORDINAL_WORDS[clean_word]
+            break
+
+        if clean_word.isdigit():
+            level_number = int(clean_word)
+            break
+
+    if not level_number:
+        return normalized_value
+
+    realm = None
+    realm_terms = {
+        "qi condensation": "qi_condensation",
+        "foundation establishment": "foundation_establishment",
+        "core formation": "core_formation",
+        "nascent soul": "nascent_soul",
+    }
+
+    for term, realm_key in realm_terms.items():
+        if term in normalized_value:
+            realm = realm_key
+            break
+
+    return ("cultivation_level", realm, level_number)
+
+
+def progression_keys_match(existing_key, new_key):
+    if existing_key == new_key:
+        return True
+
+    if not (
+        isinstance(existing_key, tuple)
+        and isinstance(new_key, tuple)
+        and len(existing_key) == 3
+        and len(new_key) == 3
+    ):
+        return False
+
+    _, existing_realm, existing_level = existing_key
+    _, new_realm, new_level = new_key
+
+    if existing_level != new_level:
+        return False
+
+    return existing_realm is None or new_realm is None or existing_realm == new_realm
+
+
+def is_more_specific_progression_value(existing_value, new_value):
+    return len(normalize_value(new_value)) > len(normalize_value(existing_value))
+
+
+def progression_values_match(progression_type, first_value, second_value):
+    if not first_value or not second_value:
+        return False
+
+    first_key = progression_compare_key(progression_type, first_value)
+    second_key = progression_compare_key(progression_type, second_value)
+    return progression_keys_match(first_key, second_key)
+
+
 def normalize_progression_type(progression_type):
     normalized_type = progression_type.strip().lower().replace(" ", "_")
 
@@ -1140,6 +1346,73 @@ def normalize_progression_type(progression_type):
         return "power_rank"
 
     return normalized_type
+
+
+def is_valid_position_progression(new_value):
+    normalized_value = normalize_value(new_value)
+    blocked_action_terms = {
+        "acquired",
+        "accepted",
+        "bought",
+        "collected",
+        "consumed",
+        "earned",
+        "found",
+        "given",
+        "gifted",
+        "got",
+        "obtained",
+        "picked up",
+        "purchased",
+        "received",
+        "receives",
+        "sold",
+        "took",
+        "used",
+        "uses",
+        "was given",
+        "was gifted",
+        "was handed",
+        "was rewarded",
+        "won",
+    }
+    blocked_item_terms = {
+        "artifact",
+        "bag",
+        "bottle",
+        "elixir",
+        "essence",
+        "gourd",
+        "jade",
+        "manual",
+        "medicine",
+        "mirror",
+        "pendant",
+        "pill",
+        "resource",
+        "reward",
+        "robe",
+        "slip",
+        "spirit stone",
+        "stone",
+        "tablet",
+        "treasure",
+    }
+
+    if any(term in normalized_value for term in blocked_action_terms):
+        return False
+
+    if any(term in normalized_value for term in blocked_item_terms):
+        return False
+
+    return True
+
+
+def is_valid_progression_value(progression_type, new_value):
+    if progression_type == "position":
+        return is_valid_position_progression(new_value)
+
+    return True
 
 
 def is_confirmed_progression(progression):
@@ -1187,6 +1460,18 @@ def is_confirmed_progression(progression):
         "requires more",
         "need more",
         "would require",
+        "already at",
+        "currently at",
+        "currently remains",
+        "did not change",
+        "has not changed",
+        "no change",
+        "remained at",
+        "remains at",
+        "same level",
+        "still at",
+        "without change",
+        "without indication of change",
     }
     new_value = progression.new_value.lower()
 
@@ -1223,26 +1508,49 @@ def is_confirmed_progression(progression):
     return any(term in text for term in confirmation_terms)
 
 
-def update_character_current_progression(character, progression_type, new_value):
-    if progression_type == "cultivation_level":
-        character.current_cultivation_level = new_value
-    elif progression_type == "position":
-        character.current_position = new_value
-    elif progression_type == "class_rank":
-        character.current_class_rank = new_value
-    elif progression_type == "power_rank":
-        character.current_power_rank = new_value
+def recalculate_character_current_progression(character, progression_type):
+    field_by_type = {
+        "cultivation_level": "current_cultivation_level",
+        "position": "current_position",
+        "class_rank": "current_class_rank",
+        "power_rank": "current_power_rank",
+    }
+    field_name = field_by_type.get(progression_type)
+
+    if not field_name:
+        return
+
+    latest_progression = (
+        CharacterProgressionEvent.query.join(
+            Chapter,
+            CharacterProgressionEvent.chapter_id == Chapter.id,
+        )
+        .filter(
+            CharacterProgressionEvent.character_id == character.id,
+            CharacterProgressionEvent.progression_type == progression_type,
+        )
+        .order_by(Chapter.chapter_number.desc(), CharacterProgressionEvent.id.desc())
+        .first()
+    )
+
+    setattr(
+        character,
+        field_name,
+        latest_progression.new_value if latest_progression else None,
+    )
 
 
 def find_existing_progression(character, progression_type, new_value):
-    new_value_key = normalize_value(new_value)
+    new_value_key = progression_compare_key(progression_type, new_value)
     progression_rows = CharacterProgressionEvent.query.filter_by(
         character_id=character.id,
         progression_type=progression_type,
     ).all()
 
     for progression in progression_rows:
-        if normalize_value(progression.new_value) == new_value_key:
+        existing_key = progression_compare_key(progression.progression_type, progression.new_value)
+
+        if progression_keys_match(existing_key, new_value_key):
             return progression
 
     return None
@@ -1277,41 +1585,11 @@ def find_existing_character_skill(character, skill, relationship_type):
     ).first()
 
 
-def find_existing_character_item(character, item, relationship_type):
-    return CharacterItem.query.filter_by(
+def find_existing_character_skill_pair(character, skill):
+    return CharacterSkill.query.filter_by(
         character_id=character.id,
-        item_id=item.id,
-        relationship_type=relationship_type,
+        skill_id=skill.id,
     ).first()
-
-
-def is_noisy_character_item_relationship(item, relationship_type):
-    item_text = f"{item.name} {item.category} {item.description}".lower()
-
-    if relationship_type != "uses":
-        return False
-
-    consumable_terms = {
-        "pill",
-        "medicine",
-        "medicinal",
-        "elixir",
-        "food",
-        "consumable",
-    }
-
-    durable_exception_terms = {
-        "unique",
-        "artifact",
-        "treasure",
-        "recurring",
-        "plot-critical",
-        "plot critical",
-    }
-
-    return any(term in item_text for term in consumable_terms) and not any(
-        term in item_text for term in durable_exception_terms
-    )
 
 
 def merge_description(existing_description, new_description):
@@ -1335,7 +1613,6 @@ def save_chapter_extraction(novel, chapter, extraction):
         "events_created": 0,
         "progression_events_created": 0,
         "character_skills_created": 0,
-        "character_items_created": 0,
         "life_events_created": 0,
         "evidence_created": 0,
     }
@@ -1448,6 +1725,13 @@ def save_chapter_extraction(novel, chapter, extraction):
         if not has_meaningful_evidence(extracted_skill.evidence):
             continue
 
+        if not is_wiki_significant_skill(
+            extracted_skill.name,
+            extracted_skill.category,
+            extracted_skill.description,
+        ):
+            continue
+
         skill = find_existing_skill(novel, extracted_skill.name)
 
         if skill:
@@ -1514,10 +1798,43 @@ def save_chapter_extraction(novel, chapter, extraction):
         character = find_existing_character(novel, extracted_relationship.character_name)
         skill = find_existing_skill(novel, extracted_relationship.skill_name)
 
-        if not character or not skill:
+        if not character:
             continue
 
+        if not is_wiki_significant_skill(
+            extracted_relationship.skill_name,
+            "technique",
+            extracted_relationship.description,
+        ):
+            continue
+
+        if not skill:
+            skill = Skill(
+                novel_id=novel.id,
+                name=extracted_relationship.skill_name,
+                category="technique",
+                description=extracted_relationship.description,
+                review_status="pending",
+            )
+            db.session.add(skill)
+            db.session.flush()
+            summary["skills_created"] += 1
+
+            if add_evidence(
+                novel,
+                chapter,
+                "skill",
+                skill.id,
+                extracted_relationship.evidence,
+            ):
+                summary["evidence_created"] += 1
+
         relationship_type = normalize_relationship_type(extracted_relationship.relationship_type)
+        existing_skill_pair = find_existing_character_skill_pair(character, skill)
+
+        if existing_skill_pair:
+            continue
+
         existing_relationship = find_existing_character_skill(
             character,
             skill,
@@ -1553,57 +1870,6 @@ def save_chapter_extraction(novel, chapter, extraction):
             summary["evidence_created"] += 1
 
         summary["character_skills_created"] += 1
-
-    for extracted_relationship in extraction.character_items:
-        if not has_meaningful_evidence(extracted_relationship.evidence):
-            continue
-
-        character = find_existing_character(novel, extracted_relationship.character_name)
-        item = find_existing_by_name(Item, novel, extracted_relationship.item_name)
-
-        if not character or not item:
-            continue
-
-        relationship_type = normalize_relationship_type(extracted_relationship.relationship_type)
-
-        if is_noisy_character_item_relationship(item, relationship_type):
-            continue
-
-        existing_relationship = find_existing_character_item(
-            character,
-            item,
-            relationship_type,
-        )
-
-        if existing_relationship:
-            existing_relationship.description = merge_description(
-                existing_relationship.description,
-                extracted_relationship.description,
-            )
-            continue
-
-        relationship = CharacterItem(
-            novel_id=novel.id,
-            character_id=character.id,
-            item_id=item.id,
-            chapter_id=chapter.id,
-            relationship_type=relationship_type,
-            description=extracted_relationship.description,
-            review_status="pending",
-        )
-        db.session.add(relationship)
-        db.session.flush()
-
-        if add_evidence(
-            novel,
-            chapter,
-            "character_item",
-            relationship.id,
-            extracted_relationship.evidence,
-        ):
-            summary["evidence_created"] += 1
-
-        summary["character_items_created"] += 1
 
     for extracted_event in extraction.events:
         # Timeline events are intentionally disabled for this MVP phase.
@@ -1701,6 +1967,17 @@ def save_chapter_extraction(novel, chapter, extraction):
             summary["characters_created"] += 1
 
         progression_type = normalize_progression_type(extracted_progression.progression_type)
+
+        if not is_valid_progression_value(progression_type, extracted_progression.new_value):
+            continue
+
+        if progression_values_match(
+            progression_type,
+            extracted_progression.old_value,
+            extracted_progression.new_value,
+        ):
+            continue
+
         existing_progression = find_existing_progression(
             character,
             progression_type,
@@ -1708,6 +1985,27 @@ def save_chapter_extraction(novel, chapter, extraction):
         )
 
         if existing_progression:
+            if is_more_specific_progression_value(
+                existing_progression.new_value,
+                extracted_progression.new_value,
+            ):
+                existing_progression.new_value = extracted_progression.new_value
+                existing_progression.description = merge_description(
+                    existing_progression.description,
+                    extracted_progression.description,
+                )
+                recalculate_character_current_progression(character, progression_type)
+
+                if add_evidence(
+                    novel,
+                    chapter,
+                    "progression",
+                    existing_progression.id,
+                    extracted_progression.evidence,
+                ):
+                    summary["evidence_created"] += 1
+
+            recalculate_character_current_progression(character, progression_type)
             continue
 
         progression = CharacterProgressionEvent(
@@ -1721,12 +2019,8 @@ def save_chapter_extraction(novel, chapter, extraction):
             review_status="pending",
         )
         db.session.add(progression)
-        update_character_current_progression(
-            character,
-            progression_type,
-            extracted_progression.new_value,
-        )
         db.session.flush()
+        recalculate_character_current_progression(character, progression_type)
 
         if add_evidence(
             novel,

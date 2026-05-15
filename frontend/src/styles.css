@@ -249,6 +249,13 @@ button:disabled {
   margin: 0;
 }
 
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .summary-row {
   margin-bottom: 12px;
   color: #526171;

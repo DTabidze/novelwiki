@@ -148,3 +148,76 @@ def extract_single_chapter(novel_id, chapter_id):
     data["summary"] = summary
     data["extracted_chapter"] = chapter.to_reference_dict()
     return success(data)
+
+
+@admin_novels_bp.post("/novels/<int:novel_id>/extract-first-15")
+def extract_first_fifteen_chapters(novel_id):
+    novel = Novel.query.get_or_404(novel_id)
+    chapters = (
+        Chapter.query.filter_by(novel_id=novel.id)
+        .order_by(Chapter.chapter_number)
+        .limit(15)
+        .all()
+    )
+
+    if not chapters:
+        return failure("No chapters found for this novel.")
+
+    aggregate_summary = {
+        "characters_created": 0,
+        "characters_updated": 0,
+        "skills_created": 0,
+        "skills_updated": 0,
+        "items_created": 0,
+        "items_updated": 0,
+        "events_created": 0,
+        "progression_events_created": 0,
+        "character_skills_created": 0,
+        "life_events_created": 0,
+        "evidence_created": 0,
+    }
+    chapter_summaries = []
+
+    try:
+        novel.status = "processing"
+        novel.error_message = None
+        db.session.commit()
+
+        for chapter in chapters:
+            summary = extract_chapter_with_ai(novel, chapter)
+            chapter_summaries.append(
+                {
+                    "chapter": chapter.to_reference_dict(),
+                    "summary": summary,
+                }
+            )
+
+            for key in aggregate_summary:
+                aggregate_summary[key] += summary.get(key, 0)
+    except RuntimeError as error:
+        novel.status = "failed"
+        novel.error_message = str(error)
+        db.session.commit()
+        return failure(str(error), status=400)
+    except AuthenticationError:
+        novel.status = "failed"
+        novel.error_message = "OpenAI API key was rejected. Check backend/.env and restart Flask."
+        db.session.commit()
+        return failure(novel.error_message, status=401)
+    except RateLimitError:
+        novel.status = "failed"
+        novel.error_message = "OpenAI API quota is unavailable. Check project billing and usage limits."
+        db.session.commit()
+        return failure(novel.error_message, status=429)
+    except Exception as error:
+        novel.status = "failed"
+        novel.error_message = "AI extraction failed. Check backend logs for details."
+        db.session.commit()
+        current_app.logger.exception("AI batch extraction failed: %s", error)
+        return failure(novel.error_message, status=500)
+
+    data = get_extracted_data(novel)
+    data["summary"] = aggregate_summary
+    data["extracted_chapter_count"] = len(chapter_summaries)
+    data["chapter_summaries"] = chapter_summaries
+    return success(data)

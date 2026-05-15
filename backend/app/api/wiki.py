@@ -54,11 +54,15 @@ def evidence_for(entity_type, entity_id):
 
 def approved_progression_for_character(character_id):
     return (
-        CharacterProgressionEvent.query.filter_by(
-            character_id=character_id,
-            review_status=APPROVED,
+        CharacterProgressionEvent.query.join(
+            Chapter,
+            CharacterProgressionEvent.chapter_id == Chapter.id,
         )
-        .order_by(CharacterProgressionEvent.id)
+        .filter(
+            CharacterProgressionEvent.character_id == character_id,
+            CharacterProgressionEvent.review_status == APPROVED,
+        )
+        .order_by(Chapter.chapter_number, CharacterProgressionEvent.id)
         .all()
     )
 

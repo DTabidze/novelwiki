@@ -250,10 +250,20 @@ function WikiEvidence({ evidence }) {
   );
 }
 
+function firstDescriptionChunk(description) {
+  if (!description) {
+    return "";
+  }
+
+  return description.split(/\n\s*\n/)[0].trim();
+}
+
 function WikiCharacterDetail({ character }) {
   if (!character) {
     return <p>Select a character to read their wiki page.</p>;
   }
+
+  const displayDescription = firstDescriptionChunk(character.description);
 
   return (
     <article className="wiki-detail">
@@ -281,9 +291,7 @@ function WikiCharacterDetail({ character }) {
         </div>
       ) : null}
 
-      {character.description ? <p>{character.description}</p> : null}
-
-      <WikiEvidence evidence={character.evidence} />
+      {displayDescription ? <p>{displayDescription}</p> : null}
 
       <section className="wiki-subsection">
         <h4>Progression</h4>
@@ -519,6 +527,7 @@ function App() {
   const [message, setMessage] = React.useState("");
   const [isUploading, setIsUploading] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isBatchExtracting, setIsBatchExtracting] = React.useState(false);
   const [extractingChapterId, setExtractingChapterId] = React.useState(null);
   const [extractedData, setExtractedData] = React.useState(null);
   const [wikiCharacters, setWikiCharacters] = React.useState([]);
@@ -670,6 +679,33 @@ function App() {
     }
   }
 
+  async function handleExtractFirstFifteen() {
+    if (!selectedNovelId) {
+      setMessage("Select a novel first.");
+      return;
+    }
+
+    setIsBatchExtracting(true);
+    setMessage("Extracting first 15 chapters in order...");
+
+    try {
+      const data = await fetchJson(
+        `${API_BASE_URL}/admin/novels/${selectedNovelId}/extract-first-15`,
+        {
+          method: "POST",
+        }
+      );
+
+      setExtractedData(data);
+      setMessage(buildBatchExtractionMessage(data));
+      await loadNovels();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsBatchExtracting(false);
+    }
+  }
+
   function updateExtractedRecord(entityType, updatedRecord) {
     setExtractedData((currentData) => {
       if (!currentData) {
@@ -704,14 +740,34 @@ function App() {
     const characterCount = summary.characters_created + summary.characters_updated;
     const skillCount = summary.skills_created + summary.skills_updated;
     const itemCount = summary.items_created + summary.items_updated;
+    const characterSkillCount = summary.character_skills_created || 0;
 
     return (
       `Chapter ${chapter.chapter_number} extracted: ` +
       `${characterCount} characters, ${skillCount} skills, ` +
-      `${itemCount} items, ${summary.progression_events_created} progression, ` +
-      `${summary.character_skills_created} character skills, ` +
-      `${summary.character_items_created} character items, ` +
+      `${itemCount} items, ${characterSkillCount} character skills, ` +
+      `${summary.progression_events_created} progression, ` +
       `${summary.life_events_created} life events, ${summary.events_created} timeline facts.`
+    );
+  }
+
+  function buildBatchExtractionMessage(data) {
+    if (!data.summary || !data.extracted_chapter_count) {
+      return "Batch extraction finished. Review the pending records below.";
+    }
+
+    const summary = data.summary;
+    const characterCount = summary.characters_created + summary.characters_updated;
+    const skillCount = summary.skills_created + summary.skills_updated;
+    const itemCount = summary.items_created + summary.items_updated;
+    const characterSkillCount = summary.character_skills_created || 0;
+
+    return (
+      `Extracted ${data.extracted_chapter_count} chapters: ` +
+      `${characterCount} characters, ${skillCount} skills, ` +
+      `${itemCount} items, ${characterSkillCount} character skills, ` +
+      `${summary.progression_events_created} progression, ` +
+      `${summary.life_events_created} life events.`
     );
   }
 
@@ -870,7 +926,7 @@ function App() {
                             <span>{chapter.character_count.toLocaleString()} chars</span>
                             <button
                               type="button"
-                              disabled={extractingChapterId === chapter.id}
+                              disabled={isBatchExtracting || extractingChapterId === chapter.id}
                               onClick={() => handleExtractChapter(chapter.id)}
                             >
                               {extractingChapterId === chapter.id ? "Extracting..." : "AI Extract"}
@@ -886,9 +942,22 @@ function App() {
               <section className="panel extraction-panel">
                 <div className="panel-header">
                   <h2>Extraction Pipeline</h2>
-                  <button type="button" disabled={!selectedNovelId || isProcessing} onClick={handleProcessNovel}>
-                    {isProcessing ? "Processing..." : "Run Placeholder Processing"}
-                  </button>
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      disabled={!selectedNovelId || isProcessing || isBatchExtracting}
+                      onClick={handleProcessNovel}
+                    >
+                      {isProcessing ? "Processing..." : "Run Placeholder Processing"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!selectedNovelId || isBatchExtracting || extractingChapterId}
+                      onClick={handleExtractFirstFifteen}
+                    >
+                      {isBatchExtracting ? "Extracting 1-15..." : "Extract First 15"}
+                    </button>
+                  </div>
                 </div>
 
                 {!selectedNovelId ? <p>Select a novel to run placeholder extraction.</p> : null}
