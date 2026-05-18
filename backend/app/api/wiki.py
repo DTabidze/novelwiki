@@ -11,6 +11,7 @@ from app.models import (
     Novel,
     Skill,
     WikiEvidence,
+    WikiEvent,
 )
 
 
@@ -197,7 +198,38 @@ def public_item(item):
     }
 
 
+def review_count(model, novel_id, status):
+    return model.query.filter_by(novel_id=novel_id, review_status=status).count()
+
+
 def public_novel(novel):
+    approved_entry_count = sum(
+        review_count(model, novel.id, APPROVED)
+        for model in (
+            Character,
+            Skill,
+            Item,
+            CharacterProgressionEvent,
+            CharacterSkill,
+            CharacterItem,
+            CharacterLifeEvent,
+            WikiEvent,
+        )
+    )
+    pending_review_count = sum(
+        review_count(model, novel.id, "pending")
+        for model in (
+            Character,
+            Skill,
+            Item,
+            CharacterProgressionEvent,
+            CharacterSkill,
+            CharacterItem,
+            CharacterLifeEvent,
+            WikiEvent,
+        )
+    )
+
     return {
         "id": novel.id,
         "title": novel.title,
@@ -214,6 +246,13 @@ def public_novel(novel):
             novel_id=novel.id,
             review_status=APPROVED,
         ).count(),
+        "approved_progression_count": CharacterProgressionEvent.query.filter_by(
+            novel_id=novel.id,
+            review_status=APPROVED,
+        ).count(),
+        "approved_entry_count": approved_entry_count,
+        "pending_review_count": pending_review_count,
+        "updated_at": novel.updated_at.isoformat() if novel.updated_at else None,
     }
 
 

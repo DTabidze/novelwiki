@@ -1,5 +1,15 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import "./styles.css";
 
 const API_BASE_URL = "http://127.0.0.1:5050/api";
@@ -258,106 +268,444 @@ function firstDescriptionChunk(description) {
   return description.split(/\n\s*\n/)[0].trim();
 }
 
-function WikiCharacterDetail({ character }) {
+function initialsForName(name) {
+  return (name || "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function chapterLabel(chapter) {
+  return chapter ? `Chapter ${chapter.chapter_number}` : "Unknown chapter";
+}
+
+function relationshipLabel(relationship) {
+  const type = relationship.relationship_type
+    ? relationship.relationship_type.replace("_", " ")
+    : "known";
+  const chapter = relationship.chapter ? ` in Chapter ${relationship.chapter.chapter_number}` : "";
+  return `${type.charAt(0).toUpperCase()}${type.slice(1)}${chapter}`;
+}
+
+function WikiAvatar({ name, size = "large" }) {
+  return (
+    <div className={`wiki-avatar ${size}`} aria-hidden="true">
+      <span>{initialsForName(name)}</span>
+    </div>
+  );
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  return new Date(value).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function WikiNovelOverview({ characters, items, novel, onOpenCharacters, onSelectCharacter, skills }) {
+  const featuredCharacters = characters.slice(0, 4);
+  const featuredSkills = skills.slice(0, 2);
+  const featuredItems = items.slice(0, 2);
+  const browseCards = [
+    ["Characters", novel.approved_character_count, "View all characters", onOpenCharacters],
+    ["Cultivation", novel.approved_progression_count, "Explore progression", null],
+    ["Skills", novel.approved_skill_count, "View all skills", null],
+    ["Items", novel.approved_item_count, "View all items", null],
+    ["Organizations", 0, "Coming later", null],
+    ["Places", 0, "Coming later", null],
+    ["Timeline", 0, "Major events later", null],
+  ];
+
+  return (
+    <article className="wiki-novel-page">
+      <section className="wiki-novel-hero">
+        <div className="wiki-novel-cover">
+          <WikiAvatar name={novel.title} />
+        </div>
+        <div className="wiki-novel-info">
+          <h1>{novel.title}</h1>
+          <span className="wiki-novel-tag">Cultivation Novel</span>
+          <div className="wiki-novel-meta">
+            <span>Author: Unknown</span>
+            <span>Status: Tracking</span>
+            <span>Chapters Tracked: {formatNumber(novel.chapter_count)}</span>
+          </div>
+          <p>
+            A structured public wiki built from reviewed extraction data. Browse approved
+            characters, cultivation progression, skills, items, and future world entries.
+          </p>
+        </div>
+      </section>
+
+      <section className="wiki-stats-bar">
+        <div>
+          <strong>{formatNumber(novel.chapter_count)}</strong>
+          <span>Chapters</span>
+        </div>
+        <div>
+          <strong>{formatNumber(novel.approved_character_count)}</strong>
+          <span>Approved Characters</span>
+        </div>
+        <div>
+          <strong>{formatNumber(novel.approved_progression_count)}</strong>
+          <span>Progression Facts</span>
+        </div>
+        <div>
+          <strong>{formatNumber(novel.approved_skill_count)}</strong>
+          <span>Skills</span>
+        </div>
+        <div>
+          <strong>{formatNumber(novel.approved_item_count)}</strong>
+          <span>Items</span>
+        </div>
+      </section>
+
+      <section className="wiki-overview-grid">
+        <div className="wiki-card">
+          <div className="wiki-card-heading">
+            <h2>Main Characters</h2>
+            <button className="wiki-text-link" type="button" onClick={onOpenCharacters}>
+              View all characters
+            </button>
+          </div>
+          <div className="wiki-character-card-grid">
+            {featuredCharacters.map((character) => (
+              <button
+                className="wiki-character-card"
+                key={character.id}
+                type="button"
+                onClick={() => onSelectCharacter(character)}
+              >
+                <WikiAvatar name={character.name} size="small" />
+                <strong>{character.name}</strong>
+                <span>{character.current_cultivation_level || character.current_position || "Character"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="wiki-card">
+          <h2>Data & Tracking Status</h2>
+          <div className="wiki-status-list">
+            <div>
+              <span>Last updated</span>
+              <strong>{formatDate(novel.updated_at)}</strong>
+            </div>
+            <div>
+              <span>Approved entries</span>
+              <strong>{formatNumber(novel.approved_entry_count)}</strong>
+            </div>
+            <div>
+              <span>Pending review</span>
+              <strong>{formatNumber(novel.pending_review_count)}</strong>
+            </div>
+            <div>
+              <span>Coverage</span>
+              <strong>Up to {formatNumber(novel.chapter_count)} chapters</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="wiki-card">
+        <h2>Browse This Novel</h2>
+        <div className="wiki-browse-grid">
+          {browseCards.map(([label, count, subtitle, action]) => (
+            <button
+              className="wiki-browse-card"
+              disabled={!action}
+              key={label}
+              type="button"
+              onClick={action || undefined}
+            >
+              <span>{label.slice(0, 1)}</span>
+              <div>
+                <strong>{label}</strong>
+                <small>
+                  {formatNumber(count)} {subtitle}
+                </small>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {(featuredSkills.length > 0 || featuredItems.length > 0) && (
+        <section className="wiki-overview-grid compact">
+          <div className="wiki-card">
+            <h2>Featured Skills</h2>
+            {featuredSkills.map((skill) => (
+              <div className="wiki-mini-link" key={skill.id}>
+                <strong>{skill.name}</strong>
+                <span>{skill.category || "Skill"}</span>
+              </div>
+            ))}
+          </div>
+          <div className="wiki-card">
+            <h2>Featured Items</h2>
+            {featuredItems.map((item) => (
+              <div className="wiki-mini-link" key={item.id}>
+                <strong>{item.name}</strong>
+                <span>{item.category || "Item"}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </article>
+  );
+}
+
+function WikiLandingPage({ novels, onLoadNovel }) {
+  return (
+    <article className="wiki-landing-page wiki-novel-library">
+      <section className="wiki-library-header">
+        <h1>Novels</h1>
+        <p>Browse and explore cultivation novels with automatically extracted wiki data.</p>
+      </section>
+
+      <section className="wiki-library-toolbar">
+        <input type="search" placeholder="Search novels..." />
+        <select defaultValue="all">
+          <option value="all">Status: All</option>
+          <option value="tracking">Tracking</option>
+          <option value="complete">Complete</option>
+        </select>
+        <select defaultValue="all">
+          <option value="all">Chapters: All</option>
+          <option value="short">Under 250</option>
+          <option value="long">250+</option>
+        </select>
+        <select defaultValue="recent">
+          <option value="recent">Sort: Recently Updated</option>
+          <option value="title">Sort: Title</option>
+        </select>
+        <span>{formatNumber(novels.length)} novels</span>
+      </section>
+
+      <section className="wiki-card wiki-novel-table-card">
+        {novels.length === 0 ? <p>No novels available yet.</p> : null}
+        <div className="wiki-novel-table">
+          <div className="wiki-novel-table-head">
+            <span>Novel</span>
+            <span>Author</span>
+            <span>Status</span>
+            <span>Chapters</span>
+            <span>Last Updated</span>
+            <span>Actions</span>
+          </div>
+          {novels.map((wikiNovel) => (
+            <button
+              className="wiki-novel-row"
+              key={wikiNovel.id}
+              type="button"
+              onClick={() => onLoadNovel(wikiNovel.id)}
+            >
+              <div className="wiki-novel-row-title">
+                <WikiAvatar name={wikiNovel.title} size="tiny" />
+                <div>
+                  <strong>{wikiNovel.title}</strong>
+                  <small>Cultivation Novel</small>
+                </div>
+              </div>
+              <span>Unknown</span>
+              <span className="wiki-status-tag">Tracking</span>
+              <strong>{formatNumber(wikiNovel.chapter_count)}</strong>
+              <span>{formatDate(wikiNovel.updated_at)}</span>
+              <span className="wiki-row-action">›</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </article>
+  );
+}
+
+function WikiCharacterBrowser({ characters, novel, onSelectCharacter }) {
+  return (
+    <article className="wiki-character-browser">
+      <section className="wiki-library-header compact">
+        <span className="wiki-novel-tag">{novel.title}</span>
+        <h1>Characters</h1>
+        <p>Browse approved characters for this novel.</p>
+      </section>
+
+      <section className="wiki-card">
+        <div className="wiki-card-heading">
+          <h2>All Characters</h2>
+          <span>{formatNumber(characters.length)} approved</span>
+        </div>
+        {characters.length === 0 ? <p>No approved characters yet.</p> : null}
+        <div className="wiki-character-browser-grid">
+          {characters.map((character) => (
+            <button
+              className="wiki-character-browser-card"
+              key={character.id}
+              type="button"
+              onClick={() => onSelectCharacter(character)}
+            >
+              <WikiAvatar name={character.name} size="small" />
+              <div>
+                <strong>{character.name}</strong>
+                <span>{character.current_cultivation_level || character.current_position || "Character"}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+    </article>
+  );
+}
+
+function WikiCharacterDetail({ character, relatedCharacters = [], onSelectRelated }) {
   if (!character) {
-    return <p>Select a character to read their wiki page.</p>;
+    return (
+      <section className="wiki-empty-panel">
+        <h2>Select a character</h2>
+        <p>Choose an approved character from the sidebar to view their public wiki page.</p>
+      </section>
+    );
   }
 
   const displayDescription = firstDescriptionChunk(character.description);
+  const progressionEvents = [...(character.progression_events || [])].sort((first, second) => {
+    const firstChapter = first.chapter ? first.chapter.chapter_number : 0;
+    const secondChapter = second.chapter ? second.chapter.chapter_number : 0;
+    return secondChapter - firstChapter;
+  });
+  const currentProgression = progressionEvents.find(
+    (event) =>
+      character.current_cultivation_level &&
+      event.new_value &&
+      event.new_value.toLowerCase() === character.current_cultivation_level.toLowerCase()
+  );
+  const shownRelatedCharacters = relatedCharacters
+    .filter((related) => related.id !== character.id)
+    .slice(0, 3);
 
   return (
-    <article className="wiki-detail">
-      <h3>{character.name}</h3>
-
-      <div className="meta-lines">
-        {character.current_cultivation_level ? (
-          <span>Current cultivation: {character.current_cultivation_level}</span>
-        ) : null}
-        {character.current_position ? <span>Current position: {character.current_position}</span> : null}
-        {character.first_mentioned_chapter ? (
-          <span>First mentioned: Chapter {character.first_mentioned_chapter.chapter_number}</span>
-        ) : null}
-        {character.first_appeared_chapter ? (
-          <span>First appeared: Chapter {character.first_appeared_chapter.chapter_number}</span>
-        ) : null}
-      </div>
-
-      {character.aliases && character.aliases.length > 0 ? (
-        <div className="alias-list">
-          <strong>Aliases</strong>
-          {character.aliases.map((alias) => (
-            <span key={alias.id}>{alias.alias}</span>
-          ))}
+    <article className="wiki-character-page">
+      <section className="wiki-hero-card">
+        <div className="wiki-portrait">
+          <WikiAvatar name={character.name} />
         </div>
-      ) : null}
 
-      {displayDescription ? <p>{displayDescription}</p> : null}
+        <div className="wiki-hero-main">
+          <div className="wiki-title-row">
+            <h1>{character.name}</h1>
+            <span className="wiki-title-mark">Qi</span>
+          </div>
 
-      <section className="wiki-subsection">
-        <h4>Progression</h4>
-        {character.progression_events && character.progression_events.length === 0 ? (
-          <p>No approved progression yet.</p>
-        ) : null}
-        {(character.progression_events || []).map((event) => (
-          <article className="mini-record" key={event.id}>
-            <strong>{event.new_value}</strong>
-            <p>
-              {event.chapter ? `Chapter ${event.chapter.chapter_number}` : "Unknown chapter"}
-              {event.old_value ? `, from ${event.old_value}` : ""}
-            </p>
-            {event.description ? <p>{event.description}</p> : null}
-            <WikiEvidence evidence={event.evidence} />
-          </article>
-        ))}
+          <div className="wiki-fact-grid">
+            <div className="wiki-fact">
+              <span className="wiki-fact-icon">C</span>
+              <div>
+                <small>Current Cultivation</small>
+                <strong>{character.current_cultivation_level || "Unknown"}</strong>
+              </div>
+            </div>
+            <div className="wiki-fact">
+              <span className="wiki-fact-icon">P</span>
+              <div>
+                <small>Current Position</small>
+                <strong>{character.current_position || "Unknown"}</strong>
+              </div>
+            </div>
+            <div className="wiki-fact">
+              <span className="wiki-fact-icon">B</span>
+              <div>
+                <small>First Mentioned</small>
+                <strong>{chapterLabel(character.first_mentioned_chapter)}</strong>
+              </div>
+            </div>
+            <div className="wiki-fact">
+              <span className="wiki-fact-icon">A</span>
+              <div>
+                <small>Aliases</small>
+                <strong>
+                  {character.aliases && character.aliases.length > 0
+                    ? character.aliases.map((alias) => alias.alias).join(", ")
+                    : "N/A"}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {displayDescription ? <p className="wiki-description">{displayDescription}</p> : null}
+        </div>
       </section>
 
-      {character.skills && character.skills.length > 0 ? (
-        <section className="wiki-subsection">
-          <h4>Skills</h4>
-          {character.skills.map((relationship) => (
-            <article className="mini-record" key={relationship.id}>
-              <strong>{relationship.skill ? relationship.skill.name : "Unknown skill"}</strong>
-              <p>
-                {relationship.relationship_type.replace("_", " ")}
-                {relationship.chapter ? `, Chapter ${relationship.chapter.chapter_number}` : ""}
-              </p>
-              {relationship.description ? <p>{relationship.description}</p> : null}
-              <WikiEvidence evidence={relationship.evidence} />
-            </article>
-          ))}
-        </section>
-      ) : null}
+      <section className="wiki-content-grid">
+        <div className="wiki-card wiki-progression-card">
+          <h2>Cultivation Progression</h2>
+          {progressionEvents.length === 0 ? <p>No approved progression yet.</p> : null}
+          <div className="wiki-timeline">
+            {progressionEvents.map((event) => {
+              const isCurrent = currentProgression ? currentProgression.id === event.id : false;
 
-      {character.items && character.items.length > 0 ? (
-        <section className="wiki-subsection">
-          <h4>Items</h4>
-          {character.items.map((relationship) => (
-            <article className="mini-record" key={relationship.id}>
-              <strong>{relationship.item ? relationship.item.name : "Unknown item"}</strong>
-              <p>
-                {relationship.relationship_type.replace("_", " ")}
-                {relationship.chapter ? `, Chapter ${relationship.chapter.chapter_number}` : ""}
-              </p>
-              {relationship.description ? <p>{relationship.description}</p> : null}
-              <WikiEvidence evidence={relationship.evidence} />
-            </article>
-          ))}
-        </section>
-      ) : null}
+              return (
+                <article className={isCurrent ? "wiki-timeline-row active" : "wiki-timeline-row"} key={event.id}>
+                  <span className="wiki-timeline-dot" />
+                  <div>
+                    <small>{chapterLabel(event.chapter)}</small>
+                    <strong>{event.new_value}</strong>
+                    {event.old_value ? <p>From {event.old_value}</p> : null}
+                  </div>
+                  {isCurrent ? <span className="wiki-stage-pill">Current Stage</span> : null}
+                </article>
+              );
+            })}
+          </div>
+        </div>
 
-      {character.life_events && character.life_events.length > 0 ? (
-        <section className="wiki-subsection">
-          <h4>Life Events</h4>
-          {character.life_events.map((event) => (
-            <article className="mini-record" key={event.id}>
-              <strong>{event.event_type.replace("_", " ")}</strong>
-              {event.description ? <p>{event.description}</p> : null}
-              {event.reason ? <p>Reason: {event.reason}</p> : null}
-              <WikiEvidence evidence={event.evidence} />
-            </article>
-          ))}
-        </section>
-      ) : null}
+        <div className="wiki-side-stack">
+          <section className="wiki-card">
+            <h2>Skills</h2>
+            {character.skills && character.skills.length > 0 ? (
+              character.skills.map((relationship) => (
+                <article className="wiki-skill-row" key={relationship.id}>
+                  <span className="wiki-skill-icon">F</span>
+                  <div>
+                    <strong>{relationship.skill ? relationship.skill.name : "Unknown skill"}</strong>
+                    <p>{relationshipLabel(relationship)}</p>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p>No approved skills yet.</p>
+            )}
+          </section>
+
+          <section className="wiki-card">
+            <h2>Related Characters</h2>
+            {shownRelatedCharacters.length === 0 ? <p>No related characters yet.</p> : null}
+            {shownRelatedCharacters.map((related) => (
+              <button
+                className="wiki-related-row"
+                key={related.id}
+                type="button"
+                onClick={() => onSelectRelated(related)}
+              >
+                <WikiAvatar name={related.name} size="small" />
+                <span>{related.name}</span>
+                <small>{related.current_cultivation_level || related.current_position || ""}</small>
+              </button>
+            ))}
+          </section>
+        </div>
+      </section>
     </article>
   );
 }
@@ -418,107 +766,261 @@ function WikiItemDetail({ item }) {
 function WikiPanel({
   characters,
   items,
+  page,
   loading,
   novel,
   novels,
   onLoadNovel,
+  onOpenAdmin,
   onSelectCharacter,
-  onSelectItem,
-  onSelectSkill,
   selectedCharacter,
-  selectedItem,
   selectedNovelId,
-  selectedSkill,
   skills,
 }) {
+  const navigate = useNavigate();
+  const trackedNovel = novel;
+  const activeSection = !trackedNovel ? "Novels" : page === "Character" ? "Characters" : page;
+  const globalNav = ["Novels", "Recent Updates", "Bookmarks", "About"];
+  const novelNav = ["Novels", "Overview", "Characters", "Cultivation", "Skills", "Items", "Organizations", "Places", "Timeline"];
+
+  function openNovel(novelId) {
+    navigate(`/wiki/novels/${novelId}`);
+  }
+
+  function openCharacters() {
+    if (trackedNovel) {
+      navigate(`/wiki/novels/${trackedNovel.id}/characters`);
+    }
+  }
+
+  function openCharacter(character) {
+    if (trackedNovel) {
+      navigate(`/wiki/novels/${trackedNovel.id}/characters/${character.id}`);
+    }
+  }
+
+  function handleNav(label) {
+    if (label === "Novels") {
+      navigate("/wiki/novels");
+      return;
+    }
+
+    if (!trackedNovel) {
+      return;
+    }
+
+    if (label === "Overview") {
+      navigate(`/wiki/novels/${trackedNovel.id}`);
+      return;
+    }
+
+    if (label === "Characters") {
+      openCharacters();
+    }
+  }
+
   return (
-    <section className="layout wiki-layout">
-      <aside className="panel novel-list">
-        <h2>Wiki Novels</h2>
-        {novels.length === 0 ? <p>No novels available.</p> : null}
-        {novels.map((wikiNovel) => (
-          <button
-            className={selectedNovelId === wikiNovel.id ? "novel-button active" : "novel-button"}
-            key={wikiNovel.id}
-            type="button"
-            onClick={() => onLoadNovel(wikiNovel.id)}
-          >
-            <span>{wikiNovel.title}</span>
-            <small>{wikiNovel.chapter_count} chapters</small>
-            <small>{wikiNovel.approved_character_count} approved characters</small>
-          </button>
-        ))}
+    <section className="wiki-app">
+      <aside className="wiki-sidebar">
+        <div className="wiki-brand">
+          <div className="wiki-logo">NW</div>
+          <strong>Cultivation Wiki</strong>
+          <span>Explore the Dao</span>
+        </div>
+
+        <input className="wiki-sidebar-search" type="search" placeholder="Search wiki..." />
+
+        <nav className="wiki-nav">
+          {(trackedNovel ? novelNav : globalNav).map((label) => (
+            <button
+              className={label === activeSection ? "active" : ""}
+              disabled={
+                Boolean(trackedNovel) &&
+                !["Novels", "Overview", "Characters"].includes(label)
+              }
+              key={label}
+              type="button"
+              onClick={() => handleNav(label)}
+            >
+              <span>{label.slice(0, 1)}</span>
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="wiki-sidebar-section">
+          <div className="wiki-sidebar-title">
+            <span>{trackedNovel ? "Selected Novel" : "Novel Context"}</span>
+            <button type="button" onClick={onOpenAdmin}>
+              Admin
+            </button>
+          </div>
+          {trackedNovel ? (
+            <button
+              className="wiki-tracked-novel active"
+              type="button"
+              onClick={() => openNovel(trackedNovel.id)}
+            >
+              <WikiAvatar name={trackedNovel.title} size="tiny" />
+              <span>{trackedNovel.title}</span>
+              <small>{trackedNovel.approved_character_count} characters</small>
+            </button>
+          ) : (
+            <p className="wiki-sidebar-context-empty">
+              Select a novel from the main list to browse its characters, skills, and progression.
+            </p>
+          )}
+        </div>
       </aside>
 
-      <div className="content-stack">
-        <section className="panel">
-          <h2>{novel ? novel.title : "Public Wiki"}</h2>
-          {!novel ? <p>Select a novel to view approved wiki data.</p> : null}
-          {loading ? <p>Loading wiki data...</p> : null}
-          {novel ? (
-            <div className="summary-row">
-              <span>{novel.approved_character_count} characters</span>
-              <span>{novel.approved_skill_count} skills</span>
-              <span>{novel.approved_item_count} items</span>
-            </div>
+      <div className="wiki-main">
+        <header className="wiki-topbar">
+          <div className="wiki-breadcrumb">
+            <Link to="/wiki/novels">Home</Link>
+            <span>/</span>
+            <Link to="/wiki/novels">Novels</Link>
+            {trackedNovel ? (
+              <>
+                <span>/</span>
+                <Link to={`/wiki/novels/${trackedNovel.id}`}>{trackedNovel.title}</Link>
+              </>
+            ) : null}
+            {page === "Characters" ? (
+              <>
+                <span>/</span>
+                <strong>Characters</strong>
+              </>
+            ) : null}
+            {page === "Character" && selectedCharacter ? (
+              <>
+                <span>/</span>
+                <Link to={`/wiki/novels/${trackedNovel.id}/characters`}>Characters</Link>
+                <span>/</span>
+                <strong>{selectedCharacter.name}</strong>
+              </>
+            ) : null}
+          </div>
+          <input className="wiki-search" type="search" placeholder="Search characters, novels, skills..." />
+        </header>
+
+        <div className="wiki-content">
+          {!trackedNovel ? (
+            <WikiLandingPage novels={novels} onLoadNovel={openNovel} />
           ) : null}
-        </section>
 
-        {novel ? (
-          <section className="wiki-grid">
-            <div className="panel">
-              <h2>Characters</h2>
-              <WikiRecordList
-                emptyText="No approved characters yet."
-                items={characters}
-                onSelect={onSelectCharacter}
-                selectedId={selectedCharacter ? selectedCharacter.id : null}
-              />
-            </div>
+          {loading ? <p className="wiki-loading">Loading wiki data...</p> : null}
 
-            <div className="panel">
-              <h2>Character Page</h2>
-              <WikiCharacterDetail character={selectedCharacter} />
-            </div>
+          {trackedNovel ? (
+            <>
+              <section className="wiki-browser-strip">
+                <div>
+                  <strong>{trackedNovel.title}</strong>
+                  <span>
+                    {trackedNovel.approved_character_count} characters / {trackedNovel.approved_skill_count} skills /{" "}
+                    {trackedNovel.approved_item_count} items
+                  </span>
+                </div>
+                <div className="wiki-entity-tabs">
+                  <select
+                    value={selectedCharacter ? selectedCharacter.id : ""}
+                    onChange={(event) => {
+                      if (!event.target.value) {
+                        navigate(`/wiki/novels/${trackedNovel.id}`);
+                        return;
+                      }
 
-            <div className="panel">
-              <h2>Skills</h2>
-              <WikiRecordList
-                emptyText="No approved skills yet."
-                items={skills}
-                onSelect={onSelectSkill}
-                selectedId={selectedSkill ? selectedSkill.id : null}
-              />
-            </div>
+                      const character = characters.find((item) => item.id === Number(event.target.value));
+                      if (character) {
+                        openCharacter(character);
+                      }
+                    }}
+                  >
+                    <option value="">Select character...</option>
+                    {characters.map((character) => (
+                      <option key={character.id} value={character.id}>
+                        {character.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </section>
 
-            <div className="panel">
-              <h2>Skill Page</h2>
-              <WikiSkillDetail skill={selectedSkill} />
-            </div>
+              {page === "Character" && selectedCharacter ? (
+                <WikiCharacterDetail
+                  character={selectedCharacter}
+                  relatedCharacters={characters}
+                  onSelectRelated={openCharacter}
+                />
+              ) : null}
 
-            <div className="panel">
-              <h2>Items</h2>
-              <WikiRecordList
-                emptyText="No approved items yet."
-                items={items}
-                onSelect={onSelectItem}
-                selectedId={selectedItem ? selectedItem.id : null}
-              />
-            </div>
+              {page === "Characters" ? (
+                <WikiCharacterBrowser
+                  characters={characters}
+                  novel={trackedNovel}
+                  onSelectCharacter={openCharacter}
+                />
+              ) : null}
 
-            <div className="panel">
-              <h2>Item Page</h2>
-              <WikiItemDetail item={selectedItem} />
-            </div>
-          </section>
-        ) : null}
+              {page === "Overview" ? (
+                <WikiNovelOverview
+                  characters={characters}
+                  items={items}
+                  novel={trackedNovel}
+                  onOpenCharacters={openCharacters}
+                  onSelectCharacter={openCharacter}
+                  skills={skills}
+                />
+              ) : null}
+            </>
+          ) : null}
+        </div>
       </div>
     </section>
   );
 }
 
+function WikiNovelRoute({ items, loading, loadNovel, loadCharacter, novel, novels, onOpenAdmin, setMessage, ...props }) {
+  const { novelId, characterId } = useParams();
+  const numericNovelId = Number(novelId);
+  const numericCharacterId = characterId ? Number(characterId) : null;
+  const page = numericCharacterId ? "Character" : props.page;
+
+  React.useEffect(() => {
+    if (numericNovelId && (!novel || novel.id !== numericNovelId)) {
+      loadNovel(numericNovelId).catch((error) => setMessage(error.message));
+    }
+  }, [numericNovelId, novel, loadNovel, setMessage]);
+
+  React.useEffect(() => {
+    if (!numericCharacterId || props.selectedCharacter?.id === numericCharacterId) {
+      return;
+    }
+
+    const listedCharacter = props.characters.find((character) => character.id === numericCharacterId);
+    if (listedCharacter) {
+      loadCharacter(listedCharacter).catch((error) => setMessage(error.message));
+    }
+  }, [numericCharacterId, props.characters, props.selectedCharacter, loadCharacter, setMessage]);
+
+  return (
+    <WikiPanel
+      {...props}
+      items={items}
+      loading={loading}
+      novel={novel}
+      novels={novels}
+      onLoadNovel={loadNovel}
+      onOpenAdmin={onOpenAdmin}
+      onSelectCharacter={loadCharacter}
+      page={page}
+    />
+  );
+}
+
 function App() {
-  const [activeView, setActiveView] = React.useState("admin");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeView = location.pathname.startsWith("/admin") ? "admin" : "wiki";
   const [novels, setNovels] = React.useState([]);
   const [selectedNovelId, setSelectedNovelId] = React.useState(null);
   const [chapterResult, setChapterResult] = React.useState(null);
@@ -811,7 +1313,7 @@ function App() {
   }, []);
 
   return (
-    <main className="app-shell">
+    <main className={activeView === "wiki" ? "app-shell wiki-shell" : "app-shell"}>
       <section className="page-header">
         <p className="eyebrow">{activeView === "admin" ? "Admin MVP" : "Public Wiki"}</p>
         <h1>{activeView === "admin" ? "NovelWiki Upload Verification" : "NovelWiki"}</h1>
@@ -819,7 +1321,7 @@ function App() {
           <button
             className={activeView === "admin" ? "active" : ""}
             type="button"
-            onClick={() => setActiveView("admin")}
+            onClick={() => navigate("/admin")}
           >
             Admin
           </button>
@@ -827,7 +1329,7 @@ function App() {
             className={activeView === "wiki" ? "active" : ""}
             type="button"
             onClick={() => {
-              setActiveView("wiki");
+              navigate("/wiki/novels");
               loadWikiNovels().catch((error) => setMessage(error.message));
             }}
           >
@@ -839,22 +1341,89 @@ function App() {
       {message ? <p className="message">{message}</p> : null}
 
       {activeView === "wiki" ? (
-        <WikiPanel
-          characters={wikiCharacters}
-          items={wikiItems}
-          loading={wikiLoading}
-          novel={wikiNovel}
-          novels={wikiNovels}
-          onLoadNovel={loadWikiNovel}
-          onSelectCharacter={loadWikiCharacter}
-          onSelectItem={loadWikiItem}
-          onSelectSkill={loadWikiSkill}
-          selectedCharacter={wikiSelectedCharacter}
-          selectedItem={wikiSelectedItem}
-          selectedNovelId={wikiSelectedNovelId}
-          selectedSkill={wikiSelectedSkill}
-          skills={wikiSkills}
-        />
+        <Routes>
+          <Route path="/" element={<Navigate to="/wiki/novels" replace />} />
+          <Route path="/wiki" element={<Navigate to="/wiki/novels" replace />} />
+          <Route
+            path="/wiki/novels"
+            element={
+              <WikiPanel
+                characters={[]}
+                items={[]}
+                loading={wikiLoading}
+                novel={null}
+                novels={wikiNovels}
+                onLoadNovel={loadWikiNovel}
+                onOpenAdmin={() => navigate("/admin")}
+                onSelectCharacter={loadWikiCharacter}
+                page="Novels"
+                selectedCharacter={null}
+                selectedNovelId={null}
+                skills={[]}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="Overview"
+                selectedCharacter={null}
+                selectedNovelId={wikiSelectedNovelId}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId/characters"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="Characters"
+                selectedCharacter={null}
+                selectedNovelId={wikiSelectedNovelId}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId/characters/:characterId"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="Characters"
+                selectedCharacter={wikiSelectedCharacter}
+                selectedNovelId={wikiSelectedNovelId}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+        </Routes>
       ) : (
         <>
           <section className="panel">
@@ -1098,4 +1667,8 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+);
