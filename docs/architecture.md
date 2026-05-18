@@ -30,10 +30,28 @@ SQLite database
 
 ## Frontend Folders
 
-- `frontend/src/main.jsx`: Current MVP React app, including Admin and Wiki views.
-- `frontend/src/styles.css`: Current MVP styling.
+- `frontend/src/main.jsx`: React entrypoint and router mount.
+- `frontend/src/App.jsx`: Top-level app state, route definitions, and admin/wiki view switching.
+- `frontend/src/api.js`: Shared frontend API helper.
+- `frontend/src/components/admin/`: Admin review components.
+- `frontend/src/components/wiki/`: Public wiki components.
+- `frontend/src/utils/`: Small frontend utility functions.
+- `frontend/src/styles.css`: Current shared MVP styling.
 
-The frontend can be split into `api/`, `components/`, and `pages/` later when the UI grows.
+The frontend currently keeps CSS in one shared stylesheet. Split this into admin/wiki styles later if the UI keeps growing.
+
+## Public Wiki Navigation
+
+The public wiki starts at the novel library. Users choose a novel first, then browse that novel's wiki data.
+
+Current public routes:
+
+- `/wiki/novels`: Novel library.
+- `/wiki/novels/:novelId`: Selected novel overview.
+- `/wiki/novels/:novelId/characters`: Character list for the selected novel.
+- `/wiki/novels/:novelId/characters/:characterId`: Character detail page.
+
+Novel-specific sidebar navigation should appear only after a novel is selected. The selected novel becomes the context for character, cultivation, skill, item, and future world pages.
 
 ## Service Boundaries
 

@@ -10,7 +10,8 @@ The project has completed the first real vertical slice:
 4. Extracted characters, skills, items, progression events, life events, aliases, and evidence are stored.
 5. Admin can approve, reject, edit, and merge reviewed records.
 6. Public wiki endpoints expose approved data only.
-7. React has an Admin view and a public Wiki view with clickable characters, skills, and items.
+7. React has an Admin view and routed public Wiki pages for novels and characters.
+8. Approved character-skill relationships can be displayed on character pages.
 
 ## Phase 1: Foundation
 
@@ -59,12 +60,13 @@ Start with `.txt`. Add `.epub` and `.docx` after the first flow works.
 5. Derive current character cultivation or position from approved progression events.
 6. Do not expose raw chapter content in public responses.
 
-## Next Phase: Character Relationships
+## Next Phase: Public Wiki Pages
 
-1. Add explicit character-skill relationships.
-2. Add explicit character-item relationships.
-3. Review relationships before showing them publicly.
-4. Display approved skills and items on character pages.
+1. Add dedicated public skill list/detail pages.
+2. Add dedicated public item list/detail pages.
+3. Add a cultivation/progression index for the selected novel.
+4. Add timeline, organization, and place pages after the core wiki pages are stable.
+5. Re-enable character-item relationships carefully, with stricter filtering for consumables and minor items.
 
 ## Later: Better File Support
 
