@@ -1,8 +1,19 @@
 import React from "react";
 import WikiAvatar from "./WikiAvatar.jsx";
-import { chapterLabel, firstDescriptionChunk, relationshipLabel } from "../../utils/wikiFormat.js";
+import {
+  chapterLabel,
+  firstDescriptionChunk,
+  formatCultivationValue,
+  relationshipLabel,
+} from "../../utils/wikiFormat.js";
 
-export default function WikiCharacterDetail({ character, relatedCharacters = [], onSelectRelated }) {
+export default function WikiCharacterDetail({
+  character,
+  onOpenCultivation,
+  onSelectRelated,
+  onSelectSkill,
+  relatedCharacters = [],
+}) {
   if (!character) {
     return (
       <section className="wiki-empty-panel">
@@ -22,11 +33,14 @@ export default function WikiCharacterDetail({ character, relatedCharacters = [],
     (event) =>
       character.current_cultivation_level &&
       event.new_value &&
-      event.new_value.toLowerCase() === character.current_cultivation_level.toLowerCase()
+      formatCultivationValue(event.new_value).toLowerCase() ===
+        formatCultivationValue(character.current_cultivation_level).toLowerCase()
   );
   const shownRelatedCharacters = relatedCharacters
     .filter((related) => related.id !== character.id)
-    .slice(0, 3);
+    .slice(0, 5);
+  const shownProgressionEvents = progressionEvents.slice(0, 5);
+  const shownSkills = (character.skills || []).slice(0, 5);
 
   return (
     <article className="wiki-character-page">
@@ -38,7 +52,6 @@ export default function WikiCharacterDetail({ character, relatedCharacters = [],
         <div className="wiki-hero-main">
           <div className="wiki-title-row">
             <h1>{character.name}</h1>
-            <span className="wiki-title-mark">Qi</span>
           </div>
 
           <div className="wiki-fact-grid">
@@ -46,7 +59,7 @@ export default function WikiCharacterDetail({ character, relatedCharacters = [],
               <span className="wiki-fact-icon">C</span>
               <div>
                 <small>Current Cultivation</small>
-                <strong>{character.current_cultivation_level || "Unknown"}</strong>
+                <strong>{formatCultivationValue(character.current_cultivation_level) || "Unknown"}</strong>
               </div>
             </div>
             <div className="wiki-fact">
@@ -82,10 +95,17 @@ export default function WikiCharacterDetail({ character, relatedCharacters = [],
 
       <section className="wiki-content-grid">
         <div className="wiki-card wiki-progression-card">
-          <h2>Cultivation Progression</h2>
+          <div className="wiki-card-heading">
+            <h2>Cultivation Progression</h2>
+            {progressionEvents.length > shownProgressionEvents.length ? (
+              <button className="wiki-text-link" type="button" onClick={onOpenCultivation}>
+                View full progression
+              </button>
+            ) : null}
+          </div>
           {progressionEvents.length === 0 ? <p>No approved progression yet.</p> : null}
           <div className="wiki-timeline">
-            {progressionEvents.map((event) => {
+            {shownProgressionEvents.map((event) => {
               const isCurrent = currentProgression ? currentProgression.id === event.id : false;
 
               return (
@@ -93,8 +113,19 @@ export default function WikiCharacterDetail({ character, relatedCharacters = [],
                   <span className="wiki-timeline-dot" />
                   <div>
                     <small>{chapterLabel(event.chapter)}</small>
-                    <strong>{event.new_value}</strong>
-                    {event.old_value ? <p>From {event.old_value}</p> : null}
+                    <strong>
+                      {event.progression_type === "cultivation_level"
+                        ? formatCultivationValue(event.new_value)
+                        : event.new_value}
+                    </strong>
+                    {event.old_value ? (
+                      <p>
+                        From{" "}
+                        {event.progression_type === "cultivation_level"
+                          ? formatCultivationValue(event.old_value)
+                          : event.old_value}
+                      </p>
+                    ) : null}
                   </div>
                   {isCurrent ? <span className="wiki-stage-pill">Current Stage</span> : null}
                 </article>
@@ -105,16 +136,27 @@ export default function WikiCharacterDetail({ character, relatedCharacters = [],
 
         <div className="wiki-side-stack">
           <section className="wiki-card">
-            <h2>Skills</h2>
+            <div className="wiki-card-heading">
+              <h2>Skills</h2>
+              {character.skills && character.skills.length > shownSkills.length ? (
+                <span>{character.skills.length - shownSkills.length} more</span>
+              ) : null}
+            </div>
             {character.skills && character.skills.length > 0 ? (
-              character.skills.map((relationship) => (
-                <article className="wiki-skill-row" key={relationship.id}>
+              shownSkills.map((relationship) => (
+                <button
+                  className="wiki-skill-row"
+                  disabled={!relationship.skill}
+                  key={relationship.id}
+                  type="button"
+                  onClick={() => onSelectSkill(relationship.skill)}
+                >
                   <span className="wiki-skill-icon">F</span>
                   <div>
                     <strong>{relationship.skill ? relationship.skill.name : "Unknown skill"}</strong>
                     <p>{relationshipLabel(relationship)}</p>
                   </div>
-                </article>
+                </button>
               ))
             ) : (
               <p>No approved skills yet.</p>
@@ -133,7 +175,11 @@ export default function WikiCharacterDetail({ character, relatedCharacters = [],
               >
                 <WikiAvatar name={related.name} size="small" />
                 <span>{related.name}</span>
-                <small>{related.current_cultivation_level || related.current_position || ""}</small>
+                <small>
+                  {related.current_cultivation_level
+                    ? formatCultivationValue(related.current_cultivation_level)
+                    : related.current_position || ""}
+                </small>
               </button>
             ))}
           </section>

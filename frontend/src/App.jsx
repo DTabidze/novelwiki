@@ -25,6 +25,7 @@ export default function App() {
   const [wikiLoading, setWikiLoading] = React.useState(false);
   const [wikiNovel, setWikiNovel] = React.useState(null);
   const [wikiNovels, setWikiNovels] = React.useState([]);
+  const [wikiProgressionEvents, setWikiProgressionEvents] = React.useState([]);
   const [wikiSelectedCharacter, setWikiSelectedCharacter] = React.useState(null);
   const [wikiSelectedItem, setWikiSelectedItem] = React.useState(null);
   const [wikiSelectedNovelId, setWikiSelectedNovelId] = React.useState(null);
@@ -49,17 +50,19 @@ export default function App() {
     setWikiSelectedItem(null);
 
     try {
-      const [novelData, charactersData, skillsData, itemsData] = await Promise.all([
+      const [novelData, charactersData, skillsData, itemsData, progressionData] = await Promise.all([
         fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}`),
         fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}/characters`),
         fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}/skills`),
         fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}/items`),
+        fetchJson(`${API_BASE_URL}/wiki/novels/${novelId}/progression`),
       ]);
 
       setWikiNovel(novelData);
       setWikiCharacters(charactersData);
       setWikiSkills(skillsData);
       setWikiItems(itemsData);
+      setWikiProgressionEvents(progressionData);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -345,8 +348,11 @@ export default function App() {
                 onOpenAdmin={() => navigate("/admin")}
                 onSelectCharacter={loadWikiCharacter}
                 page="Novels"
+                progressionEvents={[]}
                 selectedCharacter={null}
+                selectedItem={null}
                 selectedNovelId={null}
+                selectedSkill={null}
                 skills={[]}
               />
             }
@@ -358,14 +364,19 @@ export default function App() {
                 characters={wikiCharacters}
                 items={wikiItems}
                 loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
                 loading={wikiLoading}
                 loadNovel={loadWikiNovel}
                 novel={wikiNovel}
                 novels={wikiNovels}
                 onOpenAdmin={() => navigate("/admin")}
                 page="Overview"
+                progressionEvents={wikiProgressionEvents}
                 selectedCharacter={null}
+                selectedItem={null}
                 selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={null}
                 setMessage={setMessage}
                 skills={wikiSkills}
               />
@@ -378,14 +389,19 @@ export default function App() {
                 characters={wikiCharacters}
                 items={wikiItems}
                 loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
                 loading={wikiLoading}
                 loadNovel={loadWikiNovel}
                 novel={wikiNovel}
                 novels={wikiNovels}
                 onOpenAdmin={() => navigate("/admin")}
                 page="Characters"
+                progressionEvents={wikiProgressionEvents}
                 selectedCharacter={null}
+                selectedItem={null}
                 selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={null}
                 setMessage={setMessage}
                 skills={wikiSkills}
               />
@@ -398,14 +414,169 @@ export default function App() {
                 characters={wikiCharacters}
                 items={wikiItems}
                 loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
                 loading={wikiLoading}
                 loadNovel={loadWikiNovel}
                 novel={wikiNovel}
                 novels={wikiNovels}
                 onOpenAdmin={() => navigate("/admin")}
                 page="Characters"
+                progressionEvents={wikiProgressionEvents}
                 selectedCharacter={wikiSelectedCharacter}
+                selectedItem={null}
                 selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={null}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId/characters/:characterId/progression"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="CharacterProgression"
+                progressionEvents={wikiProgressionEvents}
+                selectedCharacter={wikiSelectedCharacter}
+                selectedItem={null}
+                selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={null}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId/cultivation"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="Cultivation"
+                progressionEvents={wikiProgressionEvents}
+                selectedCharacter={null}
+                selectedItem={null}
+                selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={null}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId/skills"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="Skills"
+                progressionEvents={wikiProgressionEvents}
+                selectedCharacter={null}
+                selectedItem={null}
+                selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={null}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId/skills/:skillId"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="Skills"
+                progressionEvents={wikiProgressionEvents}
+                selectedCharacter={null}
+                selectedItem={null}
+                selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={wikiSelectedSkill}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId/items"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="Items"
+                progressionEvents={wikiProgressionEvents}
+                selectedCharacter={null}
+                selectedItem={null}
+                selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={null}
+                setMessage={setMessage}
+                skills={wikiSkills}
+              />
+            }
+          />
+          <Route
+            path="/wiki/novels/:novelId/items/:itemId"
+            element={
+              <WikiNovelRoute
+                characters={wikiCharacters}
+                items={wikiItems}
+                loadCharacter={loadWikiCharacter}
+                loadItem={loadWikiItem}
+                loadSkill={loadWikiSkill}
+                loading={wikiLoading}
+                loadNovel={loadWikiNovel}
+                novel={wikiNovel}
+                novels={wikiNovels}
+                onOpenAdmin={() => navigate("/admin")}
+                page="Items"
+                progressionEvents={wikiProgressionEvents}
+                selectedCharacter={null}
+                selectedItem={wikiSelectedItem}
+                selectedNovelId={wikiSelectedNovelId}
+                selectedSkill={null}
                 setMessage={setMessage}
                 skills={wikiSkills}
               />

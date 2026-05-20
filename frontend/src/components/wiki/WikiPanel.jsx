@@ -3,13 +3,19 @@ import { Link, useNavigate } from "react-router-dom";
 import WikiAvatar from "./WikiAvatar.jsx";
 import WikiCharacterBrowser from "./WikiCharacterBrowser.jsx";
 import WikiCharacterDetail from "./WikiCharacterDetail.jsx";
+import WikiCharacterProgressionPage from "./WikiCharacterProgressionPage.jsx";
+import WikiCultivationPage from "./WikiCultivationPage.jsx";
+import WikiEntityBrowser from "./WikiEntityBrowser.jsx";
+import WikiItemPage from "./WikiItemPage.jsx";
 import WikiLandingPage from "./WikiLandingPage.jsx";
 import WikiNovelOverview from "./WikiNovelOverview.jsx";
+import WikiSkillPage from "./WikiSkillPage.jsx";
 
 export default function WikiPanel({
   characters,
   items,
   page,
+  progressionEvents = [],
   loading,
   novel,
   novels,
@@ -17,7 +23,9 @@ export default function WikiPanel({
   onOpenAdmin,
   onSelectCharacter,
   selectedCharacter,
+  selectedItem,
   selectedNovelId,
+  selectedSkill,
   skills,
 }) {
   const navigate = useNavigate();
@@ -36,9 +44,45 @@ export default function WikiPanel({
     }
   }
 
+  function openCultivation() {
+    if (trackedNovel) {
+      navigate(`/wiki/novels/${trackedNovel.id}/cultivation`);
+    }
+  }
+
   function openCharacter(character) {
     if (trackedNovel) {
       navigate(`/wiki/novels/${trackedNovel.id}/characters/${character.id}`);
+    }
+  }
+
+  function openCharacterProgression(character) {
+    if (trackedNovel && character) {
+      navigate(`/wiki/novels/${trackedNovel.id}/characters/${character.id}/progression`);
+    }
+  }
+
+  function openSkills() {
+    if (trackedNovel) {
+      navigate(`/wiki/novels/${trackedNovel.id}/skills`);
+    }
+  }
+
+  function openSkill(skill) {
+    if (trackedNovel) {
+      navigate(`/wiki/novels/${trackedNovel.id}/skills/${skill.id}`);
+    }
+  }
+
+  function openItems() {
+    if (trackedNovel) {
+      navigate(`/wiki/novels/${trackedNovel.id}/items`);
+    }
+  }
+
+  function openItem(item) {
+    if (trackedNovel) {
+      navigate(`/wiki/novels/${trackedNovel.id}/items/${item.id}`);
     }
   }
 
@@ -59,6 +103,21 @@ export default function WikiPanel({
 
     if (label === "Characters") {
       openCharacters();
+      return;
+    }
+
+    if (label === "Cultivation") {
+      openCultivation();
+      return;
+    }
+
+    if (label === "Skills") {
+      openSkills();
+      return;
+    }
+
+    if (label === "Items") {
+      openItems();
     }
   }
 
@@ -79,7 +138,7 @@ export default function WikiPanel({
               className={label === activeSection ? "active" : ""}
               disabled={
                 Boolean(trackedNovel) &&
-                !["Novels", "Overview", "Characters"].includes(label)
+                !["Novels", "Overview", "Characters", "Cultivation", "Skills", "Items"].includes(label)
               }
               key={label}
               type="button"
@@ -134,12 +193,58 @@ export default function WikiPanel({
                 <strong>Characters</strong>
               </>
             ) : null}
+            {page === "Skills" ? (
+              <>
+                <span>/</span>
+                <strong>Skills</strong>
+              </>
+            ) : null}
+            {page === "Cultivation" ? (
+              <>
+                <span>/</span>
+                <strong>Cultivation</strong>
+              </>
+            ) : null}
+            {page === "Skill" && selectedSkill ? (
+              <>
+                <span>/</span>
+                <Link to={`/wiki/novels/${trackedNovel.id}/skills`}>Skills</Link>
+                <span>/</span>
+                <strong>{selectedSkill.name}</strong>
+              </>
+            ) : null}
+            {page === "Items" ? (
+              <>
+                <span>/</span>
+                <strong>Items</strong>
+              </>
+            ) : null}
+            {page === "Item" && selectedItem ? (
+              <>
+                <span>/</span>
+                <Link to={`/wiki/novels/${trackedNovel.id}/items`}>Items</Link>
+                <span>/</span>
+                <strong>{selectedItem.name}</strong>
+              </>
+            ) : null}
             {page === "Character" && selectedCharacter ? (
               <>
                 <span>/</span>
                 <Link to={`/wiki/novels/${trackedNovel.id}/characters`}>Characters</Link>
                 <span>/</span>
                 <strong>{selectedCharacter.name}</strong>
+              </>
+            ) : null}
+            {page === "CharacterProgression" && selectedCharacter ? (
+              <>
+                <span>/</span>
+                <Link to={`/wiki/novels/${trackedNovel.id}/characters`}>Characters</Link>
+                <span>/</span>
+                <Link to={`/wiki/novels/${trackedNovel.id}/characters/${selectedCharacter.id}`}>
+                  {selectedCharacter.name}
+                </Link>
+                <span>/</span>
+                <strong>Progression</strong>
               </>
             ) : null}
           </div>
@@ -155,45 +260,18 @@ export default function WikiPanel({
 
           {trackedNovel ? (
             <>
-              <section className="wiki-browser-strip">
-                <div>
-                  <strong>{trackedNovel.title}</strong>
-                  <span>
-                    {trackedNovel.approved_character_count} characters / {trackedNovel.approved_skill_count} skills /{" "}
-                    {trackedNovel.approved_item_count} items
-                  </span>
-                </div>
-                <div className="wiki-entity-tabs">
-                  <select
-                    value={selectedCharacter ? selectedCharacter.id : ""}
-                    onChange={(event) => {
-                      if (!event.target.value) {
-                        navigate(`/wiki/novels/${trackedNovel.id}`);
-                        return;
-                      }
-
-                      const character = characters.find((item) => item.id === Number(event.target.value));
-                      if (character) {
-                        openCharacter(character);
-                      }
-                    }}
-                  >
-                    <option value="">Select character...</option>
-                    {characters.map((character) => (
-                      <option key={character.id} value={character.id}>
-                        {character.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </section>
-
               {page === "Character" && selectedCharacter ? (
                 <WikiCharacterDetail
                   character={selectedCharacter}
+                  onOpenCultivation={() => openCharacterProgression(selectedCharacter)}
                   relatedCharacters={characters}
                   onSelectRelated={openCharacter}
+                  onSelectSkill={openSkill}
                 />
+              ) : null}
+
+              {page === "CharacterProgression" && selectedCharacter ? (
+                <WikiCharacterProgressionPage character={selectedCharacter} />
               ) : null}
 
               {page === "Characters" ? (
@@ -204,12 +282,63 @@ export default function WikiPanel({
                 />
               ) : null}
 
+              {page === "Skills" ? (
+                <WikiEntityBrowser
+                  countLabel="approved"
+                  entities={skills}
+                  iconLabel="Skill"
+                  novel={trackedNovel}
+                  pageTitle="Skills"
+                  onSelectEntity={openSkill}
+                />
+              ) : null}
+
+              {page === "Cultivation" ? (
+                <WikiCultivationPage
+                  characters={characters}
+                  novel={trackedNovel}
+                  progressionEvents={progressionEvents}
+                  selectedCharacter={null}
+                  onSelectCharacterProgression={openCharacterProgression}
+                />
+              ) : null}
+
+              {page === "Skill" && selectedSkill ? (
+                <WikiSkillPage
+                  relatedSkills={skills}
+                  skill={selectedSkill}
+                  onSelectCharacter={openCharacter}
+                />
+              ) : null}
+
+              {page === "Items" ? (
+                <WikiEntityBrowser
+                  countLabel="approved"
+                  entities={items}
+                  iconLabel="Item"
+                  novel={trackedNovel}
+                  pageTitle="Items"
+                  onSelectEntity={openItem}
+                />
+              ) : null}
+
+              {page === "Item" && selectedItem ? (
+                <WikiItemPage
+                  item={selectedItem}
+                  relatedItems={items}
+                  onSelectCharacter={openCharacter}
+                />
+              ) : null}
+
               {page === "Overview" ? (
                 <WikiNovelOverview
                   characters={characters}
                   items={items}
                   novel={trackedNovel}
                   onOpenCharacters={openCharacters}
+                  onOpenCultivation={openCultivation}
+                  onOpenItems={openItems}
+                  onOpenSkills={openSkills}
                   onSelectCharacter={openCharacter}
                   skills={skills}
                 />

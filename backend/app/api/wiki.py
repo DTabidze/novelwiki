@@ -340,14 +340,56 @@ def list_public_skills(novel_id):
     return success([public_skill(skill) for skill in skills])
 
 
+@wiki_bp.get("/novels/<int:novel_id>/progression")
+def list_public_progression(novel_id):
+    Novel.query.get_or_404(novel_id)
+    progression_rows = (
+        CharacterProgressionEvent.query.join(
+            Chapter,
+            CharacterProgressionEvent.chapter_id == Chapter.id,
+        )
+        .filter(
+            CharacterProgressionEvent.novel_id == novel_id,
+            CharacterProgressionEvent.review_status == APPROVED,
+        )
+        .order_by(Chapter.chapter_number.desc(), CharacterProgressionEvent.id.desc())
+        .all()
+    )
+
+    return success([public_progression(progression) for progression in progression_rows])
+
+
 @wiki_bp.get("/skills/<int:skill_id>")
 def get_public_skill(skill_id):
     skill = Skill.query.filter_by(
         id=skill_id,
         review_status=APPROVED,
     ).first_or_404()
+    character_skill_rows = (
+        CharacterSkill.query.filter_by(
+            skill_id=skill.id,
+            review_status=APPROVED,
+        )
+        .order_by(CharacterSkill.id)
+        .all()
+    )
 
-    return success(public_skill(skill))
+    data = public_skill(skill)
+    data["characters"] = [
+        {
+            "id": relationship.id,
+            "character": public_character_summary(relationship.character)
+            if relationship.character
+            else None,
+            "chapter": chapter_reference(relationship.chapter_id),
+            "relationship_type": relationship.relationship_type,
+            "description": relationship.description,
+            "evidence": evidence_for("character_skill", relationship.id),
+        }
+        for relationship in character_skill_rows
+    ]
+
+    return success(data)
 
 
 @wiki_bp.get("/novels/<int:novel_id>/items")
@@ -368,5 +410,28 @@ def get_public_item(item_id):
         id=item_id,
         review_status=APPROVED,
     ).first_or_404()
+    character_item_rows = (
+        CharacterItem.query.filter_by(
+            item_id=item.id,
+            review_status=APPROVED,
+        )
+        .order_by(CharacterItem.id)
+        .all()
+    )
 
-    return success(public_item(item))
+    data = public_item(item)
+    data["characters"] = [
+        {
+            "id": relationship.id,
+            "character": public_character_summary(relationship.character)
+            if relationship.character
+            else None,
+            "chapter": chapter_reference(relationship.chapter_id),
+            "relationship_type": relationship.relationship_type,
+            "description": relationship.description,
+            "evidence": evidence_for("character_item", relationship.id),
+        }
+        for relationship in character_item_rows
+    ]
+
+    return success(data)

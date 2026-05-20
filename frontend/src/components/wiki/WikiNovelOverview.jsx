@@ -1,16 +1,22 @@
 import React from "react";
 import WikiAvatar from "./WikiAvatar.jsx";
-import { formatDate, formatNumber } from "../../utils/wikiFormat.js";
+import { formatCultivationValue, formatDate, formatNumber } from "../../utils/wikiFormat.js";
 
-export default function WikiNovelOverview({ characters, items, novel, onOpenCharacters, onSelectCharacter, skills }) {
+export default function WikiNovelOverview({
+  characters,
+  novel,
+  onOpenCharacters,
+  onOpenCultivation,
+  onOpenItems,
+  onOpenSkills,
+  onSelectCharacter,
+}) {
   const featuredCharacters = characters.slice(0, 4);
-  const featuredSkills = skills.slice(0, 2);
-  const featuredItems = items.slice(0, 2);
   const browseCards = [
     ["Characters", novel.approved_character_count, "View all characters", onOpenCharacters],
-    ["Cultivation", novel.approved_progression_count, "Explore progression", null],
-    ["Skills", novel.approved_skill_count, "View all skills", null],
-    ["Items", novel.approved_item_count, "View all items", null],
+    ["Cultivation", novel.approved_progression_count, "Explore progression", onOpenCultivation],
+    ["Skills", novel.approved_skill_count, "View all skills", onOpenSkills],
+    ["Items", novel.approved_item_count, "View all items", onOpenItems],
     ["Organizations", 0, "Coming later", null],
     ["Places", 0, "Coming later", null],
     ["Timeline", 0, "Major events later", null],
@@ -78,7 +84,11 @@ export default function WikiNovelOverview({ characters, items, novel, onOpenChar
               >
                 <WikiAvatar name={character.name} size="small" />
                 <strong>{character.name}</strong>
-                <span>{character.current_cultivation_level || character.current_position || "Character"}</span>
+                <span>
+                  {character.current_cultivation_level
+                    ? formatCultivationValue(character.current_cultivation_level)
+                    : character.current_position || "Character"}
+                </span>
               </button>
             ))}
           </div>
@@ -130,28 +140,6 @@ export default function WikiNovelOverview({ characters, items, novel, onOpenChar
         </div>
       </section>
 
-      {(featuredSkills.length > 0 || featuredItems.length > 0) && (
-        <section className="wiki-overview-grid compact">
-          <div className="wiki-card">
-            <h2>Featured Skills</h2>
-            {featuredSkills.map((skill) => (
-              <div className="wiki-mini-link" key={skill.id}>
-                <strong>{skill.name}</strong>
-                <span>{skill.category || "Skill"}</span>
-              </div>
-            ))}
-          </div>
-          <div className="wiki-card">
-            <h2>Featured Items</h2>
-            {featuredItems.map((item) => (
-              <div className="wiki-mini-link" key={item.id}>
-                <strong>{item.name}</strong>
-                <span>{item.category || "Item"}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </article>
   );
 }
