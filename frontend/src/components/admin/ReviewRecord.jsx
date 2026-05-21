@@ -87,6 +87,15 @@ export default function ReviewRecord({ entityType, record, fields, mergeTargets 
         </p>
       ) : null}
 
+      {record.review_warnings && record.review_warnings.length > 0 ? (
+        <div className="review-warning-list">
+          <strong>Review warnings</strong>
+          {record.review_warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
+
       {entityType === "characters" ? (
         <div className="meta-lines">
           <span>

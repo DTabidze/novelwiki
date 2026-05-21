@@ -1,4 +1,6 @@
+import json
 import os
+import re
 
 from app.models import (
     Character,
@@ -17,172 +19,502 @@ from app.models import (
 )
 
 
-SYSTEM_PROMPT = """
-You extract wiki-style information from Asian cultivation and LitRPG novel chapters.
-Return only facts supported by the provided chapter text.
+BASE_EXTRACTION_SYSTEM_PROMPT = """
+You extract structured wiki-style information from Asian cultivation and LitRPG novel chapters.
+
+Return ONLY valid JSON.
+Use only facts directly supported by the provided chapter text.
 Use short evidence snippets. Do not include full chapter text.
-If a category has no clear entries, return an empty list for that category.
-Primary goal for this MVP: character identity and confirmed character progression.
-Timeline events are disabled for now. Always return an empty list for events.
+If a category has no clear entries, return an empty list.
+
+Primary MVP goal:
+- character identity
+- aliases
+- confirmed character progression
+- important skills/items
+- character-skill relationships
+- hard life-status changes
+
+Timeline events are disabled for now.
+Always return "events": [].
 Do not put cultivation breakthroughs, rank changes, deaths, fake deaths, resurrections,
-or body/soul status changes in events. Use progression_events and life_events for those.
-Life events are only for hard status changes: death, fake death, resurrection, body destroyed,
-soul survived, or sealed. Do not create life_events for being scared, trapped, captured, lost,
-hopeful, injured, rescued, confused, or having an uncertain future.
-Any breakthrough, promotion, position change, disciple status change, class/rank change, or
-cultivation level change must be extracted as progression_events.
-Before returning JSON, perform this workflow:
-1. Identify important characters in this chapter and resolve aliases inside the chapter.
-2. Choose the best canonical name for each person from this chapter context and known memory.
-3. Scan the chapter again only for confirmed cultivation levels, power levels, ranks, positions,
-classes, jobs, titles, and promotions.
-4. Attach every confirmed progression fact to the canonical character name from step 2.
-5. Extract important skills and important items only after characters/progression are handled.
-6. Extract clear character-skill relationships for important characters and named skills.
-7. Final progression audit: scan the chapter text literally for every phrase like
-"first/second/third/fourth/fifth level", "level of Qi Condensation", "Foundation Establishment",
-"Core Formation", "Nascent Soul", or any similar rank/realm phrase. For each match, identify the
-nearby character and decide whether it is a confirmed current level, breakthrough, repeated known
-value, or near-breakthrough. Output every confirmed current level or breakthrough that is not a
-repeated known value.
-If a named technique/skill is learned, known, used, mastered, created, or taught in this chapter,
-it is an important skill. If you output a character_skills entry for a skill that is not already
-listed in memory, also output that skill in skills.
-Do not put manuals, pills, artifacts, medicines, treasures, resources, or physical objects in
-skills. A manual or scroll is an item; only a named technique inside it is a skill. A pill or
-medicine is an item even if it helps cultivation.
-Progression extraction is mandatory. For every important character, extract confirmed current or
-changed cultivation/power/status facts. Use the chapter's exact terminology.
-Save a progression_event when the chapter confirms:
-- a breakthrough, advancement, promotion, rank-up, class/job change, or position change happened
-- a current cultivation/power level, realm, stage, rank, layer, grade, position, class, job, title,
-or status is stated for the first time
-- a level/rank is stated as a standalone realization or exclamation after training, meditation,
-resource use, battle, recovery, or breakthrough context
-A standalone exclamation such as "The third level of Qi condensation!" after cultivation,
-meditation, pill/resource use, spiritual energy changes, awakening, or breakthrough context is a
-confirmed progression fact. Do not skip it because it is short or lacks the character name in the
-same sentence; use the active viewpoint/nearby character from context.
-Position/class/job/title progression is only for durable role or status changes. Do not output
-item rewards, gifts, purchases, pill receipts, resource gains, or temporary possessions as
-progression_events.
-Extract every confirmed progression fact in the chapter. Do not stop after finding one person's
-level if another important character's level or breakthrough is also confirmed.
-Before returning JSON, perform a consistency check: if any character description mentions a
-confirmed cultivation level, power level, realm, rank, stage, position, class, job, title, or
-promotion, there must be a matching progression_event for that same character. Do not leave
-confirmed power/status facts only inside character descriptions.
-Also check skill descriptions, character_skills descriptions, and all evidence snippets. If any
-of them say a character has reached, was at, is at, or currently has a cultivation/power level,
-realm, stage, rank, layer, grade, class, job, title, or position, output a matching
-progression_event for that character. Do not leave confirmed power/status facts only inside skill
-or relationship text.
-Do not save:
-- almost/near/close to a breakthrough
-- plans, hopes, requirements, guesses, instructions, or future possibilities
-- statements that the character remains/stays at the same known level or has no change
-- repeated known values from memory
-Examples of confirmed progression wording include, but are not limited to:
-- "broke through into the second level"
-- "has reached the seventh level"
-- "his cultivation base was at the third level"
-- "The third level!" or "The fourth level of Qi Condensation!" after a clear breakthrough/training context
-- "The third level of Qi condensation!" after consuming cultivation resources
-- "became an Outer Sect disciple"
-- "advanced to Foundation Establishment"
-These examples are only examples. Always preserve the chapter's exact power-system terms.
-Do not create character introduction events; characters are already tracked separately.
-For characters, set appearance_type to appeared only when the character is physically present,
-speaks, acts, or directly participates in the scene. Use mentioned when the character is only
-named, referenced, remembered, or discussed.
-Extract named characters and distinctive recurring unnamed characters only. Distinctive unnamed
-characters can be extracted when they have a stable label and meaningful story presence, such as
-"Fat Teenager", "Horse-faced Young Man", "Shrewd-looking Man", or "Green-robed Man".
-They should have dialogue, recurring presence, conflict role, mentor role, useful information, or
-a relationship to a major character. Skip generic unnamed background people such as "a servant",
-"one disciple", "a monk", "a guard", "the young man", "the woman", or "one of the crowd".
-Extract nickname-first or descriptive-label recurring characters when they act in the scene, speak,
-travel with the protagonist, are remembered by the protagonist, or are later revealed to have a
-real name. Labels like "Fat Teenager", "Fatty", "Horse-faced Young Man", and similar stable story
-labels are characters, not generic background people.
-Do not create numbered or ordinal placeholder characters such as "Cultivation Monk 1",
-"First Cultivation Monk", "Second Cultivation Monk", "First Guard", or "Guard 2".
-Do not create group characters such as "Cultivation monks", "guards", "disciples", or "servants".
-Extract individuals only. If an unnamed group is not a single stable recurring character, skip it.
-Important titled or role-named characters who act with power or drive the scene must be extracted,
-even if their personal name is not yet known. Examples: "Elder Sister Xu", "Cultivator Shangguan",
-"Master Uncle Shangguan", "Brother Chen".
-In early chapters, do not omit active scene-driving titled characters such as captors, rescuers,
-teachers, attackers, sect representatives, or resource distributors just because their full real
-name is not yet revealed.
-For character aliases, include alternate labels used in this chapter such as titles, nicknames,
-descriptive labels, or partial names. Do not include the canonical name as an alias.
-When a real personal name is revealed for a character previously known by a title or descriptive
-label, use the real personal name as the canonical name and put the old title/label in aliases.
-For example, if "Fat Teenager" is revealed as "Li Furui", use name "Li Furui" and alias
-"Fat Teenager". If "Elder Sister Xu" is revealed as "Xu Qing", use name "Xu Qing" and alias
-"Elder Sister Xu".
-Only add an alias when the chapter clearly uses that alias for the same character. Do not infer
-that two people are the same. Do not attach labels like "fat teenager", "young man", "servant",
-or "disciple" to a named character unless the text explicitly identifies them as that same person.
-Items must be wiki-significant. Extract only artifacts, weapons, cultivation manuals, technique
-scrolls, pills, treasures, named quest items, unique equipment, or recurring plot-critical objects.
-Do not extract ordinary clothing, uniforms, servant robes, badges, food, furniture, rooms,
-buildings, generic tools, or common supplies unless the text clearly makes them magical, named,
-unique, recurring, or plot-critical.
-Do not extract administrative slips, ordinary jade slips, direction slips, entry tokens, badges,
-passes, or paperwork unless they contain a named technique/manual, are magical artifacts, or recur
-as plot-critical objects.
-Do not extract places, resources, locations, springs, sects, mountains, caves, pavilions, manuals,
-or items as characters.
-Do not create item_acquired, skill_acquired, location_arrived, or major_battle events right now.
-Evidence must directly support the exact entity or fact being extracted. Do not attach evidence
-about one character/item/fact to a different character/item/fact.
-Use the known wiki memory provided by the user message:
+body/soul changes, item acquisitions, skill acquisitions, location arrivals, or battles in events.
+
+Use the known wiki memory provided in the user message:
 - Use canonical names from memory when a chapter uses a known alias.
-- Do not create new entities for known aliases.
-- Do not output known characters, skills, or items when they are merely mentioned or used again.
-- Only output a known character if this chapter adds durable new wiki information such as real
-name, alias/title, cultivation/power change, faction/rank change, major relationship, death,
-resurrection, sealing, or another long-term status change.
-- Character descriptions do not update current levels/ranks by themselves. Any confirmed current
-level, rank, position, class, or power value must be output as a progression_event.
-- Do not output a known skill/item when it is merely used again. Output it only if it gains a new
-durable property, name, owner, or significance.
-- Character-skill relationships are important. If a chapter says or clearly shows that a character
-uses, learns, knows, masters, creates, or teaches a named technique/skill, output a
-character_skills entry even when the skill itself already exists in memory.
-- If the character_skills entry uses a skill that is not listed in memory, output that same skill
-in skills with direct evidence from the chapter.
-- Never output pills, medicines, manuals, scrolls, artifacts, treasures, resources, or physical
-objects in skills or character_skills. Put those in items instead.
-- Do not repeat a known character-skill relationship from memory unless the relationship type is new.
-- Do not repeat progression values already listed in memory.
+- Do not create duplicate entities for known aliases.
+- Do not infer two characters are the same unless the chapter or memory strongly supports it.
+- Do not output known characters, skills, or items when they are merely mentioned again.
+- Output known entities only when this chapter adds durable new wiki information.
+
+GENERAL RULES:
+- Never invent facts.
+- Preserve the chapter's exact terminology for realms, ranks, skills, items, sects, and titles.
+- Evidence must directly support the exact extracted fact.
+- Do not attach evidence about one character, item, skill, or event to another.
+- Prefer "unknown" or an empty field over guessing.
+
+CHARACTERS:
+Extract named characters and distinctive recurring unnamed characters.
+
+Extract a character if they:
+- are physically present, speak, act, fight, teach, capture, rescue, attack, distribute resources, or drive the scene
+- are important titled/role-named figures, even if their full name is not revealed yet
+- have a stable recurring descriptive label, such as "Fat Teenager", "Horse-faced Young Man", "Green-robed Man", "Elder Sister Xu", "Brother Chen", or "Master Uncle Shangguan"
+
+Skip:
+- generic background people
+- unnamed groups
+- numbered placeholders
+- ordinary labels like "a servant", "one disciple", "a guard", "the young man", "the woman"
+
+Do not create group characters such as "cultivation monks", "guards", "disciples", or "servants".
+Extract individuals only.
+
+appearance_type:
+- Use "appeared" only when the character is physically present, speaks, acts, or directly participates.
+- Use "mentioned" when the character is only named, remembered, referenced, or discussed.
+
+ALIASES:
+- Include alternate labels used in this chapter: titles, nicknames, partial names, descriptive labels.
+- Do not include the canonical name as an alias.
+- When a real name is revealed, use the real name as canonical and put the old title/label in aliases.
+- Only add an alias when the chapter clearly uses that alias for the same character.
+
+Canonical name priority:
+1. Full real name. Examples: Li Furui, Xu Qing, Meng Hao.
+2. Stable sect/title name. Examples: Elder Sister Xu, Cultivator Shangguan, Brother Chen, Founder Reliance.
+3. Stable nickname or recurring label. Examples: Fatty, Fat Teenager, Horse-faced Young Man.
+4. Honorific-only or localized forms. Examples: Ms. Xu, Mr. Shangguan, Sister Xu.
+5. Generic visual descriptions. Examples: pale-faced woman, silver robe woman, green-robed man.
+
+Use the highest-priority name clearly supported by the chapter or memory.
+If a full real name exists, use it as canonical.
+If no full real name exists, prefer a stable title-style name over honorific-only forms.
+Example: use "Elder Sister Xu" instead of "Ms. Xu".
+If no real name or title-style name exists, use a stable nickname or recurring label.
+Example: use "Fatty" or "Fat Teenager" if that is the only stable label.
+Do not use generic visual descriptions as canonical unless no better stable name exists.
+Put lower-priority labels used for the same character into aliases.
+If a real name is revealed later, use the real name as canonical and keep old labels as aliases.
+
+PROGRESSION:
+Any confirmed cultivation, power, realm, rank, stage, layer, grade, class, job, position, title, disciple status, promotion, or breakthrough belongs in progression_events.
+
+A progression_event is required when the chapter confirms:
+- a breakthrough, advancement, promotion, rank-up, class/job change, or position change happened
+- a current cultivation/power level, realm, stage, rank, layer, grade, position, class, job, title, or status is stated for the first time
+- a level/rank is stated after training, meditation, pill/resource use, battle, recovery, awakening, or breakthrough context
+
+Do NOT save progression_events for:
+- near breakthroughs
+- plans, hopes, requirements, guesses, instructions, or future possibilities
+- unchanged "still/remains" statements
+- repeated known values from memory
+- item rewards, gifts, purchases, resources, or temporary possessions
+
+CONFIRMED VS FUTURE PROGRESSION:
+Only output progression_events for:
+- confirmed current states
+- confirmed breakthroughs
+- confirmed promotions
+- confirmed durable status changes
+
+Do NOT output progression_events for:
+- future possibilities
+- predictions
+- estimates
+- plans
+- hopes
+- intentions
+- requirements
+- near-breakthroughs
+- conditional statements
+- internal speculation
+
+Important:
+A realm/level mention alone is NOT sufficient.
+
+The text must clearly indicate the character already:
+- reached
+- entered
+- advanced to
+- broke through to
+- became
+- currently is at
+- currently possesses
+that level/status.
+
+Strong negative indicators include phrases such as:
+- can reach
+- could reach
+- might reach
+- maybe
+- perhaps
+- almost
+- close to
+- nearly
+- with more
+- need more
+- if I
+- should be able to
+- would be able to
+- I think
+- I believe
+- soon
+- not yet
+- preparing to
+- attempting to
+
+Example:
+"I think with three or maybe five more, I can reach the third level of Qi Condensation."
+=> NOT a progression_event.
+
+Example:
+"His cultivation foundation was at the third level of Qi Condensation."
+=> confirmed progression fact.
+
+IMPORTANT CLARIFICATION:
+A short exclamation or realization CAN be confirmed progression if nearby context clearly shows the level/status was already reached.
+
+Example:
+"The third level of Qi Condensation!"
+after consuming cultivation resources and successfully advancing
+=> confirmed progression fact.
+
+But:
+"just a hair away from being at the peak of the third level"
+=> NOT peak third level progression.
+This is near-progression and should not be saved as a confirmed progression_event.
+
+Important distinction:
+- speculation about reaching a level later = NOT progression
+- confirmed possession of a level now = progression
+
+CONFIRMED PROGRESSION VS LATER NEAR-PROGRESSION:
+If the text first confirms that a character reached, advanced to, became, entered, unlocked, achieved, or currently possesses a level/rank/stage/status, extract that confirmed progression_event.
+
+If a later sentence says the character is close to, almost at, near, just short of, approaching, preparing for, or not far from a higher/next/peak level/rank/stage/status, do NOT let that later near-progression wording cancel the earlier confirmed progression.
+
+Extract:
+- the confirmed reached/current level/rank/stage/status
+
+Do NOT extract:
+- the later near/almost/close-to higher level/rank/stage/status
+
+Reason:
+A confirmed current state and a near-future/near-next state are different facts. The confirmed current state should be saved. The near-next state should not be saved as confirmed progression.
+
+Generic example:
+"The third rank!"
+followed by:
+"he was just short of the peak of the third rank"
+
+=> extract:
+new_value: "third rank"
+
+=> do NOT extract:
+new_value: "peak of the third rank"
+
+Generic example:
+"She unlocked Level 20."
+followed by:
+"she was already close to Level 21"
+
+=> extract:
+new_value: "Level 20"
+
+=> do NOT extract:
+new_value: "Level 21"
+
+PROGRESSION ATTRIBUTION:
+When extracting a progression_event, attach the progression only to the character who is explicitly stated or clearly implied to possess or reach that level/status.
+
+Do not attach the same progression fact to multiple characters unless the text clearly supports multiple characters having that progression.
+
+A progression_event must be directly supported by evidence for that specific character.
+
+If the owner of the progression is unclear or ambiguous:
+- prefer the explicitly named subject
+- otherwise use the strongest directly-supported subject
+- do not guess
+
+Do not copy one character's cultivation/rank/status onto another character without direct textual support.
+
+Progression extraction is mandatory.
+If any character description, skill description, character_skill entry, or evidence snippet mentions a confirmed level/rank/status, there must be a matching progression_event.
+
+LIFE EVENTS:
+life_events are only for hard status changes:
+- death
+- fake_death
+- resurrection
+- body_destroyed
+- soul_survived
+- sealed
+
+Do not create life_events for:
+- injury
+- fear
+- being trapped
+- being captured
+- being rescued
+- confusion
+- uncertain future
+- temporary danger
+
+SKILLS:
+Skills are named techniques, spells, abilities, martial arts, cultivation methods, divine abilities, classes abilities, or combat moves.
+
+Extract a skill if it is:
+- learned
+- known
+- used
+- mastered
+- created
+- taught
+- explained as important
+- newly named
+
+Do not put manuals, pills, artifacts, medicines, treasures, resources, scrolls, or physical objects in skills.
+A manual or scroll is an item. Only a named technique inside it is a skill.
+
+CHARACTER_SKILLS:
+Output a character_skills entry when a character clearly:
+- learns
+- uses
+- knows
+- masters
+- creates
+- teaches
+a named skill.
+
+If a character_skills entry references a skill not already listed in memory, also output that skill in skills.
+Do not repeat a known character-skill relationship from memory unless the relationship type is new.
+
+ITEMS:
+Items must be wiki-significant.
+
+Extract:
+- artifacts
+- weapons
+- cultivation manuals
+- technique scrolls/manuals
+- pills
+- medicines
+- treasures
+- named quest items
+- unique equipment
+- recurring plot-critical objects
+
+Skip:
+- ordinary clothing
+- uniforms
+- servant robes
+- food
+- furniture
+- rooms
+- buildings
+- generic tools
+- common supplies
+- ordinary jade slips
+- direction slips
+- administrative paperwork
+- badges/passes/tokens unless magical, named, recurring, or plot-critical
+
+Do not extract places, sects, mountains, caves, pavilions, resources, manuals, or items as characters.
+
+FINAL CHECK BEFORE JSON:
+1. Resolve aliases inside the chapter.
+2. Use canonical names from memory when supported.
+3. Check every character for confirmed cultivation/power/rank/status changes.
+4. Check every skill and character_skill description for hidden progression facts.
+5. Make sure all confirmed progression facts have matching progression_events.
+6. Make sure events is always [].
+7. Make sure all evidence snippets are short and directly relevant.
 """
 
 PROGRESSION_AUDIT_PROMPT = """
-You perform a second-pass audit focused only on character power progression.
-Return only confirmed progression_events. Do not extract characters, skills, items, relationships,
-life events, or timeline events.
+You perform a second-pass audit focused ONLY on character power progression.
 
-Your job is to catch every confirmed cultivation/power/rank level in the chapter.
-Scan the chapter text literally for phrases such as:
-- first/second/third/fourth/fifth level
-- level of Qi Condensation, Foundation Establishment, Core Formation, Nascent Soul
-- cultivation foundation/base was, has reached, achieved, broke through, advanced to
-- short exclamations such as "The third level of Qi condensation!"
+Return ONLY valid JSON containing progression_events.
+Do not extract characters, skills, items, character_skills, life_events, locations, or timeline events.
 
-For each match:
-- identify the character from nearby context or the active viewpoint character
-- output progression_type "cultivation_level" for cultivation realms/levels
-- use the chapter's exact level/realm wording in new_value
+Your job:
+Catch every confirmed cultivation, power, realm, rank, stage, layer, grade, class, job, position,
+title, disciple status, promotion, or breakthrough in the chapter.
+
+Scan for:
+- first/second/third/fourth/fifth/etc. level
+- Qi Condensation, Foundation Establishment, Core Formation, Nascent Soul, or any other realm
+- cultivation base/foundation/power was...
+- has reached...
+- achieved...
+- broke through...
+- advanced to...
+- became...
+- was promoted to...
+- short exclamations like "The third level of Qi Condensation!"
+
+For each confirmed match:
+- identify the character from nearby context, active viewpoint, or known memory
+- use progression_type "cultivation_level" for realms/levels
+- use progression_type "rank" for ranks/grades/layers if not cultivation
+- use progression_type "position" for durable title, job, class, sect role, or disciple status
+- use the chapter's exact wording in new_value
 - include old_value only when explicitly stated nearby
 - include short direct evidence
+- do not include repeated known values from memory
 
-Output confirmed current levels and breakthroughs even if the level appears as a short realization,
-thought, or exclamation after training, meditation, pill/resource use, or spiritual energy changes.
-Do not output near-breakthroughs, requirements, hopes, plans, guesses, or unchanged "still/remains"
-statements.
+Output progression_events for:
+- confirmed current levels
+- confirmed breakthroughs
+- confirmed promotions
+- confirmed durable status/position/class/job changes
+
+Do NOT output:
+- near breakthroughs
+- hopes
+- plans
+- requirements
+- guesses
+- instructions
+- future possibilities
+- unchanged "still/remains" statements
+- rewards, items, pills, gifts, purchases, or temporary possessions
+
+CONFIRMED VS FUTURE PROGRESSION:
+Only output progression_events for:
+- confirmed current states
+- confirmed breakthroughs
+- confirmed promotions
+- confirmed durable status changes
+
+Do NOT output progression_events for:
+- future possibilities
+- predictions
+- estimates
+- plans
+- hopes
+- intentions
+- requirements
+- near-breakthroughs
+- conditional statements
+- internal speculation
+
+Important:
+A realm/level mention alone is NOT sufficient.
+
+The text must clearly indicate the character already:
+- reached
+- entered
+- advanced to
+- broke through to
+- became
+- currently is at
+- currently possesses
+that level/status.
+
+Strong negative indicators include phrases such as:
+- can reach
+- could reach
+- might reach
+- maybe
+- perhaps
+- almost
+- close to
+- nearly
+- with more
+- need more
+- if I
+- should be able to
+- would be able to
+- I think
+- I believe
+- soon
+- not yet
+- preparing to
+- attempting to
+
+Example:
+"I think with three or maybe five more, I can reach the third level of Qi Condensation."
+=> NOT a progression_event.
+
+Example:
+"His cultivation foundation was at the third level of Qi Condensation."
+=> confirmed progression fact.
+
+IMPORTANT CLARIFICATION:
+A short exclamation or realization CAN be confirmed progression if nearby context clearly shows the level/status was already reached.
+
+Example:
+"The third level of Qi Condensation!"
+after consuming cultivation resources and successfully advancing
+=> confirmed progression fact.
+
+But:
+"just a hair away from being at the peak of the third level"
+=> NOT peak third level progression.
+This is near-progression and should not be saved as a confirmed progression_event.
+
+Important distinction:
+- speculation about reaching a level later = NOT progression
+- confirmed possession of a level now = progression
+
+CONFIRMED PROGRESSION VS LATER NEAR-PROGRESSION:
+If the text first confirms that a character reached, advanced to, became, entered, unlocked, achieved, or currently possesses a level/rank/stage/status, extract that confirmed progression_event.
+
+If a later sentence says the character is close to, almost at, near, just short of, approaching, preparing for, or not far from a higher/next/peak level/rank/stage/status, do NOT let that later near-progression wording cancel the earlier confirmed progression.
+
+Extract:
+- the confirmed reached/current level/rank/stage/status
+
+Do NOT extract:
+- the later near/almost/close-to higher level/rank/stage/status
+
+Reason:
+A confirmed current state and a near-future/near-next state are different facts. The confirmed current state should be saved. The near-next state should not be saved as confirmed progression.
+
+Generic example:
+"The third rank!"
+followed by:
+"he was just short of the peak of the third rank"
+
+=> extract:
+new_value: "third rank"
+
+=> do NOT extract:
+new_value: "peak of the third rank"
+
+Generic example:
+"She unlocked Level 20."
+followed by:
+"she was already close to Level 21"
+
+=> extract:
+new_value: "Level 20"
+
+=> do NOT extract:
+new_value: "Level 21"
+
+PROGRESSION ATTRIBUTION:
+When extracting a progression_event, attach the progression only to the character who is explicitly stated or clearly implied to possess or reach that level/status.
+
+Do not attach the same progression fact to multiple characters unless the text clearly supports multiple characters having that progression.
+
+A progression_event must be directly supported by evidence for that specific character.
+
+If the owner of the progression is unclear or ambiguous:
+- prefer the explicitly named subject
+- otherwise use the strongest directly-supported subject
+- do not guess
+
+Do not copy one character's cultivation/rank/status onto another character without direct textual support.
+
+Before returning JSON:
+- Check if the main extraction missed any progression fact.
+- Check short realization/exclamation sentences after training, meditation, pill use, resource use, battle, recovery, or awakening.
+- Return only confirmed progression_events.
 """
 
 ALLOWED_EVENT_TYPES = {
@@ -290,56 +622,381 @@ def extract_chapter_with_ai(novel, chapter):
     class ProgressionAuditExtraction(BaseModel):
         progression_events: list[ExtractedProgressionEvent]
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    ai_config = get_ai_config()
+    client_kwargs = {"api_key": ai_config["api_key"]}
 
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is missing from backend/.env")
+    if ai_config["base_url"]:
+        client_kwargs["base_url"] = ai_config["base_url"]
 
-    client = OpenAI(api_key=api_key)
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    if ai_config["provider"] == "openrouter":
+        client_kwargs["default_headers"] = {
+            "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:5173"),
+            "X-Title": os.getenv("OPENROUTER_APP_NAME", "NovelWiki"),
+        }
+
+    client = OpenAI(**client_kwargs)
+    model = ai_config["model"]
     memory_context = build_extraction_memory(novel)
-
-    response = client.responses.parse(
-        model=model,
-        input=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    f"Novel: {novel.title}\n"
-                    f"Chapter {chapter.chapter_number}: {chapter.title}\n\n"
-                    f"{memory_context}\n\n"
-                    "Current chapter text:\n"
-                    f"{chapter.content}"
-                ),
-            },
-        ],
-        text_format=ChapterExtraction,
+    user_content = (
+        f"Novel: {novel.title}\n"
+        f"Chapter {chapter.chapter_number}: {chapter.title}\n\n"
+        f"{memory_context}\n\n"
+        "Current chapter text:\n"
+        f"{chapter.content}"
     )
 
-    extraction = response.output_parsed
-    progression_audit_response = client.responses.parse(
+    extraction = parse_ai_json_response(
+        client=client,
+        provider=ai_config["provider"],
         model=model,
-        input=[
-            {"role": "system", "content": PROGRESSION_AUDIT_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    f"Novel: {novel.title}\n"
-                    f"Chapter {chapter.chapter_number}: {chapter.title}\n\n"
-                    f"{memory_context}\n\n"
-                    "Current chapter text:\n"
-                    f"{chapter.content}"
-                ),
-            },
-        ],
-        text_format=ProgressionAuditExtraction,
+        temperature=ai_config["temperature"],
+        system_prompt=BASE_EXTRACTION_SYSTEM_PROMPT,
+        user_content=user_content,
+        schema_model=ChapterExtraction,
     )
+
+    progression_audit = parse_ai_json_response(
+        client=client,
+        provider=ai_config["provider"],
+        model=model,
+        temperature=ai_config["temperature"],
+        system_prompt=PROGRESSION_AUDIT_PROMPT,
+        user_content=user_content,
+        schema_model=ProgressionAuditExtraction,
+    )
+    extraction.progression_events.extend(progression_audit.progression_events)
     extraction.progression_events.extend(
-        progression_audit_response.output_parsed.progression_events
+        detect_direct_cultivation_progression(
+            novel,
+            chapter,
+            extraction,
+            ExtractedProgressionEvent,
+        )
     )
 
     return save_chapter_extraction(novel, chapter, extraction)
+
+
+def get_ai_config():
+    provider = os.getenv("AI_PROVIDER", "openai").strip().lower()
+
+    if provider == "openai":
+        api_key = os.getenv("AI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        model = os.getenv("AI_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        base_url = os.getenv("AI_BASE_URL") or None
+        missing_message = "OPENAI_API_KEY or AI_API_KEY is missing from backend/.env"
+    elif provider == "openrouter":
+        api_key = os.getenv("AI_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+        model = os.getenv("AI_MODEL", "deepseek/deepseek-v4-flash")
+        base_url = os.getenv("AI_BASE_URL", "https://openrouter.ai/api/v1")
+        missing_message = "AI_API_KEY or OPENROUTER_API_KEY is missing from backend/.env"
+    elif provider == "deepseek":
+        api_key = os.getenv("AI_API_KEY") or os.getenv("DEEPSEEK_API_KEY")
+        model = os.getenv("AI_MODEL", "deepseek-v4-flash")
+        base_url = os.getenv("AI_BASE_URL", "https://api.deepseek.com")
+        missing_message = "AI_API_KEY or DEEPSEEK_API_KEY is missing from backend/.env"
+    else:
+        api_key = os.getenv("AI_API_KEY")
+        model = os.getenv("AI_MODEL")
+        base_url = os.getenv("AI_BASE_URL") or None
+        missing_message = "AI_API_KEY is missing from backend/.env"
+
+        if not model:
+            raise RuntimeError("AI_MODEL is missing from backend/.env")
+
+    if not api_key:
+        raise RuntimeError(missing_message)
+
+    return {
+        "api_key": api_key,
+        "base_url": base_url,
+        "model": model,
+        "provider": provider,
+        "temperature": float(os.getenv("AI_TEMPERATURE", "0.1")),
+    }
+
+
+def parse_ai_json_response(client, provider, model, temperature, system_prompt, user_content, schema_model):
+    if provider == "openai":
+        response = client.responses.parse(
+            model=model,
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            text_format=schema_model,
+        )
+        return response.output_parsed
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"{system_prompt}\n\n"
+                "Return only valid JSON matching the requested schema. Do not wrap it in markdown."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"{user_content}\n\n"
+                "JSON schema to follow:\n"
+                f"{json.dumps(schema_model.model_json_schema(), ensure_ascii=False)}"
+            ),
+        },
+    ]
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema_model.__name__,
+                    "schema": schema_model.model_json_schema(),
+                    "strict": True,
+                },
+            },
+        )
+    except Exception as exc:
+        if getattr(exc, "status_code", None) not in {400, 422}:
+            raise
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            response_format={"type": "json_object"},
+        )
+
+    content = response.choices[0].message.content or ""
+    return schema_model.model_validate_json(extract_json_content(content))
+
+
+def extract_json_content(content):
+    stripped = content.strip()
+
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+
+        stripped = "\n".join(lines).strip()
+
+    if stripped.startswith("{"):
+        return stripped
+
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+
+    if start == -1 or end == -1 or end < start:
+        raise RuntimeError("AI response did not contain valid JSON")
+
+    return stripped[start : end + 1]
+
+
+LEVEL_WORD_PATTERN = (
+    r"first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|"
+    r"1st|2nd|3rd|4th|5th|6th|7th|8th|9th|10th"
+)
+QI_LEVEL_PATTERN = rf"(?P<level>{LEVEL_WORD_PATTERN})\s+level(?:\s+of)?\s+qi\s+condensation"
+DIRECT_QI_LEVEL_RE = re.compile(QI_LEVEL_PATTERN, re.IGNORECASE)
+BREAKTHROUGH_QI_RE = re.compile(
+    rf"broken\s+through\s+(?:the\s+)?(?P<old>{LEVEL_WORD_PATTERN})\s+level(?:\s+of)?\s+qi\s+condensation"
+    rf"\s+into\s+(?:the\s+)?(?P<new>{LEVEL_WORD_PATTERN})(?:\s+level(?:\s+of)?\s+qi\s+condensation)?",
+    re.IGNORECASE,
+)
+CURRENT_QI_CONTEXT_RE = re.compile(
+    r"\b(now|currently|current|foundation|base|cultivation|at|is|was|am|had reached|has reached|achieved)\b",
+    re.IGNORECASE,
+)
+PROPER_NAME_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b")
+NON_CHARACTER_NAME_CANDIDATES = {
+    "Qi Condensation",
+    "Pill Distribution",
+    "Distribution Day",
+    "Demonic Essence",
+    "Demonic Essences",
+    "Spirit Stone",
+    "Spirit Stones",
+}
+
+
+def detect_direct_cultivation_progression(novel, chapter, extraction, event_model):
+    text = chapter.content or ""
+    candidate_names = direct_progression_character_candidates(novel, extraction)
+    detected_events = []
+    seen_keys = set()
+
+    for match in BREAKTHROUGH_QI_RE.finditer(text):
+        evidence = snippet_around_match(text, match)
+        character_name = infer_progression_character(text, match.start(), match.end(), candidate_names)
+
+        if not character_name:
+            continue
+
+        old_value = qi_level_value(match.group("old"))
+        new_value = qi_level_value(match.group("new"))
+        key = (character_name.lower(), new_value.lower(), evidence_match_key(evidence))
+
+        if key in seen_keys:
+            continue
+
+        detected_events.append(
+            event_model(
+                character_name=character_name,
+                progression_type="cultivation_level",
+                old_value=old_value,
+                new_value=new_value,
+                description=f"{character_name} broke through to the {new_value}.",
+                evidence=evidence,
+            )
+        )
+        seen_keys.add(key)
+
+    for match in DIRECT_QI_LEVEL_RE.finditer(text):
+        evidence = snippet_around_match(text, match)
+        evidence_lower = evidence.lower()
+
+        if any(phrase in evidence_lower for phrase in ("away from", "not yet", "almost", "close to")):
+            continue
+
+        if not is_direct_current_level_context(evidence):
+            continue
+
+        character_name = infer_progression_character(text, match.start(), match.end(), candidate_names)
+
+        if not character_name:
+            continue
+
+        new_value = qi_level_value(match.group("level"))
+        key = (character_name.lower(), new_value.lower(), evidence_match_key(evidence))
+
+        if key in seen_keys:
+            continue
+
+        detected_events.append(
+            event_model(
+                character_name=character_name,
+                progression_type="cultivation_level",
+                old_value=None,
+                new_value=new_value,
+                description=f"{character_name}'s cultivation is confirmed at the {new_value}.",
+                evidence=evidence,
+            )
+        )
+        seen_keys.add(key)
+
+    return detected_events
+
+
+def direct_progression_character_candidates(novel, extraction):
+    candidates = []
+
+    for character in Character.query.filter_by(novel_id=novel.id).all():
+        candidates.append(character.name)
+        candidates.extend(alias.alias for alias in character.aliases)
+
+    for character in extraction.characters:
+        candidates.append(character.name)
+        candidates.extend(character.aliases)
+
+    unique_candidates = []
+    seen = set()
+
+    for candidate in candidates:
+        normalized_candidate = normalize_alias(candidate)
+
+        if not normalized_candidate or normalized_candidate.lower() in seen:
+            continue
+
+        seen.add(normalized_candidate.lower())
+        unique_candidates.append(normalized_candidate)
+
+    return sorted(unique_candidates, key=len, reverse=True)
+
+
+def infer_progression_character(text, start, end, candidate_names):
+    context_start = max(0, start - 700)
+    context_end = min(len(text), end + 260)
+    context = text[context_start:context_end]
+
+    best_candidate = None
+    best_distance = None
+
+    for candidate in candidate_names:
+        for match in re.finditer(re.escape(candidate), context, re.IGNORECASE):
+            absolute_start = context_start + match.start()
+            distance = min(abs(start - absolute_start), abs(end - absolute_start))
+
+            if best_distance is None or distance < best_distance:
+                best_candidate = candidate
+                best_distance = distance
+
+    if best_candidate:
+        return best_candidate
+
+    fallback_context = text[max(0, start - 420): min(len(text), end + 220)]
+    fallback_matches = [
+        match.group(0)
+        for match in PROPER_NAME_RE.finditer(fallback_context)
+        if match.group(0) not in NON_CHARACTER_NAME_CANDIDATES
+    ]
+
+    return fallback_matches[-1] if fallback_matches else None
+
+
+def snippet_around_match(text, match):
+    start = match.start()
+    end = match.end()
+    left_boundary = max(
+        text.rfind(".", 0, start),
+        text.rfind("!", 0, start),
+        text.rfind("?", 0, start),
+        text.rfind("\n", 0, start),
+    )
+    right_candidates = [
+        index
+        for index in (
+            text.find(".", end),
+            text.find("!", end),
+            text.find("?", end),
+            text.find("\n", end),
+        )
+        if index != -1
+    ]
+    right_boundary = min(right_candidates) if right_candidates else min(len(text), end + 220)
+    snippet = text[left_boundary + 1: right_boundary + 1].strip()
+
+    if len(snippet) > 500:
+        snippet = text[max(0, start - 180): min(len(text), end + 220)].strip()
+
+    return normalize_evidence_text(snippet)
+
+
+def qi_level_value(level):
+    return f"{level.lower()} level of Qi condensation"
+
+
+def is_direct_current_level_context(evidence):
+    evidence_lower = evidence.lower()
+
+    if "broken through" in evidence_lower or "broke through" in evidence_lower:
+        return True
+
+    if re.search(r"\bi\s+am\s+now\b", evidence_lower):
+        return True
+
+    if re.search(r"\bfoundation\s+(?:was|is|had been|was only|now was|currently was)", evidence_lower):
+        return True
+
+    return bool(CURRENT_QI_CONTEXT_RE.search(evidence))
 
 
 def build_extraction_memory(novel):
@@ -515,12 +1172,17 @@ def title_variant_key(name):
         "cultivator",
         "lord",
         "lady",
+        "madam",
+        "miss",
+        "mr",
+        "mrs",
+        "ms",
         "young",
     }
     words = [
-        word
+        word.strip(".,:;!?()[]")
         for word in normalize_alias(name).lower().replace("-", " ").split()
-        if word not in title_words
+        if word.strip(".,:;!?()[]") not in title_words
     ]
 
     return " ".join(words)
@@ -571,25 +1233,57 @@ def find_existing_character_by_extracted_aliases(novel, aliases):
     return None
 
 
+def character_name_lookup_candidates(name):
+    normalized_name = normalize_alias(name)
+    candidates = [normalized_name]
+    parenthetical_parts = re.findall(r"\(([^)]+)\)", normalized_name)
+    outside_parentheses = re.sub(r"\s*\([^)]*\)\s*", " ", normalized_name).strip()
+
+    candidates.extend(part.strip() for part in parenthetical_parts if part.strip())
+
+    if outside_parentheses and outside_parentheses != normalized_name:
+        candidates.append(outside_parentheses)
+
+    unique_candidates = []
+
+    for candidate in candidates:
+        candidate_key = candidate.lower()
+
+        if candidate and candidate_key not in {item.lower() for item in unique_candidates}:
+            unique_candidates.append(candidate)
+
+    return unique_candidates
+
+
 def find_existing_character(novel, name):
-    character = find_existing_by_name(Character, novel, name)
+    candidates = character_name_lookup_candidates(name)
 
-    if character:
-        return character
+    for candidate in candidates:
+        character = find_existing_by_name(Character, novel, candidate)
 
-    alias = (
-        CharacterAlias.query.join(Character)
-        .filter(
-            Character.novel_id == novel.id,
-            db.func.lower(CharacterAlias.alias) == name.lower(),
+        if character:
+            return character
+
+    for candidate in candidates:
+        alias = (
+            CharacterAlias.query.join(Character)
+            .filter(
+                Character.novel_id == novel.id,
+                db.func.lower(CharacterAlias.alias) == candidate.lower(),
+            )
+            .first()
         )
-        .first()
-    )
 
-    if alias:
-        return alias.character
+        if alias:
+            return alias.character
 
-    return find_existing_character_by_title_variant(novel, name)
+    for candidate in candidates:
+        character = find_existing_character_by_title_variant(novel, candidate)
+
+        if character:
+            return character
+
+    return None
 
 
 def find_existing_skill(novel, name):
@@ -621,6 +1315,197 @@ def normalize_appearance_type(appearance_type):
 
 def normalize_alias(alias):
     return " ".join(alias.split()).strip()
+
+
+WEAK_HONORIFIC_PREFIXES = {"ms", "mr", "mrs", "miss", "mister"}
+
+STRONG_TITLE_WORDS = {
+    "cultivator",
+    "daoist",
+    "elder",
+    "founder",
+    "junior",
+    "lord",
+    "master",
+    "patriarch",
+    "saint",
+    "sect",
+    "senior",
+}
+
+TITLE_STYLE_WORDS = STRONG_TITLE_WORDS | {"brother", "sister"}
+
+PERSON_NOUNS = {
+    "boy",
+    "cultivator",
+    "disciple",
+    "elder",
+    "girl",
+    "guard",
+    "man",
+    "servant",
+    "teenager",
+    "woman",
+    "youth",
+}
+
+DESCRIPTOR_MARKERS = {
+    "clad",
+    "eyed",
+    "faced",
+    "fat",
+    "haired",
+    "masked",
+    "old",
+    "robed",
+    "short",
+    "tall",
+    "thin",
+    "young",
+}
+
+
+def character_name_words(name):
+    return re.findall(r"[A-Za-z]+", normalize_alias(name))
+
+
+def lower_name_words(name):
+    return [word.lower() for word in character_name_words(name)]
+
+
+def is_weak_honorific_name(name):
+    words = lower_name_words(name)
+    return bool(words and words[0] in WEAK_HONORIFIC_PREFIXES)
+
+
+def phrase_starts_like_title_case(name):
+    words = normalize_alias(name).replace("-", " ").split()
+
+    if not words:
+        return False
+
+    return all(word[:1].isupper() for word in words if word[:1].isalpha())
+
+
+def looks_like_full_real_name(name):
+    words = character_name_words(name)
+    lowered_words = {word.lower() for word in words}
+
+    if is_weak_honorific_name(name):
+        return False
+
+    if len(words) < 2 or len(words) > 4:
+        return False
+
+    if lowered_words & TITLE_STYLE_WORDS:
+        return False
+
+    if lowered_words & PERSON_NOUNS:
+        return False
+
+    if lowered_words & DESCRIPTOR_MARKERS:
+        return False
+
+    return all(word[:1].isupper() for word in words)
+
+
+def looks_like_title_style_name(name):
+    lowered_words = set(lower_name_words(name))
+
+    if is_weak_honorific_name(name):
+        return False
+
+    return bool(lowered_words & TITLE_STYLE_WORDS) and phrase_starts_like_title_case(name)
+
+
+def looks_like_stable_nickname_or_label(name):
+    normalized_name = normalize_alias(name)
+    words = lower_name_words(normalized_name)
+
+    if is_weak_honorific_name(normalized_name):
+        return False
+
+    if not words or len(words) > 4:
+        return False
+
+    if looks_like_full_real_name(normalized_name) or looks_like_title_style_name(normalized_name):
+        return False
+
+    if len(words) == 1 and normalized_name[:1].isupper():
+        return True
+
+    return phrase_starts_like_title_case(normalized_name) and bool(
+        set(words) & (PERSON_NOUNS | DESCRIPTOR_MARKERS)
+    )
+
+
+def looks_like_generic_visual_description(name):
+    words = set(lower_name_words(name))
+
+    if looks_like_title_style_name(name):
+        return False
+
+    if phrase_starts_like_title_case(name):
+        return False
+
+    return bool(words & PERSON_NOUNS) and bool(words & DESCRIPTOR_MARKERS)
+
+
+def score_character_name_candidate(name):
+    normalized_name = normalize_alias(name)
+
+    if not normalized_name:
+        return -1000
+
+    if looks_like_full_real_name(normalized_name):
+        return 100
+
+    if looks_like_title_style_name(normalized_name):
+        words = set(lower_name_words(normalized_name))
+        return 85 if words & STRONG_TITLE_WORDS else 65
+
+    if looks_like_stable_nickname_or_label(normalized_name):
+        return 50
+
+    if is_weak_honorific_name(normalized_name):
+        return 30
+
+    if looks_like_generic_visual_description(normalized_name):
+        return 5
+
+    return 40 if any(word[:1].isupper() for word in character_name_words(normalized_name)) else 20
+
+
+def select_canonical_character_name(name, aliases):
+    candidates = [name, *(aliases or [])]
+    normalized_candidates = []
+    seen_candidates = set()
+
+    for candidate in candidates:
+        normalized_candidate = normalize_alias(candidate)
+        candidate_key = normalized_candidate.lower()
+
+        if not normalized_candidate or candidate_key in seen_candidates:
+            continue
+
+        normalized_candidates.append(normalized_candidate)
+        seen_candidates.add(candidate_key)
+
+    if not normalized_candidates:
+        return normalize_alias(name), []
+
+    best_index, canonical_name = max(
+        enumerate(normalized_candidates),
+        key=lambda item: (score_character_name_candidate(item[1]), -item[0]),
+    )
+    canonical_key = canonical_name.lower()
+    canonical_aliases = [
+        candidate
+        for index, candidate in enumerate(normalized_candidates)
+        if index != best_index and candidate.lower() != canonical_key
+    ]
+
+    return canonical_name, canonical_aliases
 
 
 def strip_leading_title_from_personal_name(name):
@@ -669,14 +1554,8 @@ def add_character_alias(character, alias, chapter, evidence, allow_generic=False
     if alias_label_key:
         normalized_evidence = normalize_evidence_text(evidence or "").lower()
         normalized_label = normalized_alias.lower()
-        normalized_character_name = normalize_alias(character.name).lower()
 
         if normalized_label not in normalized_evidence:
-            return False
-
-        if descriptive_label_key(character.name) == alias_label_key:
-            pass
-        elif normalized_character_name not in normalized_evidence:
             return False
 
     if not allow_generic and normalized_alias.lower() in GENERIC_PERSON_LABELS:
@@ -702,79 +1581,20 @@ def add_character_alias(character, alias, chapter, evidence, allow_generic=False
 
 
 def is_probable_personal_name(name):
-    normalized_name = normalize_alias(name)
-    words = normalized_name.replace("-", " ").split()
-    non_personal_words = {
-        "elder",
-        "junior",
-        "senior",
-        "brother",
-        "sister",
-        "master",
-        "uncle",
-        "aunt",
-        "cultivator",
-        "lord",
-        "lady",
-        "young",
-        "fat",
-        "chubby",
-        "horse",
-        "faced",
-        "shrewd",
-        "looking",
-        "green",
-        "robed",
-        "teenager",
-        "man",
-        "woman",
-        "monk",
-        "disciple",
-        "servant",
-        "guard",
-    }
-
-    if len(words) < 2 or len(words) > 4:
-        return False
-
-    if any(word.lower() in non_personal_words for word in words):
-        return False
-
-    return all(word[:1].isupper() for word in words)
+    return looks_like_full_real_name(name)
 
 
 def is_descriptive_or_title_name(name):
-    normalized_name = normalize_alias(name).lower()
-    descriptive_terms = {
-        "elder",
-        "junior",
-        "senior",
-        "brother",
-        "sister",
-        "master",
-        "uncle",
-        "aunt",
-        "cultivator",
-        "fat",
-        "chubby",
-        "horse-faced",
-        "horse faced",
-        "shrewd-looking",
-        "shrewd looking",
-        "green-robed",
-        "green robed",
-        "teenager",
-        "young man",
-        "young woman",
-        "man",
-        "woman",
-    }
-
-    return any(term in normalized_name for term in descriptive_terms)
+    return (
+        looks_like_title_style_name(name)
+        or looks_like_stable_nickname_or_label(name)
+        or looks_like_generic_visual_description(name)
+        or is_weak_honorific_name(name)
+    )
 
 
 def should_promote_canonical_name(current_name, new_name):
-    return is_probable_personal_name(new_name) and is_descriptive_or_title_name(current_name)
+    return score_character_name_candidate(new_name) > score_character_name_candidate(current_name)
 
 
 def promote_character_canonical_name(character, new_name, chapter, evidence):
@@ -1226,6 +2046,23 @@ def normalize_value(value):
     return " ".join(value.lower().split())
 
 
+def canonicalize_progression_value(progression_type, value):
+    if not value:
+        return value
+
+    normalized_value = normalize_alias(value)
+
+    if progression_type != "cultivation_level":
+        return normalized_value
+
+    return re.sub(
+        r"^(?:at\s+)?(?:the\s+)?peak\s+of\s+(?:the\s+)?",
+        "",
+        normalized_value,
+        flags=re.IGNORECASE,
+    ).strip()
+
+
 ORDINAL_WORDS = {
     "first": 1,
     "1st": 1,
@@ -1261,7 +2098,7 @@ ORDINAL_WORDS = {
 
 
 def progression_compare_key(progression_type, value):
-    normalized_value = normalize_value(value)
+    normalized_value = normalize_value(canonicalize_progression_value(progression_type, value))
 
     if progression_type != "cultivation_level":
         return normalized_value
@@ -1320,7 +2157,14 @@ def progression_keys_match(existing_key, new_key):
     return existing_realm is None or new_realm is None or existing_realm == new_realm
 
 
-def is_more_specific_progression_value(existing_value, new_value):
+def is_more_specific_progression_value(progression_type, existing_value, new_value):
+    if progression_type == "cultivation_level" and progression_values_match(
+        progression_type,
+        existing_value,
+        new_value,
+    ):
+        return False
+
     return len(normalize_value(new_value)) > len(normalize_value(existing_value))
 
 
@@ -1602,6 +2446,129 @@ def merge_description(existing_description, new_description):
     return f"{existing_description}\n\n{new_description}"
 
 
+def append_review_warning(record, warning):
+    existing_warnings = record.review_warnings.splitlines() if record.review_warnings else []
+
+    if warning not in existing_warnings:
+        existing_warnings.append(warning)
+        record.review_warnings = "\n".join(existing_warnings)
+        return True
+
+    return False
+
+
+def character_reference_candidates(character):
+    candidates = [character.name]
+    candidates.extend(alias.alias for alias in character.aliases)
+    normalized_candidates = []
+    seen_candidates = set()
+
+    for candidate in candidates:
+        normalized_candidate = normalize_alias(candidate)
+        candidate_key = normalized_candidate.lower()
+
+        if not normalized_candidate or candidate_key in seen_candidates:
+            continue
+
+        if candidate_key in GENERIC_PERSON_LABELS:
+            continue
+
+        normalized_candidates.append(normalized_candidate)
+        seen_candidates.add(candidate_key)
+
+    return normalized_candidates
+
+
+def evidence_mentions_character(evidence, character):
+    evidence_key = evidence_match_key(evidence)
+
+    if not evidence_key:
+        return False
+
+    for candidate in character_reference_candidates(character):
+        candidate_key = evidence_match_key(candidate)
+
+        if candidate_key and candidate_key in evidence_key:
+            return True
+
+    return False
+
+
+def progression_duplicate_attribution_conflicts(
+    novel,
+    chapter,
+    character,
+    progression_type,
+    new_value,
+    evidence,
+):
+    evidence_key = evidence_match_key(evidence)
+
+    if not evidence_key:
+        return []
+
+    conflicts = []
+    progression_rows = CharacterProgressionEvent.query.filter_by(
+        novel_id=novel.id,
+        chapter_id=chapter.id,
+    ).all()
+
+    for progression in progression_rows:
+        if progression.character_id == character.id:
+            continue
+
+        if progression_compare_key(progression_type, new_value) != progression_compare_key(
+            progression.progression_type,
+            progression.new_value,
+        ):
+            continue
+
+        evidence_rows = WikiEvidence.query.filter_by(
+            entity_type="progression",
+            entity_id=progression.id,
+        ).all()
+
+        if any(evidence_match_key(row.evidence_text) == evidence_key for row in evidence_rows):
+            conflicts.append(progression)
+
+    return conflicts
+
+
+def progression_review_warnings(
+    novel,
+    chapter,
+    character,
+    progression_type,
+    new_value,
+    evidence,
+):
+    warnings = []
+    duplicate_warning = (
+        "Possible duplicate progression attribution: same evidence and progression value "
+        "attached to multiple characters."
+    )
+    missing_name_warning = "Evidence may not directly name this character."
+    conflicts = progression_duplicate_attribution_conflicts(
+        novel,
+        chapter,
+        character,
+        progression_type,
+        new_value,
+        evidence,
+    )
+
+    if conflicts:
+        warnings.append(duplicate_warning)
+
+        for conflict in conflicts:
+            append_review_warning(conflict, duplicate_warning)
+
+    if not evidence_mentions_character(evidence, character):
+        warnings.append(missing_name_warning)
+
+    return warnings
+
+
 def save_chapter_extraction(novel, chapter, extraction):
     summary = {
         "characters_created": 0,
@@ -1621,14 +2588,13 @@ def save_chapter_extraction(novel, chapter, extraction):
         if not has_meaningful_evidence(extracted_character.evidence):
             continue
 
-        if not is_trackable_character_name(extracted_character.name):
+        extracted_name, extracted_aliases = select_canonical_character_name(
+            extracted_character.name,
+            extracted_character.aliases,
+        )
+
+        if not is_trackable_character_name(extracted_name):
             continue
-
-        extracted_name = strip_leading_title_from_personal_name(extracted_character.name)
-        personal_alias = personal_name_from_aliases(extracted_character.aliases)
-
-        if personal_alias and is_descriptive_or_title_name(extracted_name):
-            extracted_name = personal_alias
 
         appearance_type = normalize_appearance_type(extracted_character.appearance_type)
         character = find_existing_character(novel, extracted_name)
@@ -1636,7 +2602,7 @@ def save_chapter_extraction(novel, chapter, extraction):
         if not character:
             character = find_existing_character_by_extracted_aliases(
                 novel,
-                [extracted_character.name, *extracted_character.aliases],
+                [extracted_name, *extracted_aliases],
             )
 
         character_created = False
@@ -1679,17 +2645,7 @@ def save_chapter_extraction(novel, chapter, extraction):
         db.session.flush()
         aliases_added = False
 
-        if extracted_name.lower() != extracted_character.name.lower():
-            if add_character_alias(
-                character,
-                extracted_character.name,
-                chapter,
-                extracted_character.evidence,
-                allow_generic=True,
-            ):
-                aliases_added = True
-
-        for alias in extracted_character.aliases:
+        for alias in extracted_aliases:
             if add_character_alias(
                 character,
                 alias,
@@ -1967,29 +2923,38 @@ def save_chapter_extraction(novel, chapter, extraction):
             summary["characters_created"] += 1
 
         progression_type = normalize_progression_type(extracted_progression.progression_type)
+        new_value = canonicalize_progression_value(
+            progression_type,
+            extracted_progression.new_value,
+        )
+        old_value = canonicalize_progression_value(
+            progression_type,
+            extracted_progression.old_value,
+        )
 
-        if not is_valid_progression_value(progression_type, extracted_progression.new_value):
+        if not is_valid_progression_value(progression_type, new_value):
             continue
 
         if progression_values_match(
             progression_type,
-            extracted_progression.old_value,
-            extracted_progression.new_value,
+            old_value,
+            new_value,
         ):
             continue
 
         existing_progression = find_existing_progression(
             character,
             progression_type,
-            extracted_progression.new_value,
+            new_value,
         )
 
         if existing_progression:
             if is_more_specific_progression_value(
+                progression_type,
                 existing_progression.new_value,
-                extracted_progression.new_value,
+                new_value,
             ):
-                existing_progression.new_value = extracted_progression.new_value
+                existing_progression.new_value = new_value
                 existing_progression.description = merge_description(
                     existing_progression.description,
                     extracted_progression.description,
@@ -2008,14 +2973,23 @@ def save_chapter_extraction(novel, chapter, extraction):
             recalculate_character_current_progression(character, progression_type)
             continue
 
+        review_warnings = progression_review_warnings(
+            novel,
+            chapter,
+            character,
+            progression_type,
+            new_value,
+            extracted_progression.evidence,
+        )
         progression = CharacterProgressionEvent(
             novel_id=novel.id,
             character_id=character.id,
             chapter_id=chapter.id,
             progression_type=progression_type,
-            old_value=extracted_progression.old_value,
-            new_value=extracted_progression.new_value,
+            old_value=old_value,
+            new_value=new_value,
             description=extracted_progression.description,
+            review_warnings="\n".join(review_warnings) if review_warnings else None,
             review_status="pending",
         )
         db.session.add(progression)

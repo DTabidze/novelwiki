@@ -303,6 +303,7 @@ class CharacterProgressionEvent(ReviewMixin, db.Model):
     old_value = db.Column(db.String(255), nullable=True)
     new_value = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    review_warnings = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     character = db.relationship("Character")
@@ -319,6 +320,7 @@ class CharacterProgressionEvent(ReviewMixin, db.Model):
             "old_value": self.old_value,
             "new_value": self.new_value,
             "description": self.description,
+            "review_warnings": self.review_warnings.splitlines() if self.review_warnings else [],
             **self.review_dict(),
         }
 

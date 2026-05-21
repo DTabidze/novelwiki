@@ -79,6 +79,16 @@ def ensure_development_schema(app):
                 )
             )
 
+        progression_columns = connection.execute(
+            text("PRAGMA table_info(character_progression_events)")
+        ).fetchall()
+        progression_column_names = {column[1] for column in progression_columns}
+
+        if "review_warnings" not in progression_column_names:
+            connection.execute(
+                text("ALTER TABLE character_progression_events ADD COLUMN review_warnings TEXT")
+            )
+
         connection.commit()
 
 

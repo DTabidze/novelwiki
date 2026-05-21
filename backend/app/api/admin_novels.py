@@ -129,12 +129,12 @@ def extract_single_chapter(novel_id, chapter_id):
         return failure(str(error), status=400)
     except AuthenticationError:
         novel.status = "failed"
-        novel.error_message = "OpenAI API key was rejected. Check backend/.env and restart Flask."
+        novel.error_message = "AI API key was rejected. Check backend/.env and restart Flask."
         db.session.commit()
         return failure(novel.error_message, status=401)
     except RateLimitError:
         novel.status = "failed"
-        novel.error_message = "OpenAI API quota is unavailable. Check project billing and usage limits."
+        novel.error_message = "AI API quota is unavailable. Check provider billing and usage limits."
         db.session.commit()
         return failure(novel.error_message, status=429)
     except Exception as error:
@@ -201,12 +201,12 @@ def extract_first_fifteen_chapters(novel_id):
         return failure(str(error), status=400)
     except AuthenticationError:
         novel.status = "failed"
-        novel.error_message = "OpenAI API key was rejected. Check backend/.env and restart Flask."
+        novel.error_message = "AI API key was rejected. Check backend/.env and restart Flask."
         db.session.commit()
         return failure(novel.error_message, status=401)
     except RateLimitError:
         novel.status = "failed"
-        novel.error_message = "OpenAI API quota is unavailable. Check project billing and usage limits."
+        novel.error_message = "AI API quota is unavailable. Check provider billing and usage limits."
         db.session.commit()
         return failure(novel.error_message, status=429)
     except Exception as error:
