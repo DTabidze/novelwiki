@@ -264,6 +264,7 @@ export default function WikiPanel({
                 <WikiCharacterDetail
                   character={selectedCharacter}
                   onOpenCultivation={() => openCharacterProgression(selectedCharacter)}
+                  onSelectItem={openItem}
                   relatedCharacters={characters}
                   onSelectRelated={openCharacter}
                   onSelectSkill={openSkill}

@@ -68,6 +68,8 @@ const ORDINAL_WORDS = {
 };
 
 const LOWERCASE_CULTIVATION_WORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "of", "the", "to"]);
+const LOWERCASE_METADATA_WORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "of", "the", "to"]);
+const METADATA_FIELDS_PRESERVE_CASE = new Set(["age_text"]);
 
 function titleCaseCultivationText(value) {
   return value
@@ -95,12 +97,50 @@ function titleCaseCultivationText(value) {
     .join(" ");
 }
 
+function titleCaseMetadataText(value) {
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((word, index) => {
+      const parts = word.split("/");
+
+      return parts
+        .map((part) => {
+          const lower = part.toLowerCase();
+
+          if (index > 0 && LOWERCASE_METADATA_WORDS.has(lower)) {
+            return lower;
+          }
+
+          return `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
+        })
+        .join("/");
+    })
+    .join(" ");
+}
+
 export function formatCultivationValue(value) {
   if (!value) {
     return "";
   }
 
   return titleCaseCultivationText(value);
+}
+
+export function formatMetadataValue(value, fieldName = "") {
+  if (!value) {
+    return "";
+  }
+
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+
+  if (!normalized || METADATA_FIELDS_PRESERVE_CASE.has(fieldName)) {
+    return normalized;
+  }
+
+  return titleCaseMetadataText(normalized);
 }
 
 export function splitCultivationValue(value) {

@@ -58,6 +58,15 @@ def ensure_development_schema(app):
             )
 
         character_summary_columns = {
+            "age_text": "VARCHAR(255)",
+            "gender": "VARCHAR(255)",
+            "race_or_species": "VARCHAR(255)",
+            "race_or_species_source": "VARCHAR(50)",
+            "race_or_species_confidence": "VARCHAR(50)",
+            "origin": "VARCHAR(255)",
+            "faction_or_affiliation": "VARCHAR(255)",
+            "status": "VARCHAR(255)",
+            "titles": "TEXT",
             "current_cultivation_level": "VARCHAR(255)",
             "current_position": "VARCHAR(255)",
             "current_class_rank": "VARCHAR(255)",
@@ -88,6 +97,27 @@ def ensure_development_schema(app):
             connection.execute(
                 text("ALTER TABLE character_progression_events ADD COLUMN review_warnings TEXT")
             )
+
+        metadata_proposal_columns = connection.execute(
+            text("PRAGMA table_info(character_metadata_proposals)")
+        ).fetchall()
+        metadata_proposal_column_names = {column[1] for column in metadata_proposal_columns}
+        metadata_proposal_summary_columns = {
+            "raw_proposed_value": "TEXT",
+            "normalized_value": "TEXT",
+            "confidence_score": "FLOAT",
+            "extraction_reason": "TEXT",
+            "auto_approved": "BOOLEAN NOT NULL DEFAULT 0",
+        }
+
+        for column_name, column_type in metadata_proposal_summary_columns.items():
+            if column_name not in metadata_proposal_column_names:
+                connection.execute(
+                    text(
+                        "ALTER TABLE character_metadata_proposals "
+                        f"ADD COLUMN {column_name} {column_type}"
+                    )
+                )
 
         connection.commit()
 

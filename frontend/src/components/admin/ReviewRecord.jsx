@@ -68,6 +68,7 @@ export default function ReviewRecord({ entityType, record, fields, mergeTargets 
             record.title ||
             record.new_value ||
             record.character_name ||
+            record.field_name ||
             record.entity_type ||
             entityType}
         </strong>
@@ -80,6 +81,21 @@ export default function ReviewRecord({ entityType, record, fields, mergeTargets 
 
       {record.skill_name ? <p className="source-line">Skill: {record.skill_name}</p> : null}
       {record.item_name ? <p className="source-line">Item: {record.item_name}</p> : null}
+
+      {entityType === "character_metadata_proposals" ? (
+        <div className="meta-lines">
+          <span>Field: {record.field_name}</span>
+          <span>Old value: {record.old_value || "Empty"}</span>
+          {record.raw_proposed_value ? <span>Raw proposed: {record.raw_proposed_value}</span> : null}
+          <span>Proposed value: {record.proposed_value}</span>
+          {record.normalized_value ? <span>Normalized: {record.normalized_value}</span> : null}
+          {record.confidence_score !== null && record.confidence_score !== undefined ? (
+            <span>Confidence: {Math.round(record.confidence_score * 100)}%</span>
+          ) : null}
+          {record.extraction_reason ? <span>Reason: {record.extraction_reason}</span> : null}
+          {record.auto_approved ? <span>Auto-approved safe metadata</span> : null}
+        </div>
+      ) : null}
 
       {record.source_chapter ? (
         <p className="source-line">
@@ -118,6 +134,22 @@ export default function ReviewRecord({ entityType, record, fields, mergeTargets 
             <span>Current class rank: {record.current_class_rank}</span>
           ) : null}
           {record.current_power_rank ? <span>Current power rank: {record.current_power_rank}</span> : null}
+          {record.age_text ? <span>Age: {record.age_text}</span> : null}
+          {record.gender ? <span>Gender: {record.gender}</span> : null}
+          {record.race_or_species ? <span>Race/species: {record.race_or_species}</span> : null}
+          {record.race_or_species_source || record.race_or_species_confidence ? (
+            <span>
+              Species source: {[record.race_or_species_source, record.race_or_species_confidence]
+                .filter(Boolean)
+                .join(" / ")}
+            </span>
+          ) : null}
+          {record.origin ? <span>Origin: {record.origin}</span> : null}
+          {record.faction_or_affiliation ? (
+            <span>Affiliation: {record.faction_or_affiliation}</span>
+          ) : null}
+          {record.status ? <span>Status: {record.status}</span> : null}
+          {record.titles ? <span>Titles: {record.titles}</span> : null}
         </div>
       ) : null}
 
@@ -135,7 +167,7 @@ export default function ReviewRecord({ entityType, record, fields, mergeTargets 
       {fields.map((field) => (
         <label key={field}>
           {field.replace("_", " ")}
-          {field === "description" ? (
+          {field === "description" || field === "titles" ? (
             <textarea
               value={formValues[field]}
               onChange={(event) => setFormValues({ ...formValues, [field]: event.target.value })}
@@ -158,6 +190,15 @@ export default function ReviewRecord({ entityType, record, fields, mergeTargets 
           placeholder="Optional review notes"
         />
       </label>
+
+      {record.evidence_text ? (
+        <div className="evidence-list">
+          <strong>Evidence</strong>
+          {record.evidence_text.split(/\n\n+/).map((evidence) => (
+            <p key={evidence}>{evidence}</p>
+          ))}
+        </div>
+      ) : null}
 
       {record.evidence && record.evidence.length > 0 ? (
         <div className="evidence-list">

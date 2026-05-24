@@ -172,6 +172,7 @@ def extract_first_fifteen_chapters(novel_id):
         "items_updated": 0,
         "events_created": 0,
         "progression_events_created": 0,
+        "metadata_proposals_created": 0,
         "character_skills_created": 0,
         "life_events_created": 0,
         "evidence_created": 0,

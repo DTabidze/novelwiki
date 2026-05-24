@@ -104,6 +104,15 @@ class Character(ReviewMixin, db.Model):
     first_mentioned_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
     first_appeared_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
     first_seen_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    age_text = db.Column(db.String(255), nullable=True)
+    gender = db.Column(db.String(255), nullable=True)
+    race_or_species = db.Column(db.String(255), nullable=True)
+    race_or_species_source = db.Column(db.String(50), nullable=True)
+    race_or_species_confidence = db.Column(db.String(50), nullable=True)
+    origin = db.Column(db.String(255), nullable=True)
+    faction_or_affiliation = db.Column(db.String(255), nullable=True)
+    status = db.Column(db.String(255), nullable=True, default="unknown")
+    titles = db.Column(db.Text, nullable=True)
     current_cultivation_level = db.Column(db.String(255), nullable=True)
     current_position = db.Column(db.String(255), nullable=True)
     current_class_rank = db.Column(db.String(255), nullable=True)
@@ -132,6 +141,15 @@ class Character(ReviewMixin, db.Model):
             "first_mentioned_chapter_id": self.first_mentioned_chapter_id,
             "first_appeared_chapter_id": self.first_appeared_chapter_id,
             "first_seen_chapter_id": self.first_seen_chapter_id,
+            "age_text": self.age_text,
+            "gender": self.gender,
+            "race_or_species": self.race_or_species,
+            "race_or_species_source": self.race_or_species_source,
+            "race_or_species_confidence": self.race_or_species_confidence,
+            "origin": self.origin,
+            "faction_or_affiliation": self.faction_or_affiliation,
+            "status": self.status,
+            "titles": self.titles,
             "current_cultivation_level": self.current_cultivation_level,
             "current_position": self.current_position,
             "current_class_rank": self.current_class_rank,
@@ -165,6 +183,55 @@ class CharacterAlias(db.Model):
             "alias": self.alias,
             "first_seen_chapter_id": self.first_seen_chapter_id,
             "evidence": self.evidence,
+        }
+
+
+class CharacterMetadataProposal(ReviewMixin, db.Model):
+    __tablename__ = "character_metadata_proposals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    character_id = db.Column(db.Integer, db.ForeignKey("characters.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
+    field_name = db.Column(db.String(100), nullable=False)
+    old_value = db.Column(db.Text, nullable=True)
+    raw_proposed_value = db.Column(db.Text, nullable=True)
+    proposed_value = db.Column(db.Text, nullable=False)
+    normalized_value = db.Column(db.Text, nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    extraction_reason = db.Column(db.Text, nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
+    evidence = db.Column(db.Text, nullable=True)
+    review_warnings = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+    character = db.relationship("Character")
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "character_id": self.character_id,
+            "character_name": self.character.name if self.character else None,
+            "chapter_id": self.chapter_id,
+            "source_chapter_id": self.chapter_id,
+            "field_name": self.field_name,
+            "old_value": self.old_value,
+            "raw_proposed_value": self.raw_proposed_value,
+            "proposed_value": self.proposed_value,
+            "normalized_value": self.normalized_value,
+            "confidence_score": self.confidence_score,
+            "extraction_reason": self.extraction_reason,
+            "auto_approved": self.auto_approved,
+            "evidence_text": self.evidence,
+            "review_warnings": self.review_warnings.splitlines() if self.review_warnings else [],
+            **self.review_dict(),
         }
 
 

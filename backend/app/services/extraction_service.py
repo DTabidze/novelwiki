@@ -3,6 +3,7 @@ from app.models import (
     CharacterAlias,
     CharacterItem,
     CharacterLifeEvent,
+    CharacterMetadataProposal,
     CharacterProgressionEvent,
     CharacterSkill,
     Chapter,
@@ -52,6 +53,7 @@ def run_placeholder_extraction(novel):
         )
 
     CharacterProgressionEvent.query.filter_by(novel_id=novel.id).delete()
+    CharacterMetadataProposal.query.filter_by(novel_id=novel.id).delete()
     CharacterSkill.query.filter_by(novel_id=novel.id).delete()
     CharacterItem.query.filter_by(novel_id=novel.id).delete()
     CharacterLifeEvent.query.filter_by(novel_id=novel.id).delete()
@@ -198,6 +200,12 @@ def get_extracted_data(novel):
             with_source_and_evidence("progression", progression)
             for progression in CharacterProgressionEvent.query.filter_by(novel_id=novel.id)
             .order_by(CharacterProgressionEvent.id)
+            .all()
+        ],
+        "character_metadata_proposals": [
+            with_source_and_evidence("character_metadata_proposal", proposal)
+            for proposal in CharacterMetadataProposal.query.filter_by(novel_id=novel.id)
+            .order_by(CharacterMetadataProposal.id)
             .all()
         ],
         "character_skills": [

@@ -5,6 +5,7 @@ from app.models import (
     CharacterAlias,
     CharacterItem,
     CharacterLifeEvent,
+    CharacterMetadataProposal,
     CharacterProgressionEvent,
     CharacterSkill,
     Chapter,
@@ -23,7 +24,21 @@ REVIEW_STATUSES = {"pending", "approved", "rejected"}
 ENTITY_CONFIG = {
     "characters": {
         "model": Character,
-        "fields": {"name", "description", "review_status", "admin_notes"},
+        "fields": {
+            "name",
+            "description",
+            "age_text",
+            "gender",
+            "race_or_species",
+            "race_or_species_source",
+            "race_or_species_confidence",
+            "origin",
+            "faction_or_affiliation",
+            "status",
+            "titles",
+            "review_status",
+            "admin_notes",
+        },
     },
     "skills": {
         "model": Skill,
@@ -48,6 +63,17 @@ ENTITY_CONFIG = {
             "admin_notes",
         },
     },
+    "character_metadata_proposals": {
+        "model": CharacterMetadataProposal,
+        "fields": {
+            "field_name",
+            "old_value",
+            "proposed_value",
+            "evidence",
+            "review_status",
+            "admin_notes",
+        },
+    },
     "character_skills": {
         "model": CharacterSkill,
         "fields": {"relationship_type", "description", "review_status", "admin_notes"},
@@ -68,6 +94,7 @@ EVIDENCE_ENTITY_TYPES = {
     "items": "item",
     "events": "event",
     "progression_events": "progression",
+    "character_metadata_proposals": "character_metadata_proposal",
     "character_skills": "character_skill",
     "character_items": "character_item",
     "life_events": "life_event",
@@ -161,6 +188,79 @@ def admin_review_response(entity_type, record):
     return data
 
 
+METADATA_PROPOSAL_FIELDS = {
+    "age_text",
+    "gender",
+    "race_or_species",
+    "origin",
+    "faction_or_affiliation",
+    "status",
+    "titles",
+}
+
+LIFE_STATUS_VALUES = {
+    "alive",
+    "dead",
+    "historical",
+    "missing",
+    "sealed",
+    "reincarnated",
+    "unknown",
+}
+
+
+def apply_metadata_proposal(proposal):
+    if proposal.field_name not in METADATA_PROPOSAL_FIELDS:
+        return False
+
+    character = proposal.character
+
+    if not character:
+        return False
+
+    if proposal.field_name == "status" and proposal.proposed_value not in LIFE_STATUS_VALUES:
+        return False
+
+    if proposal.field_name == "titles":
+        character.titles = merge_text(character.titles, proposal.proposed_value)
+    else:
+        setattr(character, proposal.field_name, proposal.proposed_value)
+
+    if proposal.field_name == "race_or_species":
+        character.race_or_species_source = "extracted"
+        character.race_or_species_confidence = "confirmed"
+
+    return True
+
+
+def initialize_alive_status_on_character_approval(character):
+    if not character or not character.first_appeared_chapter_id:
+        return False
+
+    if character.status and character.status != "unknown":
+        return False
+
+    character.status = "alive"
+    return True
+
+
+def initialize_default_species_on_character_approval(character):
+    if not character:
+        return False
+
+    if character.race_or_species:
+        if not character.race_or_species_source:
+            character.race_or_species_source = "extracted"
+        if not character.race_or_species_confidence:
+            character.race_or_species_confidence = "confirmed"
+        return False
+
+    character.race_or_species = "Human"
+    character.race_or_species_source = "implicit_default"
+    character.race_or_species_confidence = "assumed"
+    return True
+
+
 @admin_review_bp.patch("/<entity_type>/<int:entity_id>")
 def update_extracted_entity(entity_type, entity_id):
     config = ENTITY_CONFIG.get(entity_type)
@@ -177,6 +277,17 @@ def update_extracted_entity(entity_type, entity_id):
     for field in config["fields"]:
         if field in payload:
             setattr(record, field, payload[field])
+
+    if (
+        entity_type == "character_metadata_proposals"
+        and payload.get("review_status") == "approved"
+    ):
+        if not apply_metadata_proposal(record):
+            return failure("Metadata proposal could not be applied.")
+
+    if entity_type == "characters" and payload.get("review_status") == "approved":
+        initialize_alive_status_on_character_approval(record)
+        initialize_default_species_on_character_approval(record)
 
     db.session.commit()
 
@@ -220,6 +331,34 @@ def merge_character(source_id):
     target.current_position = target.current_position or source.current_position
     target.current_class_rank = target.current_class_rank or source.current_class_rank
     target.current_power_rank = target.current_power_rank or source.current_power_rank
+    target.age_text = target.age_text or source.age_text
+    target.gender = target.gender or source.gender
+    source_species_confirmed = (
+        source.race_or_species
+        and source.race_or_species_source == "extracted"
+        and source.race_or_species_confidence == "confirmed"
+    )
+    target_species_assumed = (
+        target.race_or_species_source == "implicit_default"
+        and target.race_or_species_confidence == "assumed"
+    )
+
+    if source_species_confirmed and (not target.race_or_species or target_species_assumed):
+        target.race_or_species = source.race_or_species
+        target.race_or_species_source = source.race_or_species_source
+        target.race_or_species_confidence = source.race_or_species_confidence
+    else:
+        target.race_or_species = target.race_or_species or source.race_or_species
+        target.race_or_species_source = (
+            target.race_or_species_source or source.race_or_species_source
+        )
+        target.race_or_species_confidence = (
+            target.race_or_species_confidence or source.race_or_species_confidence
+        )
+    target.origin = target.origin or source.origin
+    target.faction_or_affiliation = target.faction_or_affiliation or source.faction_or_affiliation
+    target.status = target.status or source.status
+    target.titles = merge_text(target.titles, source.titles)
 
     source_aliases = [
         {
@@ -265,6 +404,9 @@ def merge_character(source_id):
         {"entity_id": target.id}
     )
     CharacterProgressionEvent.query.filter_by(character_id=source.id).update(
+        {"character_id": target.id}
+    )
+    CharacterMetadataProposal.query.filter_by(character_id=source.id).update(
         {"character_id": target.id}
     )
     CharacterSkill.query.filter_by(character_id=source.id).update(

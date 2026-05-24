@@ -5,6 +5,7 @@ import re
 from app.models import (
     Character,
     CharacterAlias,
+    CharacterMetadataProposal,
     CharacterSkill,
     CharacterLifeEvent,
     CharacterProgressionEvent,
@@ -16,6 +17,10 @@ from app.models import (
     WikiEvent,
     WikiEvidence,
     db,
+)
+from app.services.metadata_normalization import (
+    is_weak_variation,
+    normalize_metadata_field,
 )
 
 
@@ -74,6 +79,36 @@ Extract individuals only.
 appearance_type:
 - Use "appeared" only when the character is physically present, speaks, acts, or directly participates.
 - Use "mentioned" when the character is only named, remembered, referenced, or discussed.
+- In the examples below, X means any character name or alias. Do not treat X as a literal character name.
+- Mark "appeared" when the text confirms current-scene physical presence, even if the character does not speak, fight, or perform a major action yet.
+- Current-scene arrival/presence wording counts as appeared. Examples: "X is here", "X has arrived", "X came", "X entered", "X appeared", "X stood nearby", "X was among the crowd", "X sat nearby", "X watched from the side", "Look, X is here", or "Someone shouted that X had arrived".
+- Do not mark "appeared" for absence, rumor, memory, historical reference, future possibility, or comparison wording. Examples: "X isn't here", "Too bad X isn't here", "People say X is strong", "X once did...", "If X comes later", or "X might appear".
+
+CHARACTER METADATA:
+Extract durable character metadata only when clearly stated in the chapter text.
+
+Metadata can include:
+- age or approximate age
+- gender
+- race/species
+- origin, home, or place of birth
+- faction, sect, clan, or organization affiliation
+- life status only: alive, dead, historical, missing, sealed, reincarnated, or unknown
+- titles or stable roles
+
+Do not guess metadata.
+Do not infer metadata from stereotypes.
+Do not extract temporary moods, temporary injuries, temporary locations, or temporary possessions as metadata.
+Do not put sect roles, occupations, disciple ranks, social positions, titles, or faction roles in status.
+Use faction_or_affiliation for sect/clan/organization membership.
+Use titles for stable titles or roles.
+Only extract status when there is a meaningful life-status change or special condition.
+Do not extract status="alive" merely because a character appears, speaks, fights, or acts.
+Only extract status="dead" when death is explicit, such as "he died", "she was killed", "his corpse", "her soul dispersed", or clear confirmed death narration.
+Use status="historical" only for ancient, legendary, or past-era figures referenced but not appearing in the current timeline.
+Use exact wording when possible.
+If metadata is not clearly stated, use null or an empty titles list.
+If metadata already exists in memory, do not repeat it unless this chapter provides a clearer or more current durable fact.
 
 ALIASES:
 - Include alternate labels used in this chapter: titles, nicknames, partial names, descriptive labels.
@@ -555,10 +590,20 @@ def extract_chapter_with_ai(novel, chapter):
     except ImportError as exc:
         raise RuntimeError("Install AI dependencies with: pip install -r requirements.txt") from exc
 
+    class ExtractedCharacterMetadata(BaseModel):
+        age_text: str | None = Field(description="Clearly stated age or approximate age, if any")
+        gender: str | None = Field(description="Clearly stated gender, if any")
+        race_or_species: str | None = Field(description="Clearly stated race or species, if any")
+        origin: str | None = Field(description="Clearly stated origin, home, or place of birth, if any")
+        faction_or_affiliation: str | None = Field(description="Clearly stated faction, sect, clan, or organization affiliation, if any")
+        status: str | None = Field(description="Life status only: dead, historical, missing, sealed, reincarnated, or unknown. Do not use for roles, titles, sect rank, occupation, or affiliation. Do not output alive merely because the character appears or acts.")
+        titles: list[str] = Field(description="Clearly stated titles or stable roles")
+
     class ExtractedCharacter(BaseModel):
         name: str = Field(description="Character name")
         aliases: list[str] = Field(description="Alternate names, titles, or descriptive labels used in this chapter")
         appearance_type: str = Field(description="Either mentioned or appeared")
+        metadata: ExtractedCharacterMetadata = Field(description="Durable character metadata clearly stated in this chapter")
         description: str = Field(description="Brief wiki-style description")
         evidence: str = Field(description="Short supporting snippet or paraphrase from this chapter")
 
@@ -1027,8 +1072,38 @@ def build_extraction_memory(novel):
             if character.current_power_rank:
                 current_facts.append(f"power rank: {character.current_power_rank}")
 
+            metadata_facts = []
+
+            if character.age_text:
+                metadata_facts.append(f"age: {character.age_text}")
+
+            if character.gender:
+                metadata_facts.append(f"gender: {character.gender}")
+
+            if character.race_or_species:
+                species_source = (
+                    f" ({character.race_or_species_source}, "
+                    f"{character.race_or_species_confidence})"
+                    if character.race_or_species_source or character.race_or_species_confidence
+                    else ""
+                )
+                metadata_facts.append(f"race/species: {character.race_or_species}{species_source}")
+
+            if character.origin:
+                metadata_facts.append(f"origin: {character.origin}")
+
+            if character.faction_or_affiliation:
+                metadata_facts.append(f"affiliation: {character.faction_or_affiliation}")
+
+            if character.status:
+                metadata_facts.append(f"status: {character.status}")
+
+            if character.titles:
+                metadata_facts.append(f"titles: {character.titles}")
+
             current_text = f" | current: {', '.join(current_facts)}" if current_facts else ""
-            lines.append(f"- {character.name}{alias_text}{current_text}")
+            metadata_text = f" | metadata: {', '.join(metadata_facts)}" if metadata_facts else ""
+            lines.append(f"- {character.name}{alias_text}{current_text}{metadata_text}")
     else:
         lines.append("- None yet")
 
@@ -1658,6 +1733,411 @@ def is_durable_character_update(character, extracted_character, appearance_type,
     }
 
     return any(term in update_text for term in durable_terms)
+
+
+CHARACTER_METADATA_FIELDS = {
+    "age_text",
+    "gender",
+    "race_or_species",
+    "origin",
+    "faction_or_affiliation",
+    "status",
+}
+
+ALLOWED_LIFE_STATUS_VALUES = {
+    "alive",
+    "dead",
+    "historical",
+    "missing",
+    "sealed",
+    "reincarnated",
+    "unknown",
+}
+
+MAJOR_LIFE_STATUS_VALUES = ALLOWED_LIFE_STATUS_VALUES - {"alive", "unknown"}
+
+STATUS_VALUE_ALIASES = {
+    "killed": "dead",
+    "died": "dead",
+    "deceased": "dead",
+    "corpse": "dead",
+    "soul dispersed": "dead",
+    "sealed away": "sealed",
+    "legendary": "historical",
+    "ancient": "historical",
+    "past era": "historical",
+    "past-era": "historical",
+}
+
+
+def normalize_metadata_value(value):
+    if value is None:
+        return None
+
+    normalized_value = normalize_alias(value)
+
+    if not normalized_value or normalized_value.lower() in {"unknown", "n/a", "none", "null"}:
+        return None
+
+    return normalized_value
+
+
+def normalize_title_values(titles):
+    normalized_titles = []
+    seen_titles = set()
+
+    for title in titles or []:
+        normalized_title = normalize_metadata_value(title)
+
+        if not normalized_title:
+            continue
+
+        title_key = normalized_title.lower()
+
+        if title_key in seen_titles:
+            continue
+
+        normalized_titles.append(normalized_title)
+        seen_titles.add(title_key)
+
+    return normalized_titles
+
+
+def title_list_from_text(titles_text):
+    if not titles_text:
+        return []
+
+    raw_titles = re.split(r"[\n,;]+", titles_text)
+    return normalize_title_values(raw_titles)
+
+
+def title_text_from_list(titles):
+    return "\n".join(titles) if titles else None
+
+
+def canonical_life_status(value):
+    normalized_value = normalize_alias(value or "").lower().replace("-", " ")
+
+    if not normalized_value:
+        return None
+
+    if normalized_value in ALLOWED_LIFE_STATUS_VALUES:
+        return normalized_value
+
+    for phrase, status in STATUS_VALUE_ALIASES.items():
+        if phrase in normalized_value:
+            return status
+
+    return None
+
+
+def should_keep_status_metadata(status_value, for_existing_character):
+    canonical_status = canonical_life_status(status_value)
+
+    if not canonical_status:
+        return False
+
+    return canonical_status in MAJOR_LIFE_STATUS_VALUES
+
+
+def display_metadata_value(field_name, metadata_result):
+    if field_name in {"age_text", "gender", "status"}:
+        return metadata_result.normalized_value
+
+    return metadata_result.raw_value
+
+
+def is_assumed_species(character):
+    return (
+        getattr(character, "race_or_species", None)
+        and normalize_metadata_field("race_or_species", character.race_or_species)
+        and character.race_or_species_source == "implicit_default"
+        and character.race_or_species_confidence == "assumed"
+    )
+
+
+def metadata_proposal_values(metadata):
+    proposals = []
+
+    if not metadata:
+        return proposals
+
+    for field in CHARACTER_METADATA_FIELDS:
+        new_value = normalize_metadata_field(field, getattr(metadata, field, None))
+
+        if new_value:
+            if field == "status" and not should_keep_status_metadata(
+                new_value.normalized_value,
+                for_existing_character=True,
+            ):
+                continue
+
+            proposals.append((field, new_value))
+
+    for title in normalize_title_values(getattr(metadata, "titles", [])):
+        normalized_title = normalize_metadata_field("titles", title)
+
+        if normalized_title:
+            proposals.append(("titles", normalized_title))
+
+    return proposals
+
+
+def update_new_character_metadata(character, metadata):
+    metadata_updated = False
+
+    if not metadata:
+        return False
+
+    for field in CHARACTER_METADATA_FIELDS:
+        new_metadata = normalize_metadata_field(field, getattr(metadata, field, None))
+
+        if not new_metadata:
+            continue
+
+        if field == "status":
+            canonical_status = canonical_life_status(new_metadata.normalized_value)
+
+            if not should_keep_status_metadata(canonical_status, for_existing_character=False):
+                continue
+
+            new_metadata = normalize_metadata_field("status", canonical_status)
+
+        new_value = display_metadata_value(field, new_metadata)
+        current_metadata = normalize_metadata_field(field, getattr(character, field, None))
+
+        if current_metadata and current_metadata.normalized_value == new_metadata.normalized_value:
+            continue
+
+        if not current_metadata or len(new_value) > len(getattr(character, field, "") or ""):
+            setattr(character, field, new_value)
+
+            if field == "race_or_species":
+                character.race_or_species_source = "extracted"
+                character.race_or_species_confidence = "confirmed"
+
+            metadata_updated = True
+
+    current_titles = title_list_from_text(character.titles)
+    current_title_keys = {title.lower() for title in current_titles}
+    merged_titles = [*current_titles]
+
+    for title in normalize_title_values(getattr(metadata, "titles", [])):
+        if title.lower() in current_title_keys:
+            continue
+
+        merged_titles.append(title)
+        current_title_keys.add(title.lower())
+        metadata_updated = True
+
+    if metadata_updated:
+        character.titles = title_text_from_list(merged_titles)
+
+    return metadata_updated
+
+
+def append_metadata_proposal_evidence(proposal, chapter, evidence):
+    normalized_evidence = normalize_evidence_text(evidence or "")[:500]
+
+    if not normalized_evidence:
+        return False
+
+    existing_evidence = proposal.evidence or ""
+    source_label = f"Chapter {chapter.chapter_number}: {normalized_evidence}"
+
+    if evidence_match_key(source_label) in {
+        evidence_match_key(part)
+        for part in existing_evidence.split("\n\n")
+        if part.strip()
+    }:
+        return False
+
+    proposal.evidence = merge_description(proposal.evidence, source_label)
+    return True
+
+
+def append_metadata_proposal_warning(proposal, warning):
+    existing_warnings = proposal.review_warnings.splitlines() if proposal.review_warnings else []
+
+    if warning in existing_warnings:
+        return False
+
+    existing_warnings.append(warning)
+    proposal.review_warnings = "\n".join(existing_warnings)
+    return True
+
+
+def metadata_value_already_present(character, field_name, proposed_metadata):
+    if field_name == "titles":
+        return proposed_metadata.normalized_value in {
+            normalize_metadata_field("titles", title).normalized_value
+            for title in title_list_from_text(character.titles)
+            if normalize_metadata_field("titles", title)
+        }
+
+    if field_name == "race_or_species" and is_assumed_species(character):
+        return False
+
+    current_value = normalize_metadata_field(field_name, getattr(character, field_name, None))
+    return bool(
+        current_value
+        and current_value.normalized_value == proposed_metadata.normalized_value
+    )
+
+
+def current_metadata_value(character, field_name):
+    if field_name == "titles":
+        return character.titles
+
+    return getattr(character, field_name, None)
+
+
+def metadata_conflict_warning(character, field_name, proposed_metadata):
+    if field_name == "titles":
+        return None
+
+    current_value = normalize_metadata_field(field_name, getattr(character, field_name, None))
+
+    if current_value and current_value.normalized_value != proposed_metadata.normalized_value:
+        if field_name == "race_or_species" and is_assumed_species(character):
+            return "Overrides implicit default species."
+
+        return "Proposed metadata differs from the current character value."
+
+    if field_name == "race_or_species" and is_assumed_species(character):
+        return "Confirms previously assumed default species."
+
+    return None
+
+
+def existing_different_metadata_proposal(character, field_name, proposed_metadata):
+    proposal_rows = CharacterMetadataProposal.query.filter_by(
+        character_id=character.id,
+        field_name=field_name,
+    ).all()
+
+    for proposal in proposal_rows:
+        if proposal.normalized_value and proposal.normalized_value != proposed_metadata.normalized_value:
+            return True
+
+    return False
+
+
+def find_existing_metadata_proposal(character, field_name, proposed_metadata):
+    proposal_rows = CharacterMetadataProposal.query.filter_by(
+        character_id=character.id,
+        field_name=field_name,
+    ).all()
+
+    for proposal in proposal_rows:
+        if proposal.normalized_value == proposed_metadata.normalized_value:
+            return proposal
+
+    for proposal in proposal_rows:
+        normalized_existing = proposal.normalized_value or evidence_match_key(proposal.proposed_value)
+
+        if is_weak_variation(normalized_existing, proposed_metadata.normalized_value):
+            append_metadata_proposal_warning(
+                proposal,
+                "Weak metadata variation merged by high normalized similarity.",
+            )
+            return proposal
+
+    return None
+
+
+def metadata_warning_text(warnings):
+    return "\n".join(warnings) if warnings else None
+
+
+def can_auto_approve_metadata(character, field_name, proposed_metadata, warning):
+    if field_name != "gender":
+        return False
+
+    if proposed_metadata.confidence_score < 0.9:
+        return False
+
+    if warning or proposed_metadata.warnings:
+        return False
+
+    current_value = normalize_metadata_field(field_name, getattr(character, field_name, None))
+
+    if current_value and current_value.normalized_value != proposed_metadata.normalized_value:
+        return False
+
+    return True
+
+
+def apply_metadata_value_to_character(character, field_name, proposed_metadata):
+    if field_name == "titles":
+        character.titles = merge_description(character.titles, proposed_metadata.raw_value)
+    else:
+        setattr(character, field_name, proposed_metadata.normalized_value)
+
+    if field_name == "race_or_species":
+        character.race_or_species_source = "extracted"
+        character.race_or_species_confidence = "confirmed"
+
+
+def create_character_metadata_proposals(novel, chapter, character, metadata, evidence):
+    proposals_created = 0
+
+    for field_name, proposed_metadata in metadata_proposal_values(metadata):
+        if metadata_value_already_present(character, field_name, proposed_metadata):
+            continue
+
+        proposal = find_existing_metadata_proposal(character, field_name, proposed_metadata)
+        warnings = list(proposed_metadata.warnings)
+        conflict_warning = metadata_conflict_warning(character, field_name, proposed_metadata)
+
+        if conflict_warning:
+            warnings.append(conflict_warning)
+
+        if existing_different_metadata_proposal(character, field_name, proposed_metadata):
+            warnings.append(
+                "Another metadata proposal exists for this character and field with a different value."
+            )
+
+        if proposal:
+            append_metadata_proposal_evidence(proposal, chapter, evidence)
+
+            for warning in warnings:
+                append_metadata_proposal_warning(proposal, warning)
+
+            continue
+
+        warning_text = metadata_warning_text(warnings)
+        auto_approved = can_auto_approve_metadata(
+            character,
+            field_name,
+            proposed_metadata,
+            warning_text,
+        )
+
+        proposal = CharacterMetadataProposal(
+            novel_id=novel.id,
+            character_id=character.id,
+            chapter_id=chapter.id,
+            field_name=field_name,
+            old_value=current_metadata_value(character, field_name),
+            raw_proposed_value=proposed_metadata.raw_value,
+            proposed_value=display_metadata_value(field_name, proposed_metadata),
+            normalized_value=proposed_metadata.normalized_value,
+            confidence_score=proposed_metadata.confidence_score,
+            extraction_reason=proposed_metadata.extraction_reason,
+            auto_approved=auto_approved,
+            evidence=f"Chapter {chapter.chapter_number}: {normalize_evidence_text(evidence)[:500]}",
+            review_warnings=warning_text,
+            review_status="approved" if auto_approved else "pending",
+        )
+        db.session.add(proposal)
+
+        if auto_approved:
+            apply_metadata_value_to_character(character, field_name, proposed_metadata)
+
+        proposals_created += 1
+
+    return proposals_created
 
 
 def add_skill_alias(skill, alias, chapter, evidence):
@@ -2579,6 +3059,7 @@ def save_chapter_extraction(novel, chapter, extraction):
         "items_updated": 0,
         "events_created": 0,
         "progression_events_created": 0,
+        "metadata_proposals_created": 0,
         "character_skills_created": 0,
         "life_events_created": 0,
         "evidence_created": 0,
@@ -2636,6 +3117,7 @@ def save_chapter_extraction(novel, chapter, extraction):
                 first_mentioned_chapter_id=chapter.id,
                 first_appeared_chapter_id=first_appeared_chapter_id,
                 first_seen_chapter_id=chapter.id,
+                status="unknown",
                 review_status="pending",
             )
             db.session.add(character)
@@ -2643,6 +3125,22 @@ def save_chapter_extraction(novel, chapter, extraction):
             character_created = True
 
         db.session.flush()
+        metadata_updated = False
+
+        if character_created:
+            metadata_updated = update_new_character_metadata(
+                character,
+                extracted_character.metadata,
+            )
+        else:
+            summary["metadata_proposals_created"] += create_character_metadata_proposals(
+                novel,
+                chapter,
+                character,
+                extracted_character.metadata,
+                extracted_character.evidence,
+            )
+
         aliases_added = False
 
         for alias in extracted_aliases:
@@ -2659,7 +3157,7 @@ def save_chapter_extraction(novel, chapter, extraction):
             character,
             extracted_character,
             appearance_type,
-            aliases_added or canonical_name_promoted,
+            aliases_added or canonical_name_promoted or metadata_updated,
         )
 
         if durable_update:
@@ -2916,6 +3414,7 @@ def save_chapter_extraction(novel, chapter, extraction):
                 first_mentioned_chapter_id=chapter.id,
                 first_appeared_chapter_id=None,
                 first_seen_chapter_id=chapter.id,
+                status="unknown",
                 review_status="pending",
             )
             db.session.add(character)

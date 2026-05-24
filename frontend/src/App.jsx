@@ -20,6 +20,8 @@ export default function App() {
   const [isBatchExtracting, setIsBatchExtracting] = React.useState(false);
   const [extractingChapterId, setExtractingChapterId] = React.useState(null);
   const [extractedData, setExtractedData] = React.useState(null);
+  const [hideApprovedReviewCards, setHideApprovedReviewCards] = React.useState(false);
+  const [hideRejectedReviewCards, setHideRejectedReviewCards] = React.useState(true);
   const [wikiCharacters, setWikiCharacters] = React.useState([]);
   const [wikiItems, setWikiItems] = React.useState([]);
   const [wikiLoading, setWikiLoading] = React.useState(false);
@@ -207,7 +209,7 @@ export default function App() {
 
       return {
         ...currentData,
-        [entityType]: currentData[entityType].map((record) =>
+        [entityType]: (currentData[entityType] || []).map((record) =>
           record.id === updatedRecord.id ? updatedRecord : record
         ),
       };
@@ -234,12 +236,14 @@ export default function App() {
     const skillCount = summary.skills_created + summary.skills_updated;
     const itemCount = summary.items_created + summary.items_updated;
     const characterSkillCount = summary.character_skills_created || 0;
+    const metadataProposalCount = summary.metadata_proposals_created || 0;
 
     return (
       `Chapter ${chapter.chapter_number} extracted: ` +
       `${characterCount} characters, ${skillCount} skills, ` +
       `${itemCount} items, ${characterSkillCount} character skills, ` +
       `${summary.progression_events_created} progression, ` +
+      `${metadataProposalCount} metadata proposals, ` +
       `${summary.life_events_created} life events, ${summary.events_created} timeline facts.`
     );
   }
@@ -254,14 +258,130 @@ export default function App() {
     const skillCount = summary.skills_created + summary.skills_updated;
     const itemCount = summary.items_created + summary.items_updated;
     const characterSkillCount = summary.character_skills_created || 0;
+    const metadataProposalCount = summary.metadata_proposals_created || 0;
 
     return (
       `Extracted ${data.extracted_chapter_count} chapters: ` +
       `${characterCount} characters, ${skillCount} skills, ` +
       `${itemCount} items, ${characterSkillCount} character skills, ` +
       `${summary.progression_events_created} progression, ` +
+      `${metadataProposalCount} metadata proposals, ` +
       `${summary.life_events_created} life events.`
     );
+  }
+
+  function reviewEntityConfigs() {
+    return [
+      {
+        key: "characters",
+        label: "Character",
+        fields: ["name", "description"],
+        records: extractedData?.characters || [],
+      },
+      {
+        key: "character_metadata_proposals",
+        label: "Metadata Update",
+        fields: ["proposed_value"],
+        records: extractedData?.character_metadata_proposals || [],
+      },
+      {
+        key: "progression_events",
+        label: "Progression",
+        fields: ["progression_type", "old_value", "new_value", "description"],
+        records: extractedData?.progression_events || [],
+      },
+      {
+        key: "character_skills",
+        label: "Character Skill",
+        fields: ["relationship_type", "description"],
+        records: extractedData?.character_skills || [],
+      },
+      {
+        key: "skills",
+        label: "Skill",
+        fields: ["name", "category", "description"],
+        records: extractedData?.skills || [],
+      },
+      {
+        key: "items",
+        label: "Item",
+        fields: ["name", "category", "description"],
+        records: extractedData?.items || [],
+      },
+      {
+        key: "character_items",
+        label: "Character Item",
+        fields: ["relationship_type", "description"],
+        records: extractedData?.character_items || [],
+      },
+      {
+        key: "life_events",
+        label: "Life Event",
+        fields: ["event_type", "description", "reason"],
+        records: extractedData?.life_events || [],
+      },
+      {
+        key: "events",
+        label: "Timeline Fact",
+        fields: ["event_type", "title", "description"],
+        records: extractedData?.events || [],
+      },
+    ];
+  }
+
+  function chapterNumberForRecord(record) {
+    return record.source_chapter?.chapter_number || record.chapter?.chapter_number || 999999;
+  }
+
+  function chapterTitleForRecord(record) {
+    const chapter = record.source_chapter || record.chapter;
+    return chapter ? `Chapter ${chapter.chapter_number}: ${chapter.title}` : "Unknown chapter";
+  }
+
+  function reviewRecords() {
+    return reviewEntityConfigs()
+      .flatMap((config, entityIndex) =>
+        config.records.map((record, recordIndex) => ({
+          config,
+          entityIndex,
+          record,
+          recordIndex,
+        }))
+      )
+      .filter((item) => !hideRejectedReviewCards || item.record.review_status !== "rejected")
+      .filter((item) => !hideApprovedReviewCards || item.record.review_status !== "approved")
+      .sort((first, second) => {
+        const chapterDifference =
+          chapterNumberForRecord(first.record) - chapterNumberForRecord(second.record);
+
+        if (chapterDifference !== 0) {
+          return chapterDifference;
+        }
+
+        if (first.entityIndex !== second.entityIndex) {
+          return first.entityIndex - second.entityIndex;
+        }
+
+        return first.record.id - second.record.id;
+      });
+  }
+
+  function groupedReviewRecords() {
+    const groups = [];
+
+    for (const item of reviewRecords()) {
+      const chapterTitle = chapterTitleForRecord(item.record);
+      let group = groups.find((candidate) => candidate.title === chapterTitle);
+
+      if (!group) {
+        group = { title: chapterTitle, items: [] };
+        groups.push(group);
+      }
+
+      group.items.push(item);
+    }
+
+    return groups;
   }
 
   async function handleUpload(event) {
@@ -692,128 +812,58 @@ export default function App() {
                 {selectedNovelId && !extractedData ? <p>No extracted data loaded yet.</p> : null}
 
                 {extractedData ? (
-                  <div className="extraction-grid">
-                    <section>
-                      <h3>Characters</h3>
-                      {extractedData.characters.map((character) => (
-                        <ReviewRecord
-                          entityType="characters"
-                          fields={["name", "description"]}
-                          key={character.id}
-                          mergeTargets={extractedData.characters.filter((target) => target.id !== character.id)}
-                          record={character}
-                          onMerged={handleMergedCharacter}
-                          onSaved={(updatedRecord) => updateExtractedRecord("characters", updatedRecord)}
-                        />
-                      ))}
-                    </section>
+                  <div className="review-stream">
+                    <div className="review-stream-toolbar">
+                      <strong>Chapter-sorted review list</strong>
+                      <div className="review-filter-row">
+                        <label className="review-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={hideApprovedReviewCards}
+                            onChange={(event) => setHideApprovedReviewCards(event.target.checked)}
+                          />
+                          Hide approved
+                        </label>
+                        <label className="review-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={hideRejectedReviewCards}
+                            onChange={(event) => setHideRejectedReviewCards(event.target.checked)}
+                          />
+                          Hide rejected
+                        </label>
+                      </div>
+                    </div>
 
-                    <section>
-                      <h3>Skills</h3>
-                      {extractedData.skills.map((skill) => (
-                        <ReviewRecord
-                          entityType="skills"
-                          fields={["name", "category", "description"]}
-                          key={skill.id}
-                          record={skill}
-                          onSaved={(updatedRecord) => updateExtractedRecord("skills", updatedRecord)}
-                        />
-                      ))}
-                    </section>
+                    {groupedReviewRecords().map((group) => (
+                      <section className="review-chapter-group" key={group.title}>
+                        <h3>{group.title}</h3>
+                        {group.items.map(({ config, record }) => (
+                          <div className="review-stream-item" key={`${config.key}-${record.id}`}>
+                            <span className="review-type-pill">{config.label}</span>
+                            <ReviewRecord
+                              entityType={config.key}
+                              fields={config.fields}
+                              mergeTargets={
+                                config.key === "characters"
+                                  ? extractedData.characters.filter((target) => target.id !== record.id)
+                                  : []
+                              }
+                              record={record}
+                              onMerged={handleMergedCharacter}
+                              onSaved={(updatedRecord) => updateExtractedRecord(config.key, updatedRecord)}
+                            />
+                          </div>
+                        ))}
+                      </section>
+                    ))}
 
-                    <section>
-                      <h3>Items</h3>
-                      {extractedData.items.map((item) => (
-                        <ReviewRecord
-                          entityType="items"
-                          fields={["name", "category", "description"]}
-                          key={item.id}
-                          record={item}
-                          onSaved={(updatedRecord) => updateExtractedRecord("items", updatedRecord)}
-                        />
-                      ))}
-                    </section>
-
-                    <section>
-                      <h3>Timeline Facts</h3>
-                      {extractedData.events.map((event) => (
-                        <ReviewRecord
-                          entityType="events"
-                          fields={["event_type", "title", "description"]}
-                          key={event.id}
-                          record={event}
-                          onSaved={(updatedRecord) => updateExtractedRecord("events", updatedRecord)}
-                        />
-                      ))}
-                    </section>
-
-                    <section>
-                      <h3>Progression</h3>
-                      {extractedData.progression_events.map((event) => (
-                        <ReviewRecord
-                          entityType="progression_events"
-                          fields={["progression_type", "old_value", "new_value", "description"]}
-                          key={event.id}
-                          record={event}
-                          onSaved={(updatedRecord) =>
-                            updateExtractedRecord("progression_events", updatedRecord)
-                          }
-                        />
-                      ))}
-                    </section>
-
-                    <section>
-                      <h3>Character Skills</h3>
-                      {extractedData.character_skills.map((relationship) => (
-                        <ReviewRecord
-                          entityType="character_skills"
-                          fields={["relationship_type", "description"]}
-                          key={relationship.id}
-                          record={relationship}
-                          onSaved={(updatedRecord) =>
-                            updateExtractedRecord("character_skills", updatedRecord)
-                          }
-                        />
-                      ))}
-                    </section>
-
-                    <section>
-                      <h3>Character Items</h3>
-                      {extractedData.character_items.map((relationship) => (
-                        <ReviewRecord
-                          entityType="character_items"
-                          fields={["relationship_type", "description"]}
-                          key={relationship.id}
-                          record={relationship}
-                          onSaved={(updatedRecord) =>
-                            updateExtractedRecord("character_items", updatedRecord)
-                          }
-                        />
-                      ))}
-                    </section>
-
-                    <section>
-                      <h3>Life Events</h3>
-                      {extractedData.life_events.map((event) => (
-                        <ReviewRecord
-                          entityType="life_events"
-                          fields={["event_type", "description", "reason"]}
-                          key={event.id}
-                          record={event}
-                          onSaved={(updatedRecord) => updateExtractedRecord("life_events", updatedRecord)}
-                        />
-                      ))}
-                    </section>
-
-                    {extractedData.characters.length === 0 &&
-                    extractedData.skills.length === 0 &&
-                    extractedData.items.length === 0 &&
-                    extractedData.events.length === 0 &&
-                    extractedData.progression_events.length === 0 &&
-                    extractedData.character_skills.length === 0 &&
-                    extractedData.character_items.length === 0 &&
-                    extractedData.life_events.length === 0 ? (
-                      <p className="empty-state">No extracted records yet.</p>
+                    {reviewRecords().length === 0 ? (
+                      <p className="empty-state">
+                        {hideApprovedReviewCards || hideRejectedReviewCards
+                          ? "No visible review records. Some statuses may be hidden."
+                          : "No extracted records yet."}
+                      </p>
                     ) : null}
                   </div>
                 ) : null}
