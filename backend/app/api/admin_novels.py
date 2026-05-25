@@ -4,7 +4,7 @@ from flask import Blueprint, current_app, jsonify, request
 from openai import AuthenticationError, RateLimitError
 from werkzeug.utils import secure_filename
 
-from app.models import Chapter, Novel, db
+from app.models import Book, Chapter, Novel, db
 from app.services.ai_extraction_service import extract_chapter_with_ai
 from app.services.chapter_parser import split_txt_into_chapters
 from app.services.extraction_service import get_extracted_data, run_placeholder_extraction
@@ -21,6 +21,64 @@ def failure(message, status=400):
     return jsonify({"data": None, "error": message}), status
 
 
+def decode_uploaded_text(uploaded_file):
+    raw_bytes = uploaded_file.read()
+
+    try:
+        text = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw_bytes.decode("utf-8-sig", errors="replace")
+
+    return raw_bytes, text
+
+
+def save_uploaded_file(uploaded_file, original_filename):
+    upload_dir = Path(current_app.instance_path) / current_app.config["UPLOAD_FOLDER"]
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    stored_path = upload_dir / original_filename
+    stored_path.write_bytes(uploaded_file)
+    return stored_path
+
+
+def aggregate_book_summary(book):
+    data = book.to_admin_dict()
+    data["pending_review_count"] = 0
+    data["warning_count"] = 0
+    data["extracted_chapter_count"] = 0
+    return data
+
+
+def next_book_number(novel):
+    existing_numbers = [book.number for book in novel.books]
+    return max(existing_numbers, default=0) + 1
+
+
+def parse_book_number(value, novel):
+    if value in (None, ""):
+        return next_book_number(novel)
+
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    return number if number > 0 else None
+
+
+def append_chapters_to_book(novel, book, chapters):
+    for chapter_data in chapters:
+        book.chapters.append(
+            Chapter(
+                novel=novel,
+                book=book,
+                chapter_number=chapter_data["chapter_number"],
+                title=chapter_data["title"],
+                content=chapter_data["content"],
+                character_count=len(chapter_data["content"]),
+            )
+        )
+
+
 @admin_novels_bp.post("/novels/upload")
 def upload_novel():
     uploaded_file = request.files.get("file")
@@ -34,22 +92,13 @@ def upload_novel():
     if not original_filename.lower().endswith(".txt"):
         return failure("Only .txt files are supported in this MVP.")
 
-    raw_bytes = uploaded_file.read()
-
-    try:
-        text = raw_bytes.decode("utf-8")
-    except UnicodeDecodeError:
-        text = raw_bytes.decode("utf-8-sig", errors="replace")
-
+    raw_bytes, text = decode_uploaded_text(uploaded_file)
     chapters = split_txt_into_chapters(text)
 
     if not chapters:
         return failure("No chapter text could be found in the uploaded file.")
 
-    upload_dir = Path(current_app.instance_path) / current_app.config["UPLOAD_FOLDER"]
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    stored_path = upload_dir / original_filename
-    stored_path.write_bytes(raw_bytes)
+    save_uploaded_file(raw_bytes, original_filename)
 
     novel = Novel(
         title=title or Path(original_filename).stem,
@@ -57,16 +106,16 @@ def upload_novel():
         file_type="txt",
         status="ready",
     )
+    book = Book(
+        novel=novel,
+        number=1,
+        title="Book 1",
+        source_filename=original_filename,
+        parsing_status="parsed",
+        extraction_status="not_started",
+    )
 
-    for chapter_data in chapters:
-        novel.chapters.append(
-            Chapter(
-                chapter_number=chapter_data["chapter_number"],
-                title=chapter_data["title"],
-                content=chapter_data["content"],
-                character_count=len(chapter_data["content"]),
-            )
-        )
+    append_chapters_to_book(novel, book, chapters)
 
     db.session.add(novel)
     db.session.commit()
@@ -80,20 +129,120 @@ def upload_novel():
     )
 
 
+@admin_novels_bp.post("/novels")
+def create_novel():
+    payload = request.get_json(silent=True) or {}
+    title = (payload.get("title") or "").strip()
+
+    if not title:
+        return failure("Novel title is required.")
+
+    novel = Novel(
+        title=title,
+        original_filename="",
+        file_type="workspace",
+        status="ready",
+    )
+    db.session.add(novel)
+    db.session.commit()
+
+    return success({"novel": novel.to_admin_dict()}, status=201)
+
+
 @admin_novels_bp.get("/novels")
 def list_admin_novels():
     novels = Novel.query.order_by(Novel.created_at.desc()).all()
     return success([novel.to_admin_dict() for novel in novels])
 
 
-@admin_novels_bp.get("/novels/<int:novel_id>/chapters")
-def list_admin_chapters(novel_id):
+@admin_novels_bp.get("/novels/<int:novel_id>/books")
+def list_admin_books(novel_id):
     novel = Novel.query.get_or_404(novel_id)
-    chapters = Chapter.query.filter_by(novel_id=novel.id).order_by(Chapter.chapter_number).all()
+    books = Book.query.filter_by(novel_id=novel.id).order_by(Book.number).all()
 
     return success(
         {
             "novel": novel.to_admin_dict(),
+            "books": [aggregate_book_summary(book) for book in books],
+        }
+    )
+
+
+@admin_novels_bp.post("/novels/<int:novel_id>/books/upload")
+def upload_book(novel_id):
+    novel = Novel.query.get_or_404(novel_id)
+    uploaded_file = request.files.get("file")
+    title = request.form.get("title", "").strip()
+    requested_number = request.form.get("number")
+
+    if not uploaded_file:
+        return failure("A .txt file is required.")
+
+    original_filename = secure_filename(uploaded_file.filename or "")
+
+    if not original_filename.lower().endswith(".txt"):
+        return failure("Only .txt files are supported in this MVP.")
+
+    book_number = parse_book_number(requested_number, novel)
+
+    if book_number is None:
+        return failure("Book number must be a positive integer.")
+
+    existing_book = Book.query.filter_by(novel_id=novel.id, number=book_number).first()
+
+    if existing_book:
+        return failure(f"Book {book_number} already exists for this novel.")
+
+    raw_bytes, text = decode_uploaded_text(uploaded_file)
+    chapters = split_txt_into_chapters(text)
+
+    if not chapters:
+        return failure("No chapter text could be found in the uploaded file.")
+
+    stored_filename = f"novel-{novel.id}-book-{book_number}-{original_filename}"
+    save_uploaded_file(raw_bytes, stored_filename)
+
+    book = Book(
+        novel_id=novel.id,
+        number=book_number,
+        title=title or f"Book {book_number}",
+        source_filename=original_filename,
+        parsing_status="parsed",
+        extraction_status="not_started",
+    )
+    append_chapters_to_book(novel, book, chapters)
+    db.session.add(book)
+    db.session.commit()
+
+    return success(
+        {
+            "novel": novel.to_admin_dict(),
+            "book": aggregate_book_summary(book),
+            "chapter_count": len(chapters),
+        },
+        status=201,
+    )
+
+
+@admin_novels_bp.get("/novels/<int:novel_id>/chapters")
+def list_admin_chapters(novel_id):
+    novel = Novel.query.get_or_404(novel_id)
+    book_id = request.args.get("book_id", type=int)
+    query = Chapter.query.filter_by(novel_id=novel.id)
+
+    if book_id:
+        Book.query.filter_by(id=book_id, novel_id=novel.id).first_or_404()
+        query = query.filter_by(book_id=book_id)
+
+    chapters = query.order_by(Chapter.book_id, Chapter.chapter_number).all()
+
+    return success(
+        {
+            "novel": novel.to_admin_dict(),
+            "books": [
+                aggregate_book_summary(book)
+                for book in Book.query.filter_by(novel_id=novel.id).order_by(Book.number).all()
+            ],
             "chapters": [chapter.to_admin_verification_dict() for chapter in chapters],
         }
     )

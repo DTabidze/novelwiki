@@ -44,6 +44,12 @@ class Novel(db.Model):
         cascade="all, delete-orphan",
         order_by="Chapter.chapter_number",
     )
+    books = db.relationship(
+        "Book",
+        back_populates="novel",
+        cascade="all, delete-orphan",
+        order_by="Book.number",
+    )
 
     def to_admin_dict(self):
         return {
@@ -53,9 +59,50 @@ class Novel(db.Model):
             "file_type": self.file_type,
             "status": self.status,
             "error_message": self.error_message,
+            "book_count": len(self.books),
             "chapter_count": len(self.chapters),
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class Book(db.Model):
+    __tablename__ = "books"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    number = db.Column(db.Integer, nullable=False, default=1)
+    title = db.Column(db.String(255), nullable=False)
+    source_filename = db.Column(db.String(255), nullable=True)
+    parsing_status = db.Column(db.String(50), nullable=False, default="parsed")
+    extraction_status = db.Column(db.String(50), nullable=False, default="not_started")
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    uploaded_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    novel = db.relationship("Novel", back_populates="books")
+    chapters = db.relationship(
+        "Chapter",
+        back_populates="book",
+        cascade="all, delete-orphan",
+        order_by="Chapter.chapter_number",
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("novel_id", "number", name="uq_book_number"),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "number": self.number,
+            "title": self.title,
+            "source_filename": self.source_filename,
+            "parsing_status": self.parsing_status,
+            "extraction_status": self.extraction_status,
+            "chapter_count": len(self.chapters),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
         }
 
 
@@ -64,6 +111,7 @@ class Chapter(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey("books.id"), nullable=True)
     chapter_number = db.Column(db.Integer, nullable=False)
     title = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
@@ -71,15 +119,19 @@ class Chapter(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     novel = db.relationship("Novel", back_populates="chapters")
+    book = db.relationship("Book", back_populates="chapters")
 
     __table_args__ = (
-        db.UniqueConstraint("novel_id", "chapter_number", name="uq_chapter_order"),
+        db.UniqueConstraint("book_id", "chapter_number", name="uq_book_chapter_order"),
     )
 
     def to_admin_verification_dict(self):
         preview = " ".join(self.content.split())[:200]
         return {
             "id": self.id,
+            "novel_id": self.novel_id,
+            "book_id": self.book_id,
+            "book": self.book.to_admin_dict() if self.book else None,
             "chapter_number": self.chapter_number,
             "title": self.title,
             "character_count": self.character_count,
@@ -89,6 +141,7 @@ class Chapter(db.Model):
     def to_reference_dict(self):
         return {
             "id": self.id,
+            "book_id": self.book_id,
             "chapter_number": self.chapter_number,
             "title": self.title,
         }

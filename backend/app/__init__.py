@@ -29,6 +29,49 @@ def ensure_development_schema(app):
         if "error_message" not in column_names:
             connection.execute(text("ALTER TABLE novels ADD COLUMN error_message TEXT"))
 
+        chapter_columns = connection.execute(text("PRAGMA table_info(chapters)")).fetchall()
+        chapter_column_names = {column[1] for column in chapter_columns}
+
+        if "book_id" not in chapter_column_names:
+            connection.execute(text("ALTER TABLE chapters ADD COLUMN book_id INTEGER"))
+
+        novels = connection.execute(text("SELECT id, title, original_filename FROM novels")).fetchall()
+
+        for novel_id, novel_title, original_filename in novels:
+            default_book = connection.execute(
+                text("SELECT id FROM books WHERE novel_id = :novel_id ORDER BY number LIMIT 1"),
+                {"novel_id": novel_id},
+            ).fetchone()
+
+            if default_book:
+                default_book_id = default_book[0]
+            else:
+                connection.execute(
+                    text(
+                        "INSERT INTO books "
+                        "(novel_id, number, title, source_filename, parsing_status, "
+                        "extraction_status, created_at, uploaded_at) "
+                        "VALUES "
+                        "(:novel_id, 1, :title, :source_filename, 'parsed', "
+                        "'not_started', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+                    ),
+                    {
+                        "novel_id": novel_id,
+                        "title": "Book 1",
+                        "source_filename": original_filename,
+                    },
+                )
+                default_book_id = connection.execute(text("SELECT last_insert_rowid()")).scalar()
+
+            connection.execute(
+                text(
+                    "UPDATE chapters "
+                    "SET book_id = :book_id "
+                    "WHERE novel_id = :novel_id AND book_id IS NULL"
+                ),
+                {"book_id": default_book_id, "novel_id": novel_id},
+            )
+
         for table_name in review_tables:
             columns = connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
             column_names = {column[1] for column in columns}
