@@ -157,6 +157,10 @@ body:has(.wiki-shell) {
   margin-bottom: 24px;
 }
 
+.admin-page-header.compact {
+  margin-bottom: 18px;
+}
+
 .admin-page-header h1,
 .workspace-hero h1 {
   margin: 0;
@@ -498,8 +502,44 @@ body:has(.wiki-shell) {
 .workspace-main {
   min-width: 0;
   height: 100vh;
+  overflow: hidden;
+  padding: 0;
+}
+
+.workspace-page {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  padding: 32px 32px 18px;
+  background:
+    linear-gradient(180deg, rgba(6, 17, 29, 0.98), rgba(6, 17, 29, 0.92)),
+    radial-gradient(circle at top left, rgba(91, 75, 255, 0.16), transparent 34rem);
+}
+
+.workspace-page-header h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 32px;
+}
+
+.workspace-page-header p {
+  color: #aab8ca;
+}
+
+.workspace-page-body {
+  min-height: 0;
   overflow-y: auto;
-  padding: 32px;
+  padding: 18px 32px 32px;
 }
 
 .workspace-novel-switcher {
@@ -589,6 +629,17 @@ body:has(.wiki-shell) {
   padding: 14px 0;
 }
 
+.book-table .admin-table-row {
+  grid-template-columns: 96px minmax(160px, 1fr) minmax(180px, 1fr) 90px 120px 130px 120px;
+}
+
+.admin-truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-table-head {
   color: #91a4bb;
   font-size: 12px;
@@ -603,6 +654,181 @@ body:has(.wiki-shell) {
   gap: 10px;
 }
 
+.book-upload-grid,
+.chapter-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.chapter-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.8fr);
+  gap: 18px;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chapter-page .workspace-page-body {
+  overflow: hidden;
+}
+
+.chapter-list-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.chapter-filter-grid {
+  grid-template-columns:
+    minmax(170px, 1fr)
+    minmax(96px, 0.55fr)
+    minmax(96px, 0.55fr)
+    minmax(150px, 0.8fr)
+    minmax(220px, 1.25fr);
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.chapter-filter-grid label {
+  min-width: 0;
+}
+
+.chapter-filter-grid input,
+.chapter-filter-grid select {
+  width: 100%;
+  min-width: 0;
+}
+
+.chapter-search-field {
+  min-width: 0;
+}
+
+.chapter-row-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  grid-auto-rows: max-content;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chapter-list-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  min-height: 86px;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.4);
+  color: #dbe7f6;
+  text-align: left;
+}
+
+.chapter-list-row.active {
+  border-color: rgba(124, 102, 255, 0.7);
+  background: linear-gradient(135deg, rgba(94, 69, 255, 0.42), rgba(59, 130, 246, 0.18));
+}
+
+.chapter-list-row em {
+  color: #91a4bb;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.chapter-list-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.chapter-list-row-meta {
+  align-self: start;
+  display: flex;
+  justify-content: flex-end;
+  min-width: 108px;
+}
+
+.chapter-book-pill {
+  width: max-content;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: #91a4bb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chapter-list-row-main strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffffff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-list-row-main small {
+  min-width: 0;
+  overflow: hidden;
+  color: #9aacbf;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-preview-panel {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chapter-preview-panel h2 {
+  margin: 0 0 4px;
+}
+
+.chapter-preview-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.chapter-preview-meta span {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  padding: 10px;
+  color: #aab8ca;
+}
+
+.chapter-preview-meta strong {
+  color: #ffffff;
+}
+
+.chapter-preview-text {
+  min-height: 160px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(2, 6, 23, 0.28);
+  color: #cbd8e7;
+  line-height: 1.6;
+}
+
+.chapter-preview-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .pending-type-grid span {
   display: flex;
   justify-content: space-between;
@@ -613,16 +839,43 @@ body:has(.wiki-shell) {
 }
 
 @media (max-width: 1180px) {
+  body:has(.admin-shell),
+  body:has(.workspace-shell.single-sidebar) {
+    overflow: auto;
+  }
+
   .admin-shell,
   .workspace-shell {
+    min-height: 100vh;
+    height: auto;
     grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .admin-sidebar,
   .workspace-sidebar {
     position: static;
     height: auto;
+    max-height: none;
     overflow-y: visible;
+  }
+
+  .admin-main,
+  .workspace-main {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .workspace-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .workspace-page-body,
+  .chapter-page .workspace-page-body {
+    overflow: visible;
   }
 
   .admin-user-card {
@@ -632,11 +885,67 @@ body:has(.wiki-shell) {
   .admin-stat-grid,
   .workspace-stats,
   .workspace-grid,
-  .admin-novel-card {
+  .admin-novel-card,
+  .chapter-workspace-grid,
+  .chapter-filter-grid,
+  .book-table .admin-table-row {
     grid-template-columns: 1fr;
   }
 
   .admin-progress-cell {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-list-panel,
+  .chapter-preview-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .chapter-row-list {
+    max-height: 70vh;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-main,
+  .workspace-page-header,
+  .workspace-page-body {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .admin-page-header,
+  .workspace-page-header,
+  .workspace-hero,
+  .admin-header-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-header-actions input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-list-row {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-list-row-meta {
+    justify-content: flex-start;
+  }
+
+  .chapter-list-row em {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .chapter-preview-actions {
     grid-template-columns: 1fr;
   }
 }
