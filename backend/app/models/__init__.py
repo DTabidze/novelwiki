@@ -147,6 +147,55 @@ class Chapter(db.Model):
         }
 
 
+class ExtractionRun(db.Model):
+    __tablename__ = "extraction_runs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey("books.id"), nullable=True)
+    chapter_start = db.Column(db.Integer, nullable=True)
+    chapter_end = db.Column(db.Integer, nullable=True)
+    scope_type = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(50), nullable=False, default="queued")
+    total_chapters = db.Column(db.Integer, nullable=False, default=0)
+    completed_chapters = db.Column(db.Integer, nullable=False, default=0)
+    failed_chapters = db.Column(db.Integer, nullable=False, default=0)
+    current_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    created_records_count = db.Column(db.Integer, nullable=False, default=0)
+    warning_count = db.Column(db.Integer, nullable=False, default=0)
+    error_message = db.Column(db.Text, nullable=True)
+    started_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    finished_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    novel = db.relationship("Novel")
+    book = db.relationship("Book")
+    current_chapter = db.relationship("Chapter")
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "book_id": self.book_id,
+            "book": self.book.to_admin_dict() if self.book else None,
+            "chapter_start": self.chapter_start,
+            "chapter_end": self.chapter_end,
+            "scope_type": self.scope_type,
+            "status": self.status,
+            "total_chapters": self.total_chapters,
+            "completed_chapters": self.completed_chapters,
+            "failed_chapters": self.failed_chapters,
+            "current_chapter_id": self.current_chapter_id,
+            "current_chapter": self.current_chapter.to_reference_dict() if self.current_chapter else None,
+            "created_records_count": self.created_records_count,
+            "warning_count": self.warning_count,
+            "error_message": self.error_message,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 class Character(ReviewMixin, db.Model):
     __tablename__ = "characters"
 

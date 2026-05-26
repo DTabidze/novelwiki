@@ -4,6 +4,7 @@ import { API_BASE_URL, fetchJson } from "../../api.js";
 import BooksPage from "../books/BooksPage.jsx";
 import ChaptersPage from "../chapters/ChaptersPage.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import ExtractionPage from "../extraction/ExtractionPage.jsx";
 import WorkspaceSidebar from "./WorkspaceSidebar.jsx";
 import NovelWorkspaceOverview from "./NovelWorkspaceOverview.jsx";
 
@@ -23,7 +24,9 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
   const [chapters, setChapters] = React.useState([]);
   const [chapterBookFilter, setChapterBookFilter] = React.useState(null);
   const [extractedData, setExtractedData] = React.useState(null);
+  const [extractionRuns, setExtractionRuns] = React.useState([]);
   const [extractingChapterId, setExtractingChapterId] = React.useState(null);
+  const [isRunningExtraction, setIsRunningExtraction] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [novel, setNovel] = React.useState(null);
 
@@ -68,9 +71,11 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
         fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/chapters`),
         fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extracted-data`),
       ]);
+      const runData = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extraction-runs`);
       setNovel(bookData.novel);
       setBooks(bookData.books || []);
       setExtractedData(reviewData);
+      setExtractionRuns(runData.runs || []);
       setChapters(enrichChapters(chapterData.chapters || [], reviewData));
     } catch (error) {
       setMessage(error.message);
@@ -97,8 +102,13 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
     setMessage(`Extracting Chapter ${chapter.chapter_number}...`);
 
     try {
-      const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/chapters/${chapter.id}/extract`, {
+      const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extraction-runs`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scope_type: "single_chapter",
+          chapter_id: chapter.id,
+        }),
       });
       setExtractedData(data);
       setMessage(`Chapter ${chapter.chapter_number} extracted. Review pending records when ready.`);
@@ -107,6 +117,27 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
       setMessage(error.message);
     } finally {
       setExtractingChapterId(null);
+    }
+  }
+
+  async function startExtractionRun(payload) {
+    setIsRunningExtraction(true);
+    setMessage("Starting extraction run...");
+
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extraction-runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setExtractedData(data);
+      setMessage(`Extraction run completed: ${data.extracted_chapter_count || 0} chapters processed.`);
+      await loadWorkspace();
+    } catch (error) {
+      setMessage(error.message);
+      await loadWorkspace();
+    } finally {
+      setIsRunningExtraction(false);
     }
   }
 
@@ -168,7 +199,16 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
           />
           <Route
             path="extraction"
-            element={<WorkspacePlaceholder title="Extraction" message="Scoped extraction runs arrive in Phase 4." />}
+            element={
+              <ExtractionPage
+                books={books}
+                chapters={chapters}
+                extractionRuns={extractionRuns}
+                isRunningExtraction={isRunningExtraction}
+                novel={novel}
+                onStartExtraction={startExtractionRun}
+              />
+            }
           />
           <Route
             path="review"
