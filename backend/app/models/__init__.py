@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
@@ -8,6 +9,18 @@ db = SQLAlchemy()
 
 def utc_now():
     return datetime.now(timezone.utc)
+
+
+def serialize_datetime(value):
+    if not value:
+        return None
+
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+
+    return value.isoformat().replace("+00:00", "Z")
 
 
 class ReviewMixin:
@@ -44,6 +57,12 @@ class Novel(db.Model):
         cascade="all, delete-orphan",
         order_by="Chapter.chapter_number",
     )
+    books = db.relationship(
+        "Book",
+        back_populates="novel",
+        cascade="all, delete-orphan",
+        order_by="Book.number",
+    )
 
     def to_admin_dict(self):
         return {
@@ -53,9 +72,50 @@ class Novel(db.Model):
             "file_type": self.file_type,
             "status": self.status,
             "error_message": self.error_message,
+            "book_count": len(self.books),
             "chapter_count": len(self.chapters),
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class Book(db.Model):
+    __tablename__ = "books"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    number = db.Column(db.Integer, nullable=False, default=1)
+    title = db.Column(db.String(255), nullable=False)
+    source_filename = db.Column(db.String(255), nullable=True)
+    parsing_status = db.Column(db.String(50), nullable=False, default="parsed")
+    extraction_status = db.Column(db.String(50), nullable=False, default="not_started")
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    uploaded_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    novel = db.relationship("Novel", back_populates="books")
+    chapters = db.relationship(
+        "Chapter",
+        back_populates="book",
+        cascade="all, delete-orphan",
+        order_by="Chapter.chapter_number",
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("novel_id", "number", name="uq_book_number"),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "number": self.number,
+            "title": self.title,
+            "source_filename": self.source_filename,
+            "parsing_status": self.parsing_status,
+            "extraction_status": self.extraction_status,
+            "chapter_count": len(self.chapters),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
         }
 
 
@@ -64,6 +124,7 @@ class Chapter(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey("books.id"), nullable=True)
     chapter_number = db.Column(db.Integer, nullable=False)
     title = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
@@ -71,15 +132,19 @@ class Chapter(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     novel = db.relationship("Novel", back_populates="chapters")
+    book = db.relationship("Book", back_populates="chapters")
 
     __table_args__ = (
-        db.UniqueConstraint("novel_id", "chapter_number", name="uq_chapter_order"),
+        db.UniqueConstraint("book_id", "chapter_number", name="uq_book_chapter_order"),
     )
 
     def to_admin_verification_dict(self):
         preview = " ".join(self.content.split())[:200]
         return {
             "id": self.id,
+            "novel_id": self.novel_id,
+            "book_id": self.book_id,
+            "book": self.book.to_admin_dict() if self.book else None,
             "chapter_number": self.chapter_number,
             "title": self.title,
             "character_count": self.character_count,
@@ -89,8 +154,113 @@ class Chapter(db.Model):
     def to_reference_dict(self):
         return {
             "id": self.id,
+            "book_id": self.book_id,
             "chapter_number": self.chapter_number,
             "title": self.title,
+        }
+
+
+class ExtractionRun(db.Model):
+    __tablename__ = "extraction_runs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey("books.id"), nullable=True)
+    chapter_start = db.Column(db.Integer, nullable=True)
+    chapter_end = db.Column(db.Integer, nullable=True)
+    scope_type = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(50), nullable=False, default="queued")
+    total_chapters = db.Column(db.Integer, nullable=False, default=0)
+    completed_chapters = db.Column(db.Integer, nullable=False, default=0)
+    failed_chapters = db.Column(db.Integer, nullable=False, default=0)
+    current_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    created_records_count = db.Column(db.Integer, nullable=False, default=0)
+    warning_count = db.Column(db.Integer, nullable=False, default=0)
+    summary_json = db.Column(db.Text, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    started_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    finished_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    novel = db.relationship("Novel")
+    book = db.relationship("Book")
+    current_chapter = db.relationship("Chapter")
+    run_chapters = db.relationship(
+        "ExtractionRunChapter",
+        back_populates="extraction_run",
+        cascade="all, delete-orphan",
+        order_by="ExtractionRunChapter.id",
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "book_id": self.book_id,
+            "book": self.book.to_admin_dict() if self.book else None,
+            "chapter_start": self.chapter_start,
+            "chapter_end": self.chapter_end,
+            "scope_type": self.scope_type,
+            "status": self.status,
+            "total_chapters": self.total_chapters,
+            "completed_chapters": self.completed_chapters,
+            "failed_chapters": self.failed_chapters,
+            "current_chapter_id": self.current_chapter_id,
+            "current_chapter": self.current_chapter.to_reference_dict() if self.current_chapter else None,
+            "created_records_count": self.created_records_count,
+            "warning_count": self.warning_count,
+            "summary": json.loads(self.summary_json) if self.summary_json else {},
+            "run_chapters": [run_chapter.to_admin_dict() for run_chapter in self.run_chapters],
+            "error_message": self.error_message,
+            "started_at": serialize_datetime(self.started_at),
+            "finished_at": serialize_datetime(self.finished_at),
+            "created_at": serialize_datetime(self.created_at),
+        }
+
+
+class ExtractionRunChapter(db.Model):
+    __tablename__ = "extraction_run_chapters"
+
+    id = db.Column(db.Integer, primary_key=True)
+    extraction_run_id = db.Column(db.Integer, db.ForeignKey("extraction_runs.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
+    status = db.Column(db.String(50), nullable=False, default="pending")
+    records_created = db.Column(db.Integer, nullable=False, default=0)
+    warning_count = db.Column(db.Integer, nullable=False, default=0)
+    summary_json = db.Column(db.Text, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    started_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    finished_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+    extraction_run = db.relationship("ExtractionRun", back_populates="run_chapters")
+    chapter = db.relationship("Chapter")
+
+    __table_args__ = (
+        db.UniqueConstraint("extraction_run_id", "chapter_id", name="uq_run_chapter"),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "extraction_run_id": self.extraction_run_id,
+            "chapter_id": self.chapter_id,
+            "chapter": self.chapter.to_reference_dict() if self.chapter else None,
+            "status": self.status,
+            "records_created": self.records_created,
+            "warning_count": self.warning_count,
+            "summary": json.loads(self.summary_json) if self.summary_json else {},
+            "error_message": self.error_message,
+            "started_at": serialize_datetime(self.started_at),
+            "finished_at": serialize_datetime(self.finished_at),
+            "created_at": serialize_datetime(self.created_at),
+            "updated_at": serialize_datetime(self.updated_at),
         }
 
 
