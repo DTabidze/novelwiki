@@ -29,6 +29,18 @@ def ensure_development_schema(app):
         if "error_message" not in column_names:
             connection.execute(text("ALTER TABLE novels ADD COLUMN error_message TEXT"))
 
+        novel_profile_columns = {
+            "author": "VARCHAR(255)",
+            "description": "TEXT",
+            "cover_image_url": "TEXT",
+        }
+
+        for column_name, column_type in novel_profile_columns.items():
+            if column_name not in column_names:
+                connection.execute(
+                    text(f"ALTER TABLE novels ADD COLUMN {column_name} {column_type}")
+                )
+
         chapter_columns = connection.execute(text("PRAGMA table_info(chapters)")).fetchall()
         chapter_column_names = {column[1] for column in chapter_columns}
 

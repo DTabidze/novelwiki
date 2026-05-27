@@ -34,7 +34,11 @@ export default function WorkspaceSidebar({ novel }) {
   return (
     <aside className="workspace-sidebar">
       <div className="workspace-novel-switcher">
-        <div className="admin-cover-small">{novel?.title?.slice(0, 2) || "NW"}</div>
+        {novel?.cover_image_url ? (
+          <img className="admin-cover-small" src={novel.cover_image_url} alt="" />
+        ) : (
+          <div className="admin-cover-small">{novel?.title?.slice(0, 2) || "NW"}</div>
+        )}
         <div>
           <span>Novel Workspace</span>
           <strong title={novel?.title || "Loading..."}>{novel?.title || "Loading..."}</strong>

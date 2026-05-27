@@ -39,11 +39,27 @@ export default function AdminApp() {
     try {
       const data = await fetchJson(`${API_BASE_URL}/admin/novels`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       await loadNovels();
-      setMessage(`Created ${data.novel.title}.`);
+      return data.novel;
+    } catch (error) {
+      setMessage(error.message);
+      return null;
+    }
+  }
+
+  async function handleUpdateNovel(novelId, payload) {
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      await loadNovels();
       return data.novel;
     } catch (error) {
       setMessage(error.message);
@@ -71,6 +87,7 @@ export default function AdminApp() {
               novels={novels}
               onCreateNovel={handleCreateNovel}
               onOpenNovel={handleOpenNovel}
+              onUpdateNovel={handleUpdateNovel}
             />
           </AdminLayout>
         }

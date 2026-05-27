@@ -242,6 +242,9 @@ def public_novel(novel):
     return {
         "id": novel.id,
         "title": novel.title,
+        "author": novel.author,
+        "description": novel.description,
+        "cover_image_url": novel.cover_image_url,
         "chapter_count": len(novel.chapters),
         "approved_character_count": Character.query.filter_by(
             novel_id=novel.id,
