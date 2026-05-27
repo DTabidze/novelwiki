@@ -3,7 +3,7 @@ import StatusBadge from "../components/StatusBadge.jsx";
 
 export default function BookListPanel({ books }) {
   return (
-    <section className="admin-panel">
+    <section className="admin-panel workspace-book-panel">
       <div className="admin-section-header">
         <h2>Books</h2>
         <span>{books.length} total</span>
@@ -14,6 +14,7 @@ export default function BookListPanel({ books }) {
           <span>Book</span>
           <span>Title</span>
           <span>Chapters</span>
+          <span>Extracted</span>
           <span>Status</span>
         </div>
         {books.map((book) => (
@@ -21,8 +22,9 @@ export default function BookListPanel({ books }) {
             <span>Book {book.number}</span>
             <strong>{book.title}</strong>
             <span>{book.chapter_count || 0}</span>
-            <StatusBadge tone={book.parsing_status === "parsed" ? "success" : "neutral"}>
-              {book.parsing_status}
+            <span>{book.extracted_chapter_count || 0}</span>
+            <StatusBadge tone={book.extraction_status === "completed" ? "success" : "neutral"}>
+              {book.extraction_status}
             </StatusBadge>
           </div>
         ))}

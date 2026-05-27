@@ -162,6 +162,40 @@ def ensure_development_schema(app):
                     )
                 )
 
+        extraction_run_columns = connection.execute(
+            text("PRAGMA table_info(extraction_runs)")
+        ).fetchall()
+        extraction_run_column_names = {column[1] for column in extraction_run_columns}
+
+        if extraction_run_columns and "summary_json" not in extraction_run_column_names:
+            connection.execute(text("ALTER TABLE extraction_runs ADD COLUMN summary_json TEXT"))
+
+        extraction_run_chapter_columns = connection.execute(
+            text("PRAGMA table_info(extraction_run_chapters)")
+        ).fetchall()
+        extraction_run_chapter_column_names = {
+            column[1] for column in extraction_run_chapter_columns
+        }
+        extraction_run_chapter_summary_columns = {
+            "records_created": "INTEGER NOT NULL DEFAULT 0",
+            "warning_count": "INTEGER NOT NULL DEFAULT 0",
+            "summary_json": "TEXT",
+            "error_message": "TEXT",
+            "started_at": "DATETIME",
+            "finished_at": "DATETIME",
+            "created_at": "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "updated_at": "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+        }
+
+        for column_name, column_type in extraction_run_chapter_summary_columns.items():
+            if extraction_run_chapter_columns and column_name not in extraction_run_chapter_column_names:
+                connection.execute(
+                    text(
+                        "ALTER TABLE extraction_run_chapters "
+                        f"ADD COLUMN {column_name} {column_type}"
+                    )
+                )
+
         connection.commit()
 
 

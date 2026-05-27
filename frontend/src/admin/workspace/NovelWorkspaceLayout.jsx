@@ -62,8 +62,10 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
     });
   }
 
-  async function loadWorkspace() {
-    setIsLoading(true);
+  async function loadWorkspace({ showLoading = true } = {}) {
+    if (showLoading) {
+      setIsLoading(true);
+    }
 
     try {
       const [bookData, chapterData, reviewData] = await Promise.all([
@@ -80,8 +82,18 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
     } catch (error) {
       setMessage(error.message);
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
+  }
+
+  async function loadExtractionRuns() {
+    const runData = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extraction-runs`);
+    const runs = runData.runs || [];
+    setExtractionRuns(runs);
+    setIsRunningExtraction(runs.some((run) => ["queued", "running"].includes(run.status)));
+    return runs;
   }
 
   async function uploadBook(formData) {
@@ -99,7 +111,6 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
 
   async function extractChapter(chapter) {
     setExtractingChapterId(chapter.id);
-    setMessage(`Extracting Chapter ${chapter.chapter_number}...`);
 
     try {
       const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extraction-runs`, {
@@ -110,9 +121,8 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
           chapter_id: chapter.id,
         }),
       });
-      setExtractedData(data);
-      setMessage(`Chapter ${chapter.chapter_number} extracted. Review pending records when ready.`);
-      await loadWorkspace();
+      setExtractionRuns((runs) => [data.run, ...runs.filter((run) => run.id !== data.run.id)]);
+      setIsRunningExtraction(true);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -122,7 +132,6 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
 
   async function startExtractionRun(payload) {
     setIsRunningExtraction(true);
-    setMessage("Starting extraction run...");
 
     try {
       const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extraction-runs`, {
@@ -130,14 +139,24 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      setExtractedData(data);
-      setMessage(`Extraction run completed: ${data.extracted_chapter_count || 0} chapters processed.`);
-      await loadWorkspace();
+      setExtractionRuns((runs) => [data.run, ...runs.filter((run) => run.id !== data.run.id)]);
     } catch (error) {
       setMessage(error.message);
-      await loadWorkspace();
+      await loadWorkspace({ showLoading: false });
     } finally {
-      setIsRunningExtraction(false);
+      await loadExtractionRuns();
+    }
+  }
+
+  async function stopExtractionRun(run) {
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extraction-runs/${run.id}/cancel`, {
+        method: "POST",
+      });
+      setExtractionRuns((runs) => runs.map((existingRun) => existingRun.id === data.run.id ? data.run : existingRun));
+      await loadExtractionRuns();
+    } catch (error) {
+      setMessage(error.message);
     }
   }
 
@@ -153,6 +172,29 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
   React.useEffect(() => {
     loadWorkspace();
   }, [novelId]);
+
+  React.useEffect(() => {
+    const hasActiveRun = extractionRuns.some((run) => ["queued", "running"].includes(run.status));
+
+    if (!hasActiveRun && !isRunningExtraction) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        const runs = await loadExtractionRuns();
+        const stillActive = runs.some((run) => ["queued", "running"].includes(run.status));
+
+        if (!stillActive) {
+          await loadWorkspace({ showLoading: false });
+        }
+      } catch (error) {
+        setMessage(error.message);
+      }
+    }, 1500);
+
+    return () => window.clearInterval(intervalId);
+  }, [extractionRuns, isRunningExtraction, novelId]);
 
   if (isLoading) {
     return (
@@ -172,7 +214,17 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
       <section className="workspace-main">
         {message ? <div className="admin-message">{message}</div> : null}
         <Routes>
-          <Route index element={<NovelWorkspaceOverview books={books} extractedData={extractedData} novel={novel} />} />
+          <Route
+            index
+            element={
+              <NovelWorkspaceOverview
+                books={books}
+                extractedData={extractedData}
+                extractionRuns={extractionRuns}
+                novel={novel}
+              />
+            }
+          />
           <Route
             path="books"
             element={
@@ -207,6 +259,7 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
                 isRunningExtraction={isRunningExtraction}
                 novel={novel}
                 onStartExtraction={startExtractionRun}
+                onStopExtraction={stopExtractionRun}
               />
             }
           />

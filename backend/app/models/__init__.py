@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
@@ -8,6 +9,18 @@ db = SQLAlchemy()
 
 def utc_now():
     return datetime.now(timezone.utc)
+
+
+def serialize_datetime(value):
+    if not value:
+        return None
+
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+
+    return value.isoformat().replace("+00:00", "Z")
 
 
 class ReviewMixin:
@@ -163,6 +176,7 @@ class ExtractionRun(db.Model):
     current_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
     created_records_count = db.Column(db.Integer, nullable=False, default=0)
     warning_count = db.Column(db.Integer, nullable=False, default=0)
+    summary_json = db.Column(db.Text, nullable=True)
     error_message = db.Column(db.Text, nullable=True)
     started_at = db.Column(db.DateTime(timezone=True), nullable=True)
     finished_at = db.Column(db.DateTime(timezone=True), nullable=True)
@@ -171,6 +185,12 @@ class ExtractionRun(db.Model):
     novel = db.relationship("Novel")
     book = db.relationship("Book")
     current_chapter = db.relationship("Chapter")
+    run_chapters = db.relationship(
+        "ExtractionRunChapter",
+        back_populates="extraction_run",
+        cascade="all, delete-orphan",
+        order_by="ExtractionRunChapter.id",
+    )
 
     def to_admin_dict(self):
         return {
@@ -189,10 +209,58 @@ class ExtractionRun(db.Model):
             "current_chapter": self.current_chapter.to_reference_dict() if self.current_chapter else None,
             "created_records_count": self.created_records_count,
             "warning_count": self.warning_count,
+            "summary": json.loads(self.summary_json) if self.summary_json else {},
+            "run_chapters": [run_chapter.to_admin_dict() for run_chapter in self.run_chapters],
             "error_message": self.error_message,
-            "started_at": self.started_at.isoformat() if self.started_at else None,
-            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "started_at": serialize_datetime(self.started_at),
+            "finished_at": serialize_datetime(self.finished_at),
+            "created_at": serialize_datetime(self.created_at),
+        }
+
+
+class ExtractionRunChapter(db.Model):
+    __tablename__ = "extraction_run_chapters"
+
+    id = db.Column(db.Integer, primary_key=True)
+    extraction_run_id = db.Column(db.Integer, db.ForeignKey("extraction_runs.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
+    status = db.Column(db.String(50), nullable=False, default="pending")
+    records_created = db.Column(db.Integer, nullable=False, default=0)
+    warning_count = db.Column(db.Integer, nullable=False, default=0)
+    summary_json = db.Column(db.Text, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    started_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    finished_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+    extraction_run = db.relationship("ExtractionRun", back_populates="run_chapters")
+    chapter = db.relationship("Chapter")
+
+    __table_args__ = (
+        db.UniqueConstraint("extraction_run_id", "chapter_id", name="uq_run_chapter"),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "extraction_run_id": self.extraction_run_id,
+            "chapter_id": self.chapter_id,
+            "chapter": self.chapter.to_reference_dict() if self.chapter else None,
+            "status": self.status,
+            "records_created": self.records_created,
+            "warning_count": self.warning_count,
+            "summary": json.loads(self.summary_json) if self.summary_json else {},
+            "error_message": self.error_message,
+            "started_at": serialize_datetime(self.started_at),
+            "finished_at": serialize_datetime(self.finished_at),
+            "created_at": serialize_datetime(self.created_at),
+            "updated_at": serialize_datetime(self.updated_at),
         }
 
 

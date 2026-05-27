@@ -19,10 +19,25 @@ function countWarnings(extractedData) {
   );
 }
 
-export default function NovelWorkspaceOverview({ books, extractedData, novel }) {
+function extractedChapterCountFromRuns(extractionRuns) {
+  return extractionRuns
+    .filter((run) => run.status === "completed")
+    .reduce((sum, run) => sum + (run.completed_chapters || 0), 0);
+}
+
+function latestExtractionRun(extractionRuns) {
+  return extractionRuns[0] || null;
+}
+
+export default function NovelWorkspaceOverview({ books, extractedData, extractionRuns = [], novel }) {
   const navigate = useNavigate();
   const chapterCount = novel?.chapter_count || 0;
   const bookCount = books.length || novel?.book_count || 0;
+  const extractedChapterCount = extractedChapterCountFromRuns(extractionRuns);
+  const extractedProgress = chapterCount
+    ? Math.round((Math.min(extractedChapterCount, chapterCount) / chapterCount) * 100)
+    : 0;
+  const latestRun = latestExtractionRun(extractionRuns);
   const pendingCharacters = countPending(extractedData, "characters");
   const pendingMetadata = countPending(extractedData, "character_metadata_proposals");
   const pendingProgression = countPending(extractedData, "progression_events");
@@ -56,7 +71,7 @@ export default function NovelWorkspaceOverview({ books, extractedData, novel }) 
       <section className="admin-stat-grid workspace-stats">
         <StatCard label="Books" value={bookCount} detail="Uploaded" tone="blue" />
         <StatCard label="Chapters" value={chapterCount} detail="Total chapters" tone="green" />
-        <StatCard label="Extracted" value={0} detail="Run tracking next phase" tone="purple" />
+        <StatCard label="Extracted" value={extractedChapterCount} detail={`${extractedProgress}% completed`} tone="purple" />
         <StatCard label="Pending Review" value={totalPending} detail="Items" tone="orange" />
         <StatCard label="Warnings" value={warnings} detail="Need attention" tone="red" />
       </section>
@@ -67,12 +82,17 @@ export default function NovelWorkspaceOverview({ books, extractedData, novel }) 
         <section className="admin-panel">
           <div className="admin-section-header">
             <h2>Extraction Progress</h2>
-            <span>Phase 4</span>
+            <span>{extractedProgress}%</span>
           </div>
-          <ProgressBar value={0} />
-          <p className="admin-muted">
-            Extraction run tracking will replace the current temporary chapter controls in the next phases.
-          </p>
+          <ProgressBar value={extractedProgress} />
+          {latestRun ? (
+            <p className="admin-muted">
+              Latest run: {latestRun.scope_type.replaceAll("_", " ")} · {latestRun.status} ·{" "}
+              {latestRun.completed_chapters}/{latestRun.total_chapters} chapters.
+            </p>
+          ) : (
+            <p className="admin-muted">No extraction runs yet. Start with a book, range, chapter, or full novel.</p>
+          )}
         </section>
 
         <section className="admin-panel">

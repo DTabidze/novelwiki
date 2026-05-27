@@ -1,5 +1,10 @@
 import React from "react";
 
+function bookOptionLabel(book) {
+  const defaultTitle = `Book ${book.number}`;
+  return !book.title || book.title === defaultTitle ? defaultTitle : `${defaultTitle}: ${book.title}`;
+}
+
 export default function NewExtractionModal({ books, chapters, onClose, onStart }) {
   const [bookId, setBookId] = React.useState(books[0]?.id ? String(books[0].id) : "");
   const [chapterEnd, setChapterEnd] = React.useState("");
@@ -60,7 +65,7 @@ export default function NewExtractionModal({ books, chapters, onClose, onStart }
             <select value={bookId} onChange={(event) => setBookId(event.target.value)} required>
               {books.map((book) => (
                 <option key={book.id} value={book.id}>
-                  Book {book.number}: {book.title}
+                  {bookOptionLabel(book)}
                 </option>
               ))}
             </select>

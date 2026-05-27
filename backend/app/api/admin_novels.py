@@ -1,10 +1,12 @@
+import json
+import threading
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
 from openai import AuthenticationError, RateLimitError
 from werkzeug.utils import secure_filename
 
-from app.models import Book, Chapter, ExtractionRun, Novel, db, utc_now
+from app.models import Book, Chapter, ExtractionRun, ExtractionRunChapter, Novel, db, utc_now
 from app.services.ai_extraction_service import extract_chapter_with_ai
 from app.services.chapter_parser import split_txt_into_chapters
 from app.services.extraction_service import get_extracted_data, run_placeholder_extraction
@@ -44,31 +46,16 @@ def aggregate_book_summary(book):
     data = book.to_admin_dict()
     data["pending_review_count"] = 0
     data["warning_count"] = 0
-    extracted_chapter_numbers = {
-        run.chapter_start
-        for run in ExtractionRun.query.filter_by(
-            book_id=book.id,
-            scope_type="single_chapter",
-            status="completed",
-        ).all()
-        if run.chapter_start
+
+    completed_chapter_ids = {
+        run_chapter.chapter_id
+        for run_chapter in ExtractionRunChapter.query.join(Chapter)
+        .filter(Chapter.book_id == book.id)
+        .filter(ExtractionRunChapter.status == "completed")
+        .all()
     }
-    completed_book_runs = ExtractionRun.query.filter_by(
-        book_id=book.id,
-        scope_type="book",
-        status="completed",
-    ).all()
 
-    for run in completed_book_runs:
-        extracted_chapter_numbers.update(
-            chapter.chapter_number
-            for chapter in Chapter.query.filter_by(book_id=book.id)
-            .filter(Chapter.chapter_number >= (run.chapter_start or 0))
-            .filter(Chapter.chapter_number <= (run.chapter_end or 10**9))
-            .all()
-        )
-
-    data["extracted_chapter_count"] = len(extracted_chapter_numbers)
+    data["extracted_chapter_count"] = len(completed_chapter_ids)
     return data
 
 
@@ -138,6 +125,19 @@ def count_review_warnings(review_data):
     )
 
 
+def count_chapter_warnings(review_data, chapter_id):
+    warning_keys = ["progression_events", "character_metadata_proposals"]
+    total = 0
+
+    for key in warning_keys:
+        for record in review_data.get(key, []):
+            source_chapter = record.get("source_chapter") or record.get("chapter") or {}
+            if source_chapter.get("id") == chapter_id and record.get("review_warnings"):
+                total += 1
+
+    return total
+
+
 def scope_label(scope_type):
     return scope_type.replace("_", " ").title()
 
@@ -148,6 +148,7 @@ def chapters_for_extraction_scope(novel, payload):
     chapter_id = payload.get("chapter_id")
     chapter_start = payload.get("chapter_start")
     chapter_end = payload.get("chapter_end")
+    source_run_id = payload.get("source_run_id")
 
     query = Chapter.query.filter_by(novel_id=novel.id)
 
@@ -156,6 +157,7 @@ def chapters_for_extraction_scope(novel, payload):
         chapter_end = int(chapter_end) if chapter_end not in (None, "") else None
         book_id = int(book_id) if book_id not in (None, "") else None
         chapter_id = int(chapter_id) if chapter_id not in (None, "") else None
+        source_run_id = int(source_run_id) if source_run_id not in (None, "") else None
     except (TypeError, ValueError):
         return None, "Book and chapter values must be numbers."
 
@@ -188,12 +190,37 @@ def chapters_for_extraction_scope(novel, payload):
     elif scope_type == "novel":
         chapters = query.order_by(Chapter.book_id, Chapter.chapter_number).all()
     elif scope_type == "retry_failed":
-        failed_runs = ExtractionRun.query.filter_by(novel_id=novel.id, status="failed").all()
-        failed_chapter_ids = {run.current_chapter_id for run in failed_runs if run.current_chapter_id}
-        chapters = query.filter(Chapter.id.in_(failed_chapter_ids)).order_by(
+        source_run = None
+
+        if source_run_id:
+            source_run = ExtractionRun.query.filter_by(id=source_run_id, novel_id=novel.id).first()
+        else:
+            source_run = (
+                ExtractionRun.query.filter_by(novel_id=novel.id, status="failed")
+                .order_by(ExtractionRun.created_at.desc())
+                .first()
+            )
+
+        if not source_run:
+            return None, "No failed extraction run found to retry."
+
+        failed_row = next(
+            (run_chapter for run_chapter in source_run.run_chapters if run_chapter.status == "failed"),
+            None,
+        )
+
+        if not failed_row:
+            return None, "No failed chapter found in the selected extraction run."
+
+        retry_chapter_ids = [
+            run_chapter.chapter_id
+            for run_chapter in source_run.run_chapters
+            if run_chapter.id >= failed_row.id and run_chapter.status in {"failed", "pending", "skipped"}
+        ]
+        chapters = query.filter(Chapter.id.in_(retry_chapter_ids)).order_by(
             Chapter.book_id,
             Chapter.chapter_number,
-        ).all() if failed_chapter_ids else []
+        ).all()
     else:
         return None, "Unsupported extraction scope."
 
@@ -209,7 +236,7 @@ def build_extraction_run(novel, payload, chapters):
     scope_type = payload.get("scope_type")
     book_id = payload.get("book_id")
 
-    if scope_type == "single_chapter":
+    if scope_type in {"single_chapter", "retry_failed"}:
         book_id = first_chapter.book_id
 
     return ExtractionRun(
@@ -223,9 +250,67 @@ def build_extraction_run(novel, payload, chapters):
     )
 
 
-def run_extraction_scope(novel, run, chapters):
+def seed_extraction_run_chapters(run, chapters):
+    for chapter in chapters:
+        db.session.add(
+            ExtractionRunChapter(
+                extraction_run_id=run.id,
+                chapter_id=chapter.id,
+                status="pending",
+            )
+        )
+
+
+def refresh_run_totals(run):
+    run.completed_chapters = sum(
+        1 for run_chapter in run.run_chapters if run_chapter.status == "completed"
+    )
+    run.failed_chapters = sum(
+        1 for run_chapter in run.run_chapters if run_chapter.status == "failed"
+    )
+    run.created_records_count = sum(
+        run_chapter.records_created for run_chapter in run.run_chapters
+    )
+    run.warning_count = sum(run_chapter.warning_count for run_chapter in run.run_chapters)
+
+    aggregate_summary = empty_extraction_summary()
+
+    for run_chapter in run.run_chapters:
+        if not run_chapter.summary_json:
+            continue
+
+        chapter_summary = json.loads(run_chapter.summary_json)
+
+        for key in aggregate_summary:
+            aggregate_summary[key] += chapter_summary.get(key, 0)
+
+    run.summary_json = json.dumps(aggregate_summary)
+    return aggregate_summary
+
+
+def mark_pending_run_chapters_skipped(run):
+    for run_chapter in run.run_chapters:
+        if run_chapter.status == "pending":
+            run_chapter.status = "skipped"
+            run_chapter.finished_at = utc_now()
+
+
+def run_extraction_scope(novel, run):
     aggregate_summary = empty_extraction_summary()
     chapter_summaries = []
+
+    db.session.refresh(run)
+
+    if run.status == "cancelled":
+        mark_pending_run_chapters_skipped(run)
+        run.current_chapter_id = None
+        run.finished_at = run.finished_at or utc_now()
+        novel.status = "ready"
+        if run.book:
+            run.book.extraction_status = "cancelled"
+        refresh_run_totals(run)
+        db.session.commit()
+        return aggregate_summary, chapter_summaries
 
     run.status = "running"
     run.started_at = utc_now()
@@ -237,29 +322,75 @@ def run_extraction_scope(novel, run, chapters):
 
     db.session.commit()
 
-    for chapter in chapters:
+    for run_chapter in run.run_chapters:
+        db.session.refresh(run)
+
+        if run.status == "cancelled":
+            mark_pending_run_chapters_skipped(run)
+            run.current_chapter_id = None
+            run.finished_at = run.finished_at or utc_now()
+            novel.status = "ready"
+            if run.book:
+                run.book.extraction_status = "cancelled"
+            refresh_run_totals(run)
+            db.session.commit()
+            return aggregate_summary, chapter_summaries
+
+        if run_chapter.status != "pending":
+            continue
+
+        chapter = run_chapter.chapter
+        run_chapter.status = "processing"
+        run_chapter.started_at = utc_now()
         run.current_chapter_id = chapter.id
         db.session.commit()
 
-        summary = extract_chapter_with_ai(novel, chapter)
+        try:
+            summary = extract_chapter_with_ai(novel, chapter)
+        except Exception as error:
+            run_chapter.status = "failed"
+            run_chapter.error_message = str(error)
+            run_chapter.finished_at = utc_now()
+            refresh_run_totals(run)
+            db.session.commit()
+            raise
+
+        review_data = get_extracted_data(novel)
+        run_chapter.records_created = count_created_records(summary)
+        run_chapter.warning_count = count_chapter_warnings(review_data, chapter.id)
+        run_chapter.summary_json = json.dumps(summary)
+        run_chapter.status = "completed"
+        run_chapter.finished_at = utc_now()
         chapter_summaries.append({"chapter": chapter.to_reference_dict(), "summary": summary})
 
         for key in aggregate_summary:
             aggregate_summary[key] += summary.get(key, 0)
 
-        run.completed_chapters += 1
-        run.created_records_count += count_created_records(summary)
+        refresh_run_totals(run)
         db.session.commit()
+
+        db.session.refresh(run)
+
+        if run.status == "cancelled":
+            mark_pending_run_chapters_skipped(run)
+            run.current_chapter_id = None
+            run.finished_at = run.finished_at or utc_now()
+            novel.status = "ready"
+            if run.book:
+                run.book.extraction_status = "cancelled"
+            refresh_run_totals(run)
+            db.session.commit()
+            return aggregate_summary, chapter_summaries
 
     run.status = "completed"
     run.finished_at = utc_now()
+    run.current_chapter_id = None
     novel.status = "ready"
 
     if run.book:
         run.book.extraction_status = "completed"
 
-    review_data = get_extracted_data(novel)
-    run.warning_count = count_review_warnings(review_data)
+    refresh_run_totals(run)
     db.session.commit()
 
     return aggregate_summary, chapter_summaries
@@ -267,9 +398,10 @@ def run_extraction_scope(novel, run, chapters):
 
 def mark_extraction_run_failed(novel, run, message):
     run.status = "failed"
-    run.failed_chapters = max(0, run.total_chapters - run.completed_chapters)
+    refresh_run_totals(run)
     run.error_message = message
     run.finished_at = utc_now()
+    run.current_chapter_id = None
     novel.status = "failed"
     novel.error_message = message
 
@@ -277,6 +409,43 @@ def mark_extraction_run_failed(novel, run, message):
         run.book.extraction_status = "failed"
 
     db.session.commit()
+
+
+def process_extraction_run_in_background(app, run_id):
+    with app.app_context():
+        try:
+            run = ExtractionRun.query.get(run_id)
+
+            if not run:
+                return
+
+            novel = Novel.query.get(run.novel_id)
+
+            try:
+                run_extraction_scope(novel, run)
+            except RuntimeError as error:
+                mark_extraction_run_failed(novel, run, str(error))
+            except AuthenticationError:
+                mark_extraction_run_failed(
+                    novel,
+                    run,
+                    "AI API key was rejected. Check backend/.env and restart Flask.",
+                )
+            except RateLimitError:
+                mark_extraction_run_failed(
+                    novel,
+                    run,
+                    "AI API quota is unavailable. Check provider billing and usage limits.",
+                )
+            except Exception as error:
+                mark_extraction_run_failed(
+                    novel,
+                    run,
+                    "AI extraction failed. Check backend logs for details.",
+                )
+                app.logger.exception("AI extraction run failed: %s", error)
+        finally:
+            db.session.remove()
 
 
 @admin_novels_bp.post("/novels/upload")
@@ -518,6 +687,35 @@ def get_extraction_run(novel_id, run_id):
     return success({"run": run.to_admin_dict()})
 
 
+@admin_novels_bp.post("/novels/<int:novel_id>/extraction-runs/<int:run_id>/cancel")
+def cancel_extraction_run(novel_id, run_id):
+    novel = Novel.query.get_or_404(novel_id)
+    run = ExtractionRun.query.filter_by(id=run_id, novel_id=novel.id).first_or_404()
+
+    if run.status not in {"queued", "running"}:
+        return failure("Only queued or running extraction runs can be stopped.")
+
+    has_processing_chapter = any(
+        run_chapter.status == "processing" for run_chapter in run.run_chapters
+    )
+
+    run.status = "cancelled"
+    run.error_message = "Stopped by admin."
+    run.finished_at = None if has_processing_chapter else utc_now()
+    run.current_chapter_id = run.current_chapter_id if has_processing_chapter else None
+    novel.status = "ready"
+    novel.error_message = None
+
+    if run.book:
+        run.book.extraction_status = "cancelled"
+
+    mark_pending_run_chapters_skipped(run)
+    refresh_run_totals(run)
+    db.session.commit()
+
+    return success({"run": run.to_admin_dict()})
+
+
 @admin_novels_bp.post("/novels/<int:novel_id>/extraction-runs")
 def create_extraction_run(novel_id):
     novel = Novel.query.get_or_404(novel_id)
@@ -529,30 +727,16 @@ def create_extraction_run(novel_id):
 
     run = build_extraction_run(novel, payload, chapters)
     db.session.add(run)
+    db.session.flush()
+    seed_extraction_run_chapters(run, chapters)
     db.session.commit()
 
-    try:
-        aggregate_summary, chapter_summaries = run_extraction_scope(novel, run, chapters)
-    except RuntimeError as error:
-        mark_extraction_run_failed(novel, run, str(error))
-        return failure(str(error), status=400)
-    except AuthenticationError:
-        message = "AI API key was rejected. Check backend/.env and restart Flask."
-        mark_extraction_run_failed(novel, run, message)
-        return failure(message, status=401)
-    except RateLimitError:
-        message = "AI API quota is unavailable. Check provider billing and usage limits."
-        mark_extraction_run_failed(novel, run, message)
-        return failure(message, status=429)
-    except Exception as error:
-        message = "AI extraction failed. Check backend logs for details."
-        mark_extraction_run_failed(novel, run, message)
-        current_app.logger.exception("AI batch extraction failed: %s", error)
-        return failure(message, status=500)
+    app = current_app._get_current_object()
+    thread = threading.Thread(
+        target=process_extraction_run_in_background,
+        args=(app, run.id),
+        daemon=True,
+    )
+    thread.start()
 
-    data = get_extracted_data(novel)
-    data["run"] = run.to_admin_dict()
-    data["summary"] = aggregate_summary
-    data["extracted_chapter_count"] = len(chapter_summaries)
-    data["chapter_summaries"] = chapter_summaries
-    return success(data)
+    return success({"run": run.to_admin_dict()}, status=202)
