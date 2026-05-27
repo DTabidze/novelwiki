@@ -1,12 +1,13 @@
 import json
 import threading
 from pathlib import Path
+from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify, request
 from openai import AuthenticationError, RateLimitError
 from werkzeug.utils import secure_filename
 
-from app.models import Book, Chapter, ExtractionRun, ExtractionRunChapter, Novel, db, utc_now
+from app.models import Book, Chapter, ExtractionRun, ExtractionRunChapter, Novel, db, serialize_datetime, utc_now
 from app.services.ai_extraction_service import extract_chapter_with_ai
 from app.services.chapter_parser import split_txt_into_chapters
 from app.services.extraction_service import get_extracted_data, run_placeholder_extraction
@@ -56,6 +57,67 @@ def aggregate_book_summary(book):
     }
 
     data["extracted_chapter_count"] = len(completed_chapter_ids)
+    return data
+
+
+def aggregate_novel_summary(novel):
+    data = novel.to_admin_dict()
+    review_data = get_extracted_data(novel)
+    review_keys = [
+        "characters",
+        "character_metadata_proposals",
+        "progression_events",
+        "character_skills",
+        "skills",
+        "items",
+        "character_items",
+        "life_events",
+        "events",
+    ]
+    today = datetime.now(timezone.utc).date()
+
+    data["pending_review_count"] = sum(
+        1
+        for key in review_keys
+        for record in review_data.get(key, [])
+        if record.get("review_status") == "pending"
+    )
+    data["approved_record_count"] = sum(
+        1
+        for key in review_keys
+        for record in review_data.get(key, [])
+        if record.get("review_status") == "approved"
+    )
+    data["warning_count"] = count_review_warnings(review_data)
+    data["active_extraction_count"] = ExtractionRun.query.filter(
+        ExtractionRun.novel_id == novel.id,
+        ExtractionRun.status.in_(["queued", "running"]),
+    ).count()
+    data["completed_today_count"] = ExtractionRun.query.filter(
+        ExtractionRun.novel_id == novel.id,
+        ExtractionRun.status == "completed",
+        ExtractionRun.finished_at.isnot(None),
+    ).filter(db.func.date(ExtractionRun.finished_at) == today.isoformat()).count()
+
+    completed_chapter_ids = {
+        run_chapter.chapter_id
+        for run_chapter in ExtractionRunChapter.query.join(ExtractionRun)
+        .filter(ExtractionRun.novel_id == novel.id)
+        .filter(ExtractionRunChapter.status == "completed")
+        .all()
+    }
+    data["extracted_chapter_count"] = len(completed_chapter_ids)
+
+    latest_run = (
+        ExtractionRun.query.filter_by(novel_id=novel.id)
+        .order_by(ExtractionRun.created_at.desc())
+        .first()
+    )
+    data["last_extraction_status"] = latest_run.status if latest_run else None
+    data["last_extraction_at"] = serialize_datetime(
+        latest_run.finished_at or latest_run.started_at or latest_run.created_at
+    ) if latest_run else None
+
     return data
 
 
@@ -502,15 +564,25 @@ def upload_novel():
 def create_novel():
     payload = request.get_json(silent=True) or {}
     title = (payload.get("title") or "").strip()
+    author = (payload.get("author") or "").strip() or None
+    description = (payload.get("description") or "").strip() or None
+    cover_image_url = (payload.get("cover_image_url") or "").strip() or None
+    status = (payload.get("status") or "ready").strip()
 
     if not title:
         return failure("Novel title is required.")
 
+    if status not in {"ready", "draft"}:
+        return failure("Novel status must be ready or draft.")
+
     novel = Novel(
         title=title,
+        author=author,
+        description=description,
+        cover_image_url=cover_image_url,
         original_filename="",
         file_type="workspace",
-        status="ready",
+        status=status,
     )
     db.session.add(novel)
     db.session.commit()
@@ -521,7 +593,35 @@ def create_novel():
 @admin_novels_bp.get("/novels")
 def list_admin_novels():
     novels = Novel.query.order_by(Novel.created_at.desc()).all()
-    return success([novel.to_admin_dict() for novel in novels])
+    return success([aggregate_novel_summary(novel) for novel in novels])
+
+
+@admin_novels_bp.patch("/novels/<int:novel_id>")
+def update_novel(novel_id):
+    novel = Novel.query.get_or_404(novel_id)
+    payload = request.get_json(silent=True) or {}
+    title = (payload.get("title") or "").strip()
+    author = (payload.get("author") or "").strip() or None
+    description = (payload.get("description") or "").strip() or None
+    cover_image_url = (payload.get("cover_image_url") or "").strip() or None
+    status = (payload.get("status") or "ready").strip()
+
+    if not title:
+        return failure("Novel title is required.")
+
+    if status not in {"ready", "draft"}:
+        return failure("Novel status must be ready or draft.")
+
+    novel.title = title
+    novel.author = author
+    novel.description = description
+    novel.cover_image_url = cover_image_url
+    novel.status = status
+    novel.updated_at = utc_now()
+
+    db.session.commit()
+
+    return success({"novel": aggregate_novel_summary(novel)})
 
 
 @admin_novels_bp.get("/novels/<int:novel_id>/books")

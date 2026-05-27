@@ -322,39 +322,273 @@ body:has(.wiki-shell) {
 
 .admin-novel-list {
   display: grid;
+  gap: 0;
 }
 
 .admin-novel-card {
   display: grid;
-  grid-template-columns: 96px minmax(220px, 1fr) minmax(420px, 1.8fr) 170px;
-  gap: 20px;
+  grid-template-columns: minmax(340px, 1.9fr) minmax(190px, 0.9fr) minmax(110px, 0.52fr) minmax(120px, 0.58fr) minmax(100px, 0.48fr) minmax(150px, 0.72fr) 210px;
+  gap: 24px;
   align-items: center;
   border-radius: 0;
   border-width: 1px 0 0;
   box-shadow: none;
-  padding: 18px 0;
-  background: transparent;
+  min-height: 140px;
+  padding: 24px;
+  background: rgba(8, 24, 39, 0.24);
+  transition: background 140ms ease, box-shadow 140ms ease;
 }
 
 .admin-novel-card:first-child {
   border-top: 0;
 }
 
+.admin-novel-card:hover {
+  background: rgba(15, 23, 42, 0.52);
+  box-shadow: inset 3px 0 0 rgba(124, 102, 255, 0.42);
+}
+
 .admin-cover-placeholder {
-  width: 78px;
-  height: 104px;
-  border-radius: 8px;
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
   background: linear-gradient(145deg, #1f2a44, #5b35d5);
+  object-fit: cover;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.library-page-header {
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.library-page-header h1 {
+  font-size: 34px;
+}
+
+.library-search-field {
+  min-width: 320px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0 13px;
+  background: #081827;
+  color: #7f92aa;
+}
+
+.library-search-field input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.library-search-field input:focus {
+  outline: none;
+}
+
+.library-page-header .admin-header-actions button,
+.admin-card-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.library-op-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.library-op-card {
+  display: grid;
+  align-content: space-between;
+  min-height: 150px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top left, rgba(124, 102, 255, 0.11), transparent 12rem),
+    rgba(8, 24, 39, 0.82);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+}
+
+.library-op-card-main {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 22px 20px 16px;
+}
+
+.library-op-icon {
+  width: 54px;
+  height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid rgba(199, 210, 254, 0.22);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.library-op-icon svg {
+  display: block;
+}
+
+.library-op-card strong {
+  display: block;
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.library-op-card span:not(.library-op-icon) {
+  display: block;
+  margin-top: 6px;
+  color: #d9e5f4;
+  font-weight: 800;
+}
+
+.library-op-card small {
+  display: block;
+  margin-top: 3px;
+  color: #91a4bb;
+}
+
+.admin-shell button.library-op-link {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: auto;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+  padding: 13px 20px 16px;
+  background: transparent;
+  box-shadow: none;
+  color: #bda9ff;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.admin-shell button.library-op-link:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.08);
+  transform: none;
+}
+
+.admin-shell button.library-op-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.library-op-card.purple .library-op-icon { background: rgba(124, 58, 237, 0.34); color: #ddd6fe; }
+.library-op-card.orange .library-op-icon { background: rgba(245, 158, 11, 0.24); color: #fbbf24; }
+.library-op-card.green .library-op-icon { background: rgba(34, 197, 94, 0.22); color: #86efac; }
+.library-op-card.blue .library-op-icon { background: rgba(59, 130, 246, 0.22); color: #93c5fd; }
+.library-op-card.cyan .library-op-icon { background: rgba(20, 184, 166, 0.22); color: #67e8f9; }
+.library-op-card.orange .library-op-link { color: #f59e0b; }
+.library-op-card.green .library-op-link { color: #4ade80; }
+.library-op-card.blue .library-op-link { color: #60a5fa; }
+.library-op-card.cyan .library-op-link { color: #67e8f9; }
+
+.library-novel-panel {
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 24, 39, 0.92), rgba(8, 24, 39, 0.78)),
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.1), transparent 28rem);
+}
+
+.library-section-header {
+  margin-bottom: 0;
+  padding: 22px 24px;
+}
+
+.library-section-header h2 {
+  font-size: 22px;
+}
+
+.library-novel-head {
+  display: grid;
+  grid-template-columns: minmax(340px, 1.9fr) minmax(190px, 0.9fr) minmax(110px, 0.52fr) minmax(120px, 0.58fr) minmax(100px, 0.48fr) minmax(150px, 0.72fr) 210px;
+  gap: 24px;
+  padding: 16px 24px;
+  background: rgba(15, 23, 42, 0.52);
+  color: #91a4bb;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.library-novel-identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.library-title-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.library-title-meta > span:not(.admin-status-badge) {
+  color: #9aacbf;
+  font-size: 13px;
 }
 
 .admin-novel-info h3 {
-  margin: 0 0 8px;
-  color: #9b7cff;
+  margin: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.admin-novel-author,
+.workspace-author {
+  display: block;
+  margin: -2px 0 10px;
+  color: #91a4bb;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .admin-novel-info p {
-  margin: 0 0 14px;
+  margin: 7px 0 10px;
   color: #c2cfdf;
+}
+
+.admin-novel-info small {
+  display: block;
+  margin-top: 9px;
+  color: #8294ab;
 }
 
 .admin-card-meta {
@@ -407,6 +641,70 @@ body:has(.wiki-shell) {
   align-items: end;
 }
 
+.library-review-cell {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.library-review-cell > span,
+.library-count-cell span,
+.library-activity-cell span {
+  color: #91a4bb;
+  font-size: 12px;
+}
+
+.library-review-cell strong {
+  color: #ffffff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.library-review-cell small {
+  color: #9aacbf;
+}
+
+.library-count-cell,
+.library-activity-cell {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+}
+
+.library-count-cell strong,
+.library-activity-cell strong {
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.library-activity-cell strong {
+  font-size: 14px;
+}
+
+.library-activity-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: capitalize;
+}
+
+.library-activity-status.completed {
+  color: #4ade80;
+}
+
+.library-activity-status.failed {
+  color: #f59e0b;
+}
+
+.library-activity-status.running,
+.library-activity-status.queued {
+  color: #60a5fa;
+}
+
+.library-activity-status.not-started {
+  color: #64748b;
+}
+
 .admin-novel-metrics span {
   display: block;
   color: #9aacbf;
@@ -445,9 +743,10 @@ body:has(.wiki-shell) {
 .admin-danger-text { color: #f87171 !important; }
 
 .admin-card-actions {
-  display: grid;
+  display: flex;
   gap: 10px;
-  justify-items: end;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .admin-empty-state {
@@ -477,6 +776,8 @@ body:has(.wiki-shell) {
 
 .admin-modal {
   width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
   display: grid;
   gap: 18px;
   border: 1px solid rgba(148, 163, 184, 0.22);
@@ -505,6 +806,35 @@ body:has(.wiki-shell) {
 
 .admin-modal-actions {
   justify-content: flex-end;
+}
+
+.admin-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.24);
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(127, 29, 29, 0.12);
+}
+
+.admin-danger-zone h3 {
+  margin: 0 0 5px;
+  color: #fecaca;
+  font-size: 15px;
+}
+
+.admin-danger-zone p {
+  margin: 0;
+  color: #b9c7d9;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-danger-zone .admin-danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .workspace-shell {
@@ -556,10 +886,16 @@ body:has(.wiki-shell) {
     radial-gradient(circle at top left, rgba(91, 75, 255, 0.16), transparent 34rem);
 }
 
+.workspace-page-header > div:first-child {
+  min-width: 0;
+}
+
 .workspace-page-header h1 {
   margin: 0;
   color: #ffffff;
   font-size: 32px;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 .workspace-page-header p {
@@ -600,6 +936,7 @@ body:has(.wiki-shell) {
   border-radius: 6px;
   background: linear-gradient(145deg, #1f2a44, #5b35d5);
   font-size: 12px;
+  object-fit: cover;
 }
 
 .workspace-tip-card {
@@ -632,16 +969,37 @@ body:has(.wiki-shell) {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+
+.workspace-title-row h1 {
+  min-width: 0;
 }
 
 .workspace-stats {
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.overview-page-body {
+  display: grid;
+  align-content: start;
+  gap: 22px;
+}
+
+.overview-page .admin-panel {
+  min-height: 0;
+}
+
+.overview-page .admin-section-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
 }
 
 .workspace-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(360px, 0.9fr);
-  gap: 18px;
+  gap: 22px;
   align-items: start;
 }
 
@@ -1310,18 +1668,32 @@ body:has(.wiki-shell) {
     margin-top: 28px;
   }
 
-  .admin-stat-grid,
-  .workspace-stats,
-  .workspace-grid,
-  .extraction-layout-grid,
+	  .admin-stat-grid,
+	  .library-op-grid,
+	  .workspace-stats,
+	  .workspace-grid,
+	  .extraction-layout-grid,
   .extraction-stats-row,
   .admin-novel-card,
   .chapter-workspace-grid,
   .chapter-filter-grid,
   .workspace-book-panel .admin-table-row,
-  .book-table .admin-table-row {
-    grid-template-columns: 1fr;
-  }
+	  .book-table .admin-table-row {
+	    grid-template-columns: 1fr;
+	  }
+
+	  .library-novel-head {
+	    display: none;
+	  }
+
+	  .admin-novel-card {
+	    gap: 16px;
+	    padding: 18px;
+	    border: 1px solid rgba(148, 163, 184, 0.14);
+	    border-radius: 14px;
+	    margin-bottom: 12px;
+	    background: rgba(8, 24, 39, 0.7);
+	  }
 
   .extraction-layout-grid {
     grid-template-areas:

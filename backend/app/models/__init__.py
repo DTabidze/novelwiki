@@ -39,6 +39,9 @@ class Novel(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
+    author = db.Column(db.String(255), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    cover_image_url = db.Column(db.Text, nullable=True)
     original_filename = db.Column(db.String(255), nullable=False)
     file_type = db.Column(db.String(20), nullable=False, default="txt")
     status = db.Column(db.String(50), nullable=False, default="ready")
@@ -68,14 +71,17 @@ class Novel(db.Model):
         return {
             "id": self.id,
             "title": self.title,
+            "author": self.author,
+            "description": self.description,
+            "cover_image_url": self.cover_image_url,
             "original_filename": self.original_filename,
             "file_type": self.file_type,
             "status": self.status,
             "error_message": self.error_message,
             "book_count": len(self.books),
             "chapter_count": len(self.chapters),
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": serialize_datetime(self.created_at),
+            "updated_at": serialize_datetime(self.updated_at),
         }
 
 
@@ -114,8 +120,8 @@ class Book(db.Model):
             "parsing_status": self.parsing_status,
             "extraction_status": self.extraction_status,
             "chapter_count": len(self.chapters),
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
+            "created_at": serialize_datetime(self.created_at),
+            "uploaded_at": serialize_datetime(self.uploaded_at),
         }
 
 

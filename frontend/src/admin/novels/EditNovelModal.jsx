@@ -1,11 +1,11 @@
 import React from "react";
 
-export default function CreateNovelModal({ onClose, onCreate }) {
-  const [title, setTitle] = React.useState("");
-  const [author, setAuthor] = React.useState("");
-  const [description, setDescription] = React.useState("");
-  const [coverImageUrl, setCoverImageUrl] = React.useState("");
-  const [status, setStatus] = React.useState("ready");
+export default function EditNovelModal({ novel, onClose, onSave }) {
+  const [title, setTitle] = React.useState(novel?.title || "");
+  const [author, setAuthor] = React.useState(novel?.author || "");
+  const [description, setDescription] = React.useState(novel?.description || "");
+  const [coverImageUrl, setCoverImageUrl] = React.useState(novel?.cover_image_url || "");
+  const [status, setStatus] = React.useState(novel?.status || "ready");
   const [isSaving, setIsSaving] = React.useState(false);
 
   async function handleSubmit(event) {
@@ -18,18 +18,13 @@ export default function CreateNovelModal({ onClose, onCreate }) {
     setIsSaving(true);
 
     try {
-      await onCreate({
+      await onSave(novel.id, {
         title: title.trim(),
         author: author.trim(),
         description: description.trim(),
         cover_image_url: coverImageUrl.trim(),
         status,
       });
-      setTitle("");
-      setAuthor("");
-      setDescription("");
-      setCoverImageUrl("");
-      setStatus("ready");
     } finally {
       setIsSaving(false);
     }
@@ -40,8 +35,8 @@ export default function CreateNovelModal({ onClose, onCreate }) {
       <form className="admin-modal" onSubmit={handleSubmit}>
         <div className="admin-modal-header">
           <div>
-            <h2>Create Novel</h2>
-            <p>Create an empty workspace. Books are uploaded inside the novel workspace.</p>
+            <h2>Edit Novel</h2>
+            <p>Update workspace profile information. Books and extracted records are unchanged.</p>
           </div>
           <button className="admin-icon-button" type="button" onClick={onClose}>
             X
@@ -94,12 +89,22 @@ export default function CreateNovelModal({ onClose, onCreate }) {
           </select>
         </label>
 
+        <section className="admin-danger-zone">
+          <div>
+            <h3>Delete Novel</h3>
+            <p>Deletion behavior is not enabled yet. We will decide later how books and extracted data should be handled.</p>
+          </div>
+          <button className="admin-danger-button" disabled type="button">
+            Delete Novel
+          </button>
+        </section>
+
         <div className="admin-modal-actions">
           <button className="admin-secondary-button" type="button" onClick={onClose}>
             Cancel
           </button>
           <button disabled={!title.trim() || isSaving} type="submit">
-            {isSaving ? "Creating..." : "Create Novel"}
+            {isSaving ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </form>
