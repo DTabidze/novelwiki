@@ -8,7 +8,6 @@ export default function ExtractionRunCard({ run }) {
 
   return (
     <article className={`extraction-run-card ${run.status}`}>
-      <div className="extraction-run-icon">{run.status.slice(0, 1).toUpperCase()}</div>
       <div className="extraction-run-main">
         <strong>{runTitle(run)}</strong>
         <span>{run.started_at ? `Started ${formatRunDate(run.started_at)}` : "Queued"}</span>
