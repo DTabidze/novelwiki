@@ -2,6 +2,17 @@
   padding-top: 20px;
 }
 
+.extraction-modal {
+  width: min(680px, calc(100vw - 48px));
+}
+
+.extraction-modal label,
+.extraction-modal select,
+.extraction-modal input {
+  min-width: 0;
+  width: 100%;
+}
+
 .extraction-stats-row {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 18px;

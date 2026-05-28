@@ -5,9 +5,28 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify, request
 from openai import AuthenticationError, RateLimitError
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 
-from app.models import Book, Chapter, ExtractionRun, ExtractionRunChapter, Novel, db, serialize_datetime, utc_now
+from app.models import (
+    Book,
+    Chapter,
+    Character,
+    CharacterItem,
+    CharacterLifeEvent,
+    CharacterMetadataProposal,
+    CharacterProgressionEvent,
+    CharacterSkill,
+    ExtractionRun,
+    ExtractionRunChapter,
+    Novel,
+    WikiEvent,
+    WikiEvidence,
+    db,
+    serialize_datetime,
+    utc_now,
+)
 from app.services.ai_extraction_service import extract_chapter_with_ai
 from app.services.chapter_parser import split_txt_into_chapters
 from app.services.extraction_service import get_extracted_data, run_placeholder_extraction
@@ -26,13 +45,16 @@ def failure(message, status=400):
 
 def decode_uploaded_text(uploaded_file):
     raw_bytes = uploaded_file.read()
+    return raw_bytes, decode_text_bytes(raw_bytes)
 
+
+def decode_text_bytes(raw_bytes):
     try:
         text = raw_bytes.decode("utf-8")
     except UnicodeDecodeError:
         text = raw_bytes.decode("utf-8-sig", errors="replace")
 
-    return raw_bytes, text
+    return text
 
 
 def save_uploaded_file(uploaded_file, original_filename):
@@ -41,6 +63,59 @@ def save_uploaded_file(uploaded_file, original_filename):
     stored_path = upload_dir / original_filename
     stored_path.write_bytes(uploaded_file)
     return stored_path
+
+
+def stored_book_filename(novel_id, book_number, original_filename):
+    return f"novel-{novel_id}-book-{book_number}-{original_filename}"
+
+
+def find_stored_book_path(novel, book):
+    if not book.source_filename:
+        return None
+
+    upload_dir = Path(current_app.instance_path) / current_app.config["UPLOAD_FOLDER"]
+    exact_path = upload_dir / stored_book_filename(novel.id, book.number, secure_filename(book.source_filename))
+
+    if exact_path.exists():
+        return exact_path
+
+    matches = sorted(upload_dir.glob(f"novel-{novel.id}-book-*-{secure_filename(book.source_filename)}"))
+    return matches[-1] if matches else None
+
+
+def book_has_extraction_or_review_data(book):
+    chapter_ids = [chapter.id for chapter in book.chapters]
+
+    if not chapter_ids:
+        return False
+
+    if ExtractionRunChapter.query.filter(ExtractionRunChapter.chapter_id.in_(chapter_ids)).first():
+        return True
+
+    if Character.query.filter(
+        Character.novel_id == book.novel_id,
+        or_(
+            Character.first_mentioned_chapter_id.in_(chapter_ids),
+            Character.first_appeared_chapter_id.in_(chapter_ids),
+            Character.first_seen_chapter_id.in_(chapter_ids),
+        ),
+    ).first():
+        return True
+
+    review_models = [
+        CharacterMetadataProposal,
+        WikiEvent,
+        WikiEvidence,
+        CharacterProgressionEvent,
+        CharacterSkill,
+        CharacterItem,
+        CharacterLifeEvent,
+    ]
+
+    return any(
+        model.query.filter(model.novel_id == book.novel_id, model.chapter_id.in_(chapter_ids)).first()
+        for model in review_models
+    )
 
 
 def aggregate_book_summary(book):
@@ -57,6 +132,37 @@ def aggregate_book_summary(book):
     }
 
     data["extracted_chapter_count"] = len(completed_chapter_ids)
+
+    latest_run_chapter = (
+        ExtractionRunChapter.query.join(Chapter)
+        .filter(Chapter.book_id == book.id)
+        .order_by(ExtractionRunChapter.updated_at.desc())
+        .first()
+    )
+    failed_run_chapter = (
+        ExtractionRunChapter.query.join(Chapter)
+        .filter(Chapter.book_id == book.id)
+        .filter(ExtractionRunChapter.status == "failed")
+        .order_by(ExtractionRunChapter.updated_at.desc())
+        .first()
+    )
+
+    data["last_extraction_status"] = latest_run_chapter.status if latest_run_chapter else None
+    data["last_extraction_at"] = (
+        serialize_datetime(
+            latest_run_chapter.finished_at
+            or latest_run_chapter.started_at
+            or latest_run_chapter.updated_at
+        )
+        if latest_run_chapter
+        else None
+    )
+    data["failed_chapter_number"] = (
+        failed_run_chapter.chapter.chapter_number
+        if failed_run_chapter and failed_run_chapter.chapter
+        else None
+    )
+    data["can_reparse"] = not book_has_extraction_or_review_data(book)
     return data
 
 
@@ -150,6 +256,35 @@ def append_chapters_to_book(novel, book, chapters):
                 character_count=len(chapter_data["content"]),
             )
         )
+
+
+def conflicting_chapter_numbers(novel, book, chapters):
+    chapter_numbers = sorted({chapter_data["chapter_number"] for chapter_data in chapters})
+
+    if not chapter_numbers:
+        return []
+
+    query = Chapter.query.filter(
+        Chapter.novel_id == novel.id,
+        Chapter.chapter_number.in_(chapter_numbers),
+    )
+
+    if book and book.id:
+        query = query.filter(Chapter.book_id != book.id)
+
+    return sorted({chapter.chapter_number for chapter in query.all()})
+
+
+def chapter_conflict_message(conflicts):
+    if not conflicts:
+        return ""
+
+    preview = ", ".join(str(number) for number in conflicts[:5])
+    suffix = "..." if len(conflicts) > 5 else ""
+    return (
+        "This source contains chapter numbers already used by another book: "
+        f"{preview}{suffix}. Check that the selected file belongs to this book."
+    )
 
 
 def empty_extraction_summary():
@@ -668,7 +803,12 @@ def upload_book(novel_id):
     if not chapters:
         return failure("No chapter text could be found in the uploaded file.")
 
-    stored_filename = f"novel-{novel.id}-book-{book_number}-{original_filename}"
+    conflicts = conflicting_chapter_numbers(novel, None, chapters)
+
+    if conflicts:
+        return failure(chapter_conflict_message(conflicts))
+
+    stored_filename = stored_book_filename(novel.id, book_number, original_filename)
     save_uploaded_file(raw_bytes, stored_filename)
 
     book = Book(
@@ -691,6 +831,126 @@ def upload_book(novel_id):
         },
         status=201,
     )
+
+
+@admin_novels_bp.patch("/novels/<int:novel_id>/books/<int:book_id>")
+def update_book(novel_id, book_id):
+    novel = Novel.query.get_or_404(novel_id)
+    book = Book.query.filter_by(id=book_id, novel_id=novel.id).first_or_404()
+    payload = request.get_json(silent=True) or {}
+    requested_number = payload.get("number", book.number)
+    title = (payload.get("title") or "").strip()
+
+    book_number = parse_book_number(requested_number, novel)
+
+    if book_number is None:
+        return failure("Book number must be a positive integer.")
+
+    existing_book = Book.query.filter(
+        Book.novel_id == novel.id,
+        Book.number == book_number,
+        Book.id != book.id,
+    ).first()
+
+    if existing_book:
+        return failure(f"Book {book_number} already exists for this novel.")
+
+    book.number = book_number
+    book.title = title or f"Book {book_number}"
+    db.session.commit()
+
+    return success({"book": aggregate_book_summary(book)})
+
+
+@admin_novels_bp.post("/novels/<int:novel_id>/books/<int:book_id>/source")
+def replace_book_source(novel_id, book_id):
+    novel = Novel.query.get_or_404(novel_id)
+    book = Book.query.filter_by(id=book_id, novel_id=novel.id).first_or_404()
+    uploaded_file = request.files.get("file")
+
+    if book_has_extraction_or_review_data(book):
+        return failure(
+            "Source replacement is disabled because this book has extracted or review-linked data."
+        )
+
+    if not uploaded_file:
+        return failure("A .txt file is required.")
+
+    original_filename = secure_filename(uploaded_file.filename or "")
+
+    if not original_filename.lower().endswith(".txt"):
+        return failure("Only .txt files are supported in this MVP.")
+
+    raw_bytes, text = decode_uploaded_text(uploaded_file)
+    chapters = split_txt_into_chapters(text)
+
+    if not chapters:
+        return failure("Could not parse chapters from this file.")
+
+    conflicts = conflicting_chapter_numbers(novel, book, chapters)
+
+    if conflicts:
+        return failure(chapter_conflict_message(conflicts))
+
+    deleted_chapter_count = len(book.chapters)
+    stored_filename = stored_book_filename(novel.id, book.number, original_filename)
+    save_uploaded_file(raw_bytes, stored_filename)
+
+    for chapter in list(book.chapters):
+        db.session.delete(chapter)
+
+    db.session.flush()
+    book.source_filename = original_filename
+    book.uploaded_at = utc_now()
+    book.parsing_status = "source_replaced"
+    book.extraction_status = "not_started"
+    db.session.commit()
+
+    return success({"book": aggregate_book_summary(book), "deleted_chapter_count": deleted_chapter_count})
+
+
+@admin_novels_bp.post("/novels/<int:novel_id>/books/<int:book_id>/reparse")
+def reparse_book(novel_id, book_id):
+    novel = Novel.query.get_or_404(novel_id)
+    book = Book.query.filter_by(id=book_id, novel_id=novel.id).first_or_404()
+
+    if book_has_extraction_or_review_data(book):
+        return failure(
+            "Reparse is disabled because this book has extracted or review-linked data."
+        )
+
+    stored_path = find_stored_book_path(novel, book)
+
+    if not stored_path:
+        return failure("No stored source file was found for this book.")
+
+    text = decode_text_bytes(stored_path.read_bytes())
+    chapters = split_txt_into_chapters(text)
+
+    if not chapters:
+        return failure("Could not parse chapters from this file.")
+
+    conflicts = conflicting_chapter_numbers(novel, book, chapters)
+
+    if conflicts:
+        return failure(chapter_conflict_message(conflicts))
+
+    for chapter in list(book.chapters):
+        db.session.delete(chapter)
+
+    db.session.flush()
+    append_chapters_to_book(novel, book, chapters)
+    book.parsing_status = "parsed"
+    book.extraction_status = "not_started"
+    book.uploaded_at = utc_now()
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return failure("Could not reparse this book because chapter numbers conflict with existing chapters.")
+
+    return success({"book": aggregate_book_summary(book), "chapter_count": len(chapters)})
 
 
 @admin_novels_bp.get("/novels/<int:novel_id>/chapters")
