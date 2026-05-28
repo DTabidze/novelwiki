@@ -1,0 +1,204 @@
+@media (max-width: 1440px) {
+  .admin-main {
+    padding: 24px;
+  }
+
+  .admin-novel-card,
+  .library-novel-head {
+    grid-template-columns: minmax(220px, 1.55fr) minmax(132px, 0.8fr) minmax(72px, 0.36fr) minmax(78px, 0.42fr) minmax(68px, 0.36fr) minmax(104px, 0.52fr) minmax(138px, auto);
+    gap: 12px;
+  }
+
+  .admin-novel-card {
+    padding-inline: 18px;
+  }
+
+  .admin-card-actions {
+    gap: 8px;
+  }
+
+  .admin-card-actions button:first-child {
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 1180px) {
+  body:has(.admin-shell),
+  body:has(.workspace-shell.single-sidebar) {
+    overflow: auto;
+  }
+
+  .admin-shell,
+  .workspace-shell {
+    min-height: 100vh;
+    height: auto;
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .admin-sidebar,
+  .workspace-sidebar {
+    position: static;
+    height: auto;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .admin-main,
+  .workspace-main {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .workspace-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .workspace-page-body,
+  .chapter-page .workspace-page-body {
+    overflow: visible;
+  }
+
+  .workspace-shell.single-sidebar {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .admin-user-card {
+    margin-top: 28px;
+  }
+
+	  .admin-stat-grid,
+	  .library-op-grid,
+	  .workspace-stats,
+	  .workspace-grid,
+	  .extraction-layout-grid,
+  .extraction-stats-row,
+  .admin-novel-card,
+  .chapter-workspace-grid,
+  .chapter-filter-grid,
+  .workspace-book-panel .admin-table-row,
+	  .book-table .admin-table-row {
+	    grid-template-columns: 1fr;
+	  }
+
+	  .library-novel-head {
+	    display: none;
+	  }
+
+	  .admin-novel-card {
+	    gap: 16px;
+	    padding: 18px;
+	    border: 1px solid rgba(148, 163, 184, 0.14);
+	    border-radius: 14px;
+	    margin-bottom: 12px;
+	    background: rgba(8, 24, 39, 0.7);
+	  }
+
+  .admin-card-actions {
+    justify-content: flex-start;
+  }
+
+  .extraction-layout-grid {
+    grid-template-areas:
+      "active"
+      "runs";
+  }
+
+  .extraction-stat-span-2,
+  .extraction-stat-span-3 {
+    grid-column: auto;
+  }
+
+  .admin-progress-cell {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-list-panel,
+  .chapter-preview-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .chapter-row-list {
+    max-height: 70vh;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-main,
+  .workspace-page-header,
+  .workspace-page-body {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .admin-page-header,
+  .workspace-page-header,
+  .workspace-hero,
+  .admin-header-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-header-actions input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-list-row {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-list-row-meta {
+    justify-content: flex-start;
+  }
+
+  .chapter-list-row em {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .chapter-preview-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .extraction-summary-inline > div,
+  .extraction-stream-row {
+    grid-template-columns: 1fr;
+  }
+
+  .extraction-operation-header,
+  .extraction-operation-split,
+  .extraction-progress-mainline {
+    grid-template-columns: 1fr;
+  }
+
+  .extraction-run-title-line {
+    display: grid;
+  }
+
+  .extraction-stream-row em {
+    text-align: left;
+  }
+
+  .extraction-stream-records,
+  .extraction-stream-warnings,
+  .extraction-stream-duration {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .extraction-time-stack {
+    justify-items: start;
+    text-align: left;
+  }
+}

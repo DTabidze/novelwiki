@@ -1,0 +1,13 @@
+.admin-shell,
+.workspace-shell.single-sidebar {
+  overflow: hidden;
+}
+
+body:has(.admin-shell),
+body:has(.workspace-shell.single-sidebar) {
+  overflow: hidden;
+}
+
+body:has(.wiki-shell) {
+  overflow: auto;
+}
