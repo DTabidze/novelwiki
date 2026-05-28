@@ -74,6 +74,9 @@
 
 	  .admin-stat-grid,
 	  .library-op-grid,
+  .overview-summary-grid,
+  .overview-main-grid,
+  .overview-next-grid,
 	  .workspace-stats,
 	  .workspace-grid,
 	  .extraction-layout-grid,
@@ -157,6 +160,7 @@
   .admin-page-header,
   .workspace-page-header,
   .workspace-hero,
+  .overview-hero,
   .admin-header-actions {
     display: grid;
     grid-template-columns: 1fr;
@@ -172,6 +176,20 @@
   }
 
   .books-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-activity-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .overview-activity-row time,
+  .overview-activity-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .overview-action-grid {
     grid-template-columns: 1fr;
   }
 

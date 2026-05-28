@@ -5,6 +5,7 @@ import BooksPage from "../books/BooksPage.jsx";
 import ChaptersPage from "../chapters/ChaptersPage.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import ExtractionPage from "../extraction/ExtractionPage.jsx";
+import EditNovelModal from "../novels/EditNovelModal.jsx";
 import WorkspaceSidebar from "./WorkspaceSidebar.jsx";
 import NovelWorkspaceOverview from "./NovelWorkspaceOverview.jsx";
 
@@ -28,6 +29,7 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
   const [extractingChapterId, setExtractingChapterId] = React.useState(null);
   const [isRunningExtraction, setIsRunningExtraction] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isNovelSettingsOpen, setIsNovelSettingsOpen] = React.useState(false);
   const [novel, setNovel] = React.useState(null);
 
   function recordsForChapter(reviewData, chapterId) {
@@ -106,6 +108,23 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
       return data;
     } catch (error) {
       throw error;
+    }
+  }
+
+  async function updateNovel(novelId, payload) {
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setNovel(data.novel);
+      setIsNovelSettingsOpen(false);
+      await loadWorkspace({ showLoading: false });
+      return data.novel;
+    } catch (error) {
+      setMessage(error.message);
+      return null;
     }
   }
 
@@ -249,6 +268,7 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
                 extractedData={extractedData}
                 extractionRuns={extractionRuns}
                 novel={novel}
+                onOpenNovelSettings={() => setIsNovelSettingsOpen(true)}
               />
             }
           />
@@ -299,6 +319,13 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
           />
           <Route path="*" element={<WorkspacePlaceholder title="Workspace Section" message="This section is not implemented yet." />} />
         </Routes>
+        {isNovelSettingsOpen && novel ? (
+          <EditNovelModal
+            novel={novel}
+            onClose={() => setIsNovelSettingsOpen(false)}
+            onSave={updateNovel}
+          />
+        ) : null}
       </section>
     </main>
   );
