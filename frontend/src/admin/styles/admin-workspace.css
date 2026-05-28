@@ -1,0 +1,27 @@
+.workspace-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.overview-page-body {
+  display: grid;
+  align-content: start;
+  gap: 22px;
+}
+
+.overview-page .admin-panel {
+  min-height: 0;
+}
+
+.overview-page .admin-section-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(360px, 0.9fr);
+  gap: 22px;
+  align-items: start;
+}
+

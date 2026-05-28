@@ -1,0 +1,321 @@
+.admin-shell {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  background:
+    radial-gradient(circle at top left, rgba(91, 75, 255, 0.18), transparent 34rem),
+    #06111d;
+  color: #edf4ff;
+  font-family: var(--font-body);
+}
+
+.admin-sidebar,
+.workspace-sidebar {
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid rgba(148, 163, 184, 0.18);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(91, 75, 255, 0.12), transparent 18rem),
+    linear-gradient(180deg, #06111d 0%, #081827 100%);
+  padding: 22px 18px;
+  position: sticky;
+  top: 0;
+}
+
+.admin-brand,
+.admin-user-card,
+.workspace-novel-switcher {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-brand {
+  padding-bottom: 28px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.admin-brand strong,
+.admin-user-card strong,
+.workspace-novel-switcher strong {
+  display: block;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.admin-brand span,
+.admin-user-card span,
+.workspace-novel-switcher span {
+  color: #91a4bb;
+  font-size: 12px;
+}
+
+.admin-brand-mark,
+.admin-user-avatar,
+.admin-cover-small,
+.admin-cover-placeholder,
+.admin-stat-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.admin-brand-mark {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(199, 210, 254, 0.5);
+  border-radius: 10px;
+}
+
+.admin-user-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6d5dfc, #8b5cf6);
+}
+
+.admin-nav,
+.workspace-nav {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.admin-nav small {
+  margin: 16px 8px 4px;
+  color: #7f92aa;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-nav a,
+.workspace-nav a {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 9px;
+  padding: 0 12px;
+  color: #d9e5f4;
+  text-decoration: none;
+  font-weight: 650;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.admin-nav a span,
+.workspace-nav a span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 7px;
+  color: #9fb3cc;
+  font-size: 12px;
+}
+
+.admin-nav a.active,
+.workspace-nav a.active:not(.workspace-back-link) {
+  background: linear-gradient(135deg, rgba(94, 69, 255, 0.88), rgba(59, 130, 246, 0.42));
+  box-shadow: inset 0 0 0 1px rgba(199, 210, 254, 0.12);
+  color: #ffffff;
+}
+
+.workspace-nav a:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.admin-user-card {
+  margin-top: 28px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  padding-top: 20px;
+}
+
+.admin-main {
+  min-width: 0;
+  height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+.admin-page-header,
+.workspace-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.admin-page-header.compact {
+  margin-bottom: 18px;
+}
+
+.admin-page-header h1,
+.workspace-hero h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 32px;
+  letter-spacing: 0;
+}
+
+.admin-page-header p,
+.workspace-hero p,
+.admin-muted {
+  color: #aab8ca;
+}
+
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-header-actions input {
+  min-width: 300px;
+}
+
+
+.workspace-shell {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 0;
+  margin: -32px;
+}
+
+.workspace-shell.single-sidebar {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(91, 75, 255, 0.18), transparent 34rem),
+    #06111d;
+  color: #edf4ff;
+}
+
+.workspace-sidebar {
+  height: 100vh;
+  overflow-y: auto;
+  padding-top: 28px;
+}
+
+.workspace-main {
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+  padding: 0;
+}
+
+.workspace-page {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  padding: 32px 32px 18px;
+  background:
+    linear-gradient(180deg, rgba(6, 17, 29, 0.98), rgba(6, 17, 29, 0.92)),
+    radial-gradient(circle at top left, rgba(91, 75, 255, 0.16), transparent 34rem);
+}
+
+.workspace-page-header > div:first-child {
+  min-width: 0;
+}
+
+.workspace-page-header h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 32px;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.workspace-page-header p {
+  color: #aab8ca;
+}
+
+.workspace-page-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 32px 32px;
+}
+
+.workspace-novel-switcher {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.52);
+  min-width: 0;
+}
+
+.workspace-novel-switcher > div:last-child {
+  min-width: 0;
+}
+
+.workspace-novel-switcher strong {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.admin-cover-small {
+  width: 42px;
+  height: 54px;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #1f2a44, #5b35d5);
+  font-size: 12px;
+  object-fit: cover;
+}
+
+.workspace-tip-card {
+  margin-top: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.workspace-nav-group {
+  display: grid;
+  gap: 7px;
+}
+
+.workspace-nav-group small {
+  margin: 16px 8px 2px;
+  color: #7f92aa;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-tip-card p {
+  color: #9aacbf;
+}
+
+.workspace-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.workspace-title-row h1 {
+  min-width: 0;
+}
