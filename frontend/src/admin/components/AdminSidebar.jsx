@@ -1,12 +1,13 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
+import { FileText, LayoutDashboard, Settings, Users, BookOpen } from "lucide-react";
 
 const globalLinks = [
-  ["Dashboard", "/admin"],
-  ["Novels", "/admin/novels"],
-  ["Users", "/admin/users"],
-  ["System Logs", "/admin/system-logs"],
-  ["Settings", "/admin/settings"],
+  { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
+  { label: "Novels", path: "/admin/novels", icon: BookOpen },
+  { label: "Users", path: "/admin/users", icon: Users },
+  { label: "System Logs", path: "/admin/system-logs", icon: FileText },
+  { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
 export default function AdminSidebar() {
@@ -22,17 +23,21 @@ export default function AdminSidebar() {
 
       <nav className="admin-nav">
         <small>Main</small>
-        {globalLinks.slice(0, 2).map(([label, path]) => (
+        {globalLinks.slice(0, 2).map(({ label, path, icon: Icon }) => (
           <NavLink end={path === "/admin"} key={path} to={path}>
-            <span>{label.slice(0, 1)}</span>
+            <span>
+              <Icon aria-hidden="true" size={17} strokeWidth={1.9} />
+            </span>
             {label}
           </NavLink>
         ))}
 
         <small>System</small>
-        {globalLinks.slice(2).map(([label, path]) => (
+        {globalLinks.slice(2).map(({ label, path, icon: Icon }) => (
           <NavLink key={path} to={path}>
-            <span>{label.slice(0, 1)}</span>
+            <span>
+              <Icon aria-hidden="true" size={17} strokeWidth={1.9} />
+            </span>
             {label}
           </NavLink>
         ))}

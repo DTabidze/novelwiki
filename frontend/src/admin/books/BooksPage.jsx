@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import { BookOpen, CheckCircle2, FileCheck2, Files } from "lucide-react";
 import EmptyState from "../components/EmptyState.jsx";
 import StatCard from "../components/StatCard.jsx";
@@ -17,6 +18,7 @@ export default function BooksPage({
   onReplaceBookSource,
   onReparseBook,
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
   const [editingBook, setEditingBook] = React.useState(null);
   const [replacingBook, setReplacingBook] = React.useState(null);
@@ -36,6 +38,7 @@ export default function BooksPage({
   async function handleUpload(formData) {
     const data = await onUploadBook(formData);
     setIsUploadOpen(false);
+    setSearchParams({});
     setToast({
       tone: "success",
       message: `Book uploaded and parsed successfully. ${data.chapter_count} chapters created.`,
@@ -68,6 +71,12 @@ export default function BooksPage({
       message: `Book reparsed successfully. ${data.chapter_count} chapters created.`,
     });
   }
+
+  React.useEffect(() => {
+    if (searchParams.get("upload") === "1") {
+      setIsUploadOpen(true);
+    }
+  }, [searchParams]);
 
   React.useEffect(() => {
     if (!toast) {
@@ -133,8 +142,8 @@ export default function BooksPage({
 
           {books.length === 0 ? (
             <EmptyState
-              title="No books uploaded"
-              message="Upload a source text file to parse chapters into this novel workspace."
+          title="No books uploaded"
+          message="Upload a source text file to parse chapters into this novel workspace."
               action={<button type="button" onClick={() => setIsUploadOpen(true)}>Upload Book</button>}
             />
           ) : (
@@ -152,7 +161,10 @@ export default function BooksPage({
       {isUploadOpen ? (
         <BookUploadModal
           nextNumber={nextNumber}
-          onClose={() => setIsUploadOpen(false)}
+          onClose={() => {
+            setIsUploadOpen(false);
+            setSearchParams({});
+          }}
           onUpload={handleUpload}
         />
       ) : null}

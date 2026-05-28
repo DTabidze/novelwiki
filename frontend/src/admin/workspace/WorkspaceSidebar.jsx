@@ -1,31 +1,46 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
+import {
+  ArrowLeft,
+  BookMarked,
+  BookOpen,
+  ClipboardCheck,
+  Files,
+  LayoutDashboard,
+  Package,
+  ScanSearch,
+  Settings,
+  Sparkles,
+  TrendingUp,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
 
 const workspaceGroups = [
   [
     "Core",
     [
-      ["Overview", ""],
-      ["Books", "books"],
-      ["Chapters", "chapters"],
-      ["Extraction", "extraction"],
-      ["Review Queue", "review"],
+      { label: "Overview", path: "", icon: LayoutDashboard },
+      { label: "Books", path: "books", icon: BookOpen },
+      { label: "Chapters", path: "chapters", icon: Files },
+      { label: "Extraction", path: "extraction", icon: ScanSearch },
+      { label: "Review Queue", path: "review", icon: ClipboardCheck },
     ],
   ],
   [
     "Wiki Data",
     [
-      ["Characters", "characters"],
-      ["Skills", "skills"],
-      ["Items", "items"],
-      ["Progression", "progression"],
+      { label: "Characters", path: "characters", icon: Users },
+      { label: "Skills", path: "skills", icon: Sparkles },
+      { label: "Items", path: "items", icon: Package },
+      { label: "Progression", path: "progression", icon: TrendingUp },
     ],
   ],
   [
     "System",
     [
-      ["Warnings", "warnings"],
-      ["Settings", "settings"],
+      { label: "Warnings", path: "warnings", icon: TriangleAlert },
+      { label: "Settings", path: "settings", icon: Settings },
     ],
   ],
 ];
@@ -37,7 +52,9 @@ export default function WorkspaceSidebar({ novel }) {
         {novel?.cover_image_url ? (
           <img className="admin-cover-small" src={novel.cover_image_url} alt="" />
         ) : (
-          <div className="admin-cover-small">{novel?.title?.slice(0, 2) || "NW"}</div>
+          <div className="admin-cover-small">
+            <BookMarked aria-hidden="true" size={18} strokeWidth={1.9} />
+          </div>
         )}
         <div>
           <span>Novel Workspace</span>
@@ -47,15 +64,19 @@ export default function WorkspaceSidebar({ novel }) {
 
       <nav className="workspace-nav">
         <NavLink className="workspace-back-link" to="/admin/novels">
-          <span>B</span>
+          <span>
+            <ArrowLeft aria-hidden="true" size={17} strokeWidth={1.9} />
+          </span>
           Back to Novels
         </NavLink>
         {workspaceGroups.map(([groupLabel, links]) => (
           <div className="workspace-nav-group" key={groupLabel}>
             <small>{groupLabel}</small>
-            {links.map(([label, path]) => (
+            {links.map(({ label, path, icon: Icon }) => (
               <NavLink end={path === ""} key={label} to={path || "."}>
-                <span>{label.slice(0, 1)}</span>
+                <span>
+                  <Icon aria-hidden="true" size={17} strokeWidth={1.9} />
+                </span>
                 {label}
               </NavLink>
             ))}

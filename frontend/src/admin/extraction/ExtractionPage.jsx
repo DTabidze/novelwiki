@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import ActiveExtractionProgress from "./ActiveExtractionProgress.jsx";
 import ExtractionRunsPanel from "./ExtractionRunsPanel.jsx";
 import ExtractionStatsRow from "./ExtractionStatsRow.jsx";
@@ -22,6 +23,7 @@ export default function ExtractionPage({
   onStartExtraction,
   onStopExtraction,
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const activeRun = latestRunWithStatus(extractionRuns, "running");
   const focusRun = activeRun || extractionRuns[0] || null;
@@ -39,6 +41,17 @@ export default function ExtractionPage({
       source_run_id: run.id,
     });
   }
+
+  function closeNewExtractionModal() {
+    setIsModalOpen(false);
+    setSearchParams({});
+  }
+
+  React.useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setIsModalOpen(true);
+    }
+  }, [searchParams]);
 
   return (
     <div className="workspace-page extraction-page">
@@ -77,7 +90,7 @@ export default function ExtractionPage({
         <NewExtractionModal
           books={books}
           chapters={chapters}
-          onClose={() => setIsModalOpen(false)}
+          onClose={closeNewExtractionModal}
           onStart={onStartExtraction}
         />
       ) : null}

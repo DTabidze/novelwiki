@@ -1,13 +1,179 @@
-.admin-shell input,
+.admin-shell,
+.workspace-shell {
+  color-scheme: dark;
+}
+
+.admin-form-row {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-form-label,
+.admin-shell label,
+.workspace-shell label {
+  color: #95a8bf;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-input,
+.admin-select,
+.admin-textarea,
+.admin-file-input,
+.admin-shell input:not([type="checkbox"]):not([type="radio"]),
 .admin-shell select,
-.admin-shell textarea {
-  border-color: rgba(148, 163, 184, 0.25);
+.admin-shell textarea,
+.workspace-shell input:not([type="checkbox"]):not([type="radio"]),
+.workspace-shell select,
+.workspace-shell textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: rgba(8, 24, 39, 0.94);
+  color: #e6edf7;
+  font: inherit;
+  line-height: 1.25;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+.admin-select,
+.admin-shell select,
+.workspace-shell select {
+  appearance: none;
+  padding-right: 36px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #94a3b8 50%),
+    linear-gradient(135deg, #94a3b8 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px, 5px 5px;
+}
+
+.admin-shell select option,
+.workspace-shell select option {
   background: #081827;
   color: #e6edf7;
 }
 
-.admin-shell input::placeholder {
+.admin-textarea,
+.admin-shell textarea,
+.workspace-shell textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.admin-file-input,
+.admin-shell input[type="file"],
+.workspace-shell input[type="file"] {
+  padding: 8px;
+}
+
+.admin-file-input::file-selector-button,
+.admin-shell input[type="file"]::file-selector-button,
+.workspace-shell input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  border: 1px solid rgba(124, 102, 255, 0.58);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: rgba(79, 70, 229, 0.28);
+  color: #dbe7ff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.admin-input::placeholder,
+.admin-textarea::placeholder,
+.admin-shell input::placeholder,
+.admin-shell textarea::placeholder,
+.workspace-shell input::placeholder,
+.workspace-shell textarea::placeholder {
   color: #74859a;
+}
+
+.admin-input:hover:not(:disabled),
+.admin-select:hover:not(:disabled),
+.admin-textarea:hover:not(:disabled),
+.admin-file-input:hover:not(:disabled),
+.admin-shell input:hover:not(:disabled):not([type="checkbox"]):not([type="radio"]),
+.admin-shell select:hover:not(:disabled),
+.admin-shell textarea:hover:not(:disabled),
+.workspace-shell input:hover:not(:disabled):not([type="checkbox"]):not([type="radio"]),
+.workspace-shell select:hover:not(:disabled),
+.workspace-shell textarea:hover:not(:disabled) {
+  border-color: rgba(148, 163, 184, 0.42);
+  background-color: rgba(10, 29, 47, 0.96);
+}
+
+.admin-file-input:hover:not(:disabled)::file-selector-button,
+.admin-shell input[type="file"]:hover:not(:disabled)::file-selector-button,
+.workspace-shell input[type="file"]:hover:not(:disabled)::file-selector-button {
+  border-color: rgba(167, 139, 250, 0.76);
+  background: rgba(99, 102, 241, 0.38);
+}
+
+.admin-input:focus,
+.admin-input:focus-visible,
+.admin-select:focus,
+.admin-select:focus-visible,
+.admin-textarea:focus,
+.admin-textarea:focus-visible,
+.admin-file-input:focus,
+.admin-file-input:focus-visible,
+.admin-shell input:focus:not([type="checkbox"]):not([type="radio"]),
+.admin-shell input:focus-visible:not([type="checkbox"]):not([type="radio"]),
+.admin-shell select:focus,
+.admin-shell select:focus-visible,
+.admin-shell textarea:focus,
+.admin-shell textarea:focus-visible,
+.workspace-shell input:focus:not([type="checkbox"]):not([type="radio"]),
+.workspace-shell input:focus-visible:not([type="checkbox"]):not([type="radio"]),
+.workspace-shell select:focus,
+.workspace-shell select:focus-visible,
+.workspace-shell textarea:focus,
+.workspace-shell textarea:focus-visible {
+  border-color: rgba(96, 165, 250, 0.78);
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.admin-input:disabled,
+.admin-select:disabled,
+.admin-textarea:disabled,
+.admin-file-input:disabled,
+.admin-shell input:disabled:not([type="checkbox"]):not([type="radio"]),
+.admin-shell select:disabled,
+.admin-shell textarea:disabled,
+.workspace-shell input:disabled:not([type="checkbox"]):not([type="radio"]),
+.workspace-shell select:disabled,
+.workspace-shell textarea:disabled {
+  cursor: not-allowed;
+  border-color: rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.68);
+  color: #91a4bb;
+  opacity: 0.72;
 }
 
 .admin-shell button {

@@ -118,6 +118,11 @@
   font-size: 12px;
 }
 
+.admin-nav a span svg,
+.workspace-nav a span svg {
+  display: block;
+}
+
 .admin-nav a.active,
 .workspace-nav a.active:not(.workspace-back-link) {
   background: linear-gradient(135deg, rgba(94, 69, 255, 0.88), rgba(59, 130, 246, 0.42));
@@ -125,8 +130,28 @@
   color: #ffffff;
 }
 
+.admin-nav a:hover,
 .workspace-nav a:hover {
   background: rgba(148, 163, 184, 0.08);
+}
+
+.admin-nav a.active span,
+.workspace-nav a.active:not(.workspace-back-link) span {
+  border-color: rgba(199, 210, 254, 0.35);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-nav a:hover span,
+.workspace-nav a:hover span {
+  border-color: rgba(148, 163, 184, 0.42);
+  color: #dbe7f6;
+}
+
+.admin-nav a.active:hover span,
+.workspace-nav a.active:hover:not(.workspace-back-link) span {
+  border-color: rgba(199, 210, 254, 0.35);
+  color: #ffffff;
 }
 
 .admin-user-card {
