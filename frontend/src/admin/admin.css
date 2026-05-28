@@ -152,6 +152,7 @@ body:has(.wiki-shell) {
 .admin-main {
   min-width: 0;
   height: 100vh;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 32px;
 }
@@ -282,6 +283,10 @@ body:has(.wiki-shell) {
   border-radius: 999px;
 }
 
+.admin-stat-icon svg {
+  display: block;
+}
+
 .admin-stat-icon.purple { background: rgba(124, 58, 237, 0.42); }
 .admin-stat-icon.blue { background: rgba(14, 165, 233, 0.28); }
 .admin-stat-icon.green { background: rgba(34, 197, 94, 0.3); }
@@ -327,14 +332,14 @@ body:has(.wiki-shell) {
 
 .admin-novel-card {
   display: grid;
-  grid-template-columns: minmax(340px, 1.9fr) minmax(190px, 0.9fr) minmax(110px, 0.52fr) minmax(120px, 0.58fr) minmax(100px, 0.48fr) minmax(150px, 0.72fr) 210px;
-  gap: 24px;
+  grid-template-columns: minmax(240px, 1.7fr) minmax(150px, 0.8fr) minmax(80px, 0.42fr) minmax(86px, 0.45fr) minmax(76px, 0.4fr) minmax(112px, 0.55fr) minmax(158px, auto);
+  gap: 16px;
   align-items: center;
   border-radius: 0;
   border-width: 1px 0 0;
   box-shadow: none;
   min-height: 140px;
-  padding: 24px;
+  padding: 22px 20px;
   background: rgba(8, 24, 39, 0.24);
   transition: background 140ms ease, box-shadow 140ms ease;
 }
@@ -528,9 +533,9 @@ body:has(.wiki-shell) {
 
 .library-novel-head {
   display: grid;
-  grid-template-columns: minmax(340px, 1.9fr) minmax(190px, 0.9fr) minmax(110px, 0.52fr) minmax(120px, 0.58fr) minmax(100px, 0.48fr) minmax(150px, 0.72fr) 210px;
-  gap: 24px;
-  padding: 16px 24px;
+  grid-template-columns: minmax(240px, 1.7fr) minmax(150px, 0.8fr) minmax(80px, 0.42fr) minmax(86px, 0.45fr) minmax(76px, 0.4fr) minmax(112px, 0.55fr) minmax(158px, auto);
+  gap: 16px;
+  padding: 16px 20px;
   background: rgba(15, 23, 42, 0.52);
   color: #91a4bb;
   font-size: 12px;
@@ -669,6 +674,7 @@ body:has(.wiki-shell) {
   display: grid;
   gap: 4px;
   align-content: center;
+  min-width: 0;
 }
 
 .library-count-cell strong,
@@ -747,6 +753,11 @@ body:has(.wiki-shell) {
   gap: 10px;
   justify-content: flex-end;
   align-items: center;
+  min-width: 0;
+}
+
+.admin-card-actions > button:first-child {
+  min-width: 0;
 }
 
 .admin-empty-state {
@@ -1226,7 +1237,7 @@ body:has(.wiki-shell) {
 }
 
 .extraction-stats-row {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 18px;
   margin-bottom: 18px;
 }
@@ -1240,11 +1251,11 @@ body:has(.wiki-shell) {
 }
 
 .extraction-stat-span-2 {
-  grid-column: span 2;
+  grid-column: auto;
 }
 
 .extraction-stat-span-3 {
-  grid-column: span 3;
+  grid-column: auto;
 }
 
 .extraction-stats-row .admin-stat-card {
@@ -1257,9 +1268,9 @@ body:has(.wiki-shell) {
 
 .extraction-layout-grid {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-template-areas:
-    "active active active active active active active active runs runs runs runs";
+    "active active active runs runs";
   gap: 18px;
   align-items: stretch;
 }
@@ -1287,6 +1298,7 @@ body:has(.wiki-shell) {
 .extraction-runs-panel {
   grid-area: runs;
   min-width: 0;
+  container-type: inline-size;
 }
 
 .extraction-operation-header {
@@ -1305,13 +1317,13 @@ body:has(.wiki-shell) {
 .extraction-book-icon {
   width: 24px;
   height: 24px;
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-right: 10px;
   border: 1px solid rgba(56, 189, 248, 0.72);
   border-radius: 6px;
   color: #38bdf8;
-  font-size: 12px;
   vertical-align: 2px;
 }
 
@@ -1417,19 +1429,24 @@ body:has(.wiki-shell) {
 }
 
 .extraction-summary-inline p {
+  display: grid;
+  grid-template-rows: minmax(34px, auto) auto;
+  align-content: start;
   margin: 0;
 }
 
 .extraction-summary-inline small {
   display: block;
+  min-height: 34px;
   color: #9aacbf;
+  line-height: 1.25;
 }
 
 .extraction-summary-inline strong {
   display: block;
   color: #ffffff;
   font-size: 20px;
-  margin-top: 6px;
+  margin-top: 2px;
 }
 
 .extraction-recent-stream {
@@ -1451,8 +1468,8 @@ body:has(.wiki-shell) {
 
 .extraction-stream-row {
   display: grid;
-  grid-template-columns: 34px 58px minmax(220px, 1fr) 150px 150px 190px 74px;
-  gap: 14px;
+  grid-template-columns: 30px 48px minmax(0, 1fr) 112px 128px 72px;
+  gap: 12px;
   align-items: center;
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 10px;
@@ -1474,19 +1491,51 @@ body:has(.wiki-shell) {
   font-weight: 900;
 }
 
-.extraction-stream-row.completed .extraction-stream-icon {
+.extraction-status-icon svg {
+  display: block;
+}
+
+.animate-spin {
+  animation: admin-spin 1s linear infinite;
+}
+
+@keyframes admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.extraction-stream-row.pending .extraction-stream-icon,
+.extraction-status-icon.pending,
+.extraction-status-icon.queued {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+}
+
+.extraction-stream-row.completed .extraction-stream-icon,
+.extraction-status-icon.completed {
   background: rgba(34, 197, 94, 0.22);
   color: #86efac;
 }
 
-.extraction-stream-row.processing .extraction-stream-icon {
+.extraction-stream-row.processing .extraction-stream-icon,
+.extraction-status-icon.processing,
+.extraction-status-icon.running {
   background: rgba(59, 130, 246, 0.22);
   color: #93c5fd;
 }
 
-.extraction-stream-row.failed .extraction-stream-icon {
+.extraction-stream-row.failed .extraction-stream-icon,
+.extraction-status-icon.failed {
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
+}
+
+.extraction-stream-row.skipped .extraction-stream-icon,
+.extraction-status-icon.skipped,
+.extraction-status-icon.cancelled {
+  background: rgba(148, 163, 184, 0.14);
+  color: #94a3b8;
 }
 
 .extraction-stream-number {
@@ -1513,15 +1562,11 @@ body:has(.wiki-shell) {
   white-space: nowrap;
 }
 
-.extraction-stream-row .admin-status-badge {
-  justify-self: center;
-}
-
 .extraction-stream-records,
 .extraction-stream-warnings,
 .extraction-stream-duration {
   border-left: 1px solid rgba(148, 163, 184, 0.18);
-  padding-left: 14px;
+  padding-left: 12px;
 }
 
 .extraction-stream-records {
@@ -1546,73 +1591,173 @@ body:has(.wiki-shell) {
 
 .extraction-run-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .extraction-run-card {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) minmax(160px, 0.55fr) auto;
-  gap: 12px;
-  align-items: center;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-left-color: rgba(59, 130, 246, 0.55);
+  gap: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
   border-radius: 9px;
-  padding: 12px;
-  background: rgba(2, 6, 23, 0.22);
+  padding: 11px 13px;
+  background: rgba(2, 6, 23, 0.18);
 }
 
-.extraction-run-card.completed { border-left-color: rgba(34, 197, 94, 0.65); }
-.extraction-run-card.failed { border-left-color: rgba(239, 68, 68, 0.78); }
-.extraction-run-card.queued { border-left-color: rgba(245, 158, 11, 0.7); }
-
-.extraction-run-icon {
+.extraction-run-header {
   display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: rgba(124, 102, 255, 0.28);
-  color: #ddd6fe;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.extraction-run-icon {
-  width: 30px;
-  height: 30px;
-}
-
-.extraction-run-card strong,
-.extraction-run-card span,
-.extraction-run-card small {
-  display: block;
-}
-
-.extraction-run-main {
+  grid-template-columns: minmax(0, 1fr) max-content 28px;
+  gap: 8px;
+  align-items: center;
   min-width: 0;
 }
 
-.extraction-run-main strong {
+.extraction-run-header strong {
+  min-width: 0;
   overflow: hidden;
   color: #ffffff;
+  font-size: 15px;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.extraction-run-card span,
-.extraction-run-card small {
+.extraction-run-header span {
   color: #9aacbf;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-shell button.extraction-run-menu,
+.workspace-shell button.extraction-run-menu {
+  justify-self: end;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  border-color: transparent;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: #9aacbf;
+  box-shadow: none;
+}
+
+.admin-shell button.extraction-run-menu:hover,
+.workspace-shell button.extraction-run-menu:hover {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(148, 163, 184, 0.08);
+  transform: none;
+}
+
+.extraction-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  color: #aab8ca;
   font-size: 12px;
 }
 
-.extraction-run-progress {
-  display: grid;
-  gap: 7px;
+.extraction-run-meta > * + *::before {
+  content: "•";
+  margin-right: 10px;
+  color: #64748b;
 }
 
-.extraction-run-counts {
-  display: grid;
-  gap: 4px;
-  text-align: right;
-  white-space: nowrap;
+.extraction-run-meta b {
+  color: #93c5fd;
+  font-weight: 850;
+  text-transform: capitalize;
+}
+
+.extraction-run-card.completed .extraction-run-meta b {
+  color: #4ade80;
+}
+
+.extraction-run-card.failed .extraction-run-meta b {
+  color: #f87171;
+}
+
+.extraction-run-card.queued .extraction-run-meta b {
+  color: #f59e0b;
+}
+
+.extraction-run-card.cancelled .extraction-run-meta b,
+.extraction-run-card.skipped .extraction-run-meta b {
+  color: #94a3b8;
+}
+
+.extraction-run-meta .has-warnings {
+  color: #f59e0b;
+  font-weight: 750;
+}
+
+.extraction-run-error {
+  display: block;
+  font-size: 12px;
+}
+
+.extraction-run-bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.extraction-run-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #60a5fa, #8b5cf6);
+}
+
+.extraction-run-card.completed .extraction-run-bar span {
+  background: linear-gradient(90deg, #22c55e, #14b8a6);
+}
+
+.extraction-run-card.failed .extraction-run-bar span {
+  background: linear-gradient(90deg, #f97316, #ef4444);
+}
+
+.extraction-run-card.queued .extraction-run-bar span {
+  background: linear-gradient(90deg, #f59e0b, #facc15);
+}
+
+.extraction-run-card.cancelled .extraction-run-bar span,
+.extraction-run-card.skipped .extraction-run-bar span {
+  background: linear-gradient(90deg, #64748b, #94a3b8);
+}
+
+@container (max-width: 430px) {
+  .extraction-run-card {
+    gap: 10px;
+  }
+
+  .extraction-run-header {
+    grid-template-columns: minmax(0, 1fr) max-content 28px;
+    grid-template-areas: "title time menu";
+    gap: 8px;
+  }
+
+  .extraction-run-header strong {
+    grid-area: title;
+  }
+
+  .extraction-run-header span {
+    grid-area: time;
+  }
+
+  .extraction-run-menu {
+    grid-area: menu;
+  }
+
+  .extraction-run-meta {
+    gap: 5px 10px;
+  }
+
+  .extraction-run-meta > * + *::before {
+    content: none;
+  }
 }
 
 .pending-type-grid span {
@@ -1622,6 +1767,30 @@ body:has(.wiki-shell) {
   border-radius: 8px;
   padding: 12px;
   color: #b7c5d8;
+}
+
+@media (max-width: 1440px) {
+  .admin-main {
+    padding: 24px;
+  }
+
+  .admin-novel-card,
+  .library-novel-head {
+    grid-template-columns: minmax(220px, 1.55fr) minmax(132px, 0.8fr) minmax(72px, 0.36fr) minmax(78px, 0.42fr) minmax(68px, 0.36fr) minmax(104px, 0.52fr) minmax(138px, auto);
+    gap: 12px;
+  }
+
+  .admin-novel-card {
+    padding-inline: 18px;
+  }
+
+  .admin-card-actions {
+    gap: 8px;
+  }
+
+  .admin-card-actions button:first-child {
+    padding-inline: 12px;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -1664,6 +1833,12 @@ body:has(.wiki-shell) {
     overflow: visible;
   }
 
+  .workspace-shell.single-sidebar {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .admin-user-card {
     margin-top: 28px;
   }
@@ -1695,6 +1870,10 @@ body:has(.wiki-shell) {
 	    background: rgba(8, 24, 39, 0.7);
 	  }
 
+  .admin-card-actions {
+    justify-content: flex-start;
+  }
+
   .extraction-layout-grid {
     grid-template-areas:
       "active"
@@ -1714,19 +1893,6 @@ body:has(.wiki-shell) {
   .chapter-preview-panel {
     height: auto;
     overflow: visible;
-  }
-
-  .extraction-run-card {
-    grid-template-columns: 34px minmax(0, 1fr);
-  }
-
-  .extraction-run-counts {
-    text-align: left;
-  }
-
-  .extraction-run-progress,
-  .extraction-run-counts {
-    grid-column: 2;
   }
 
   .chapter-row-list {

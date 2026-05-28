@@ -1,9 +1,11 @@
 import React from "react";
 
-export default function StatCard({ label, value, detail, tone = "blue" }) {
+export default function StatCard({ icon: Icon, label, value, detail, tone = "blue" }) {
   return (
     <article className="admin-stat-card">
-      <div className={`admin-stat-icon ${tone}`}>{label.slice(0, 1)}</div>
+      <div className={`admin-stat-icon ${tone}`}>
+        {Icon ? <Icon aria-hidden="true" size={22} strokeWidth={1.8} /> : label.slice(0, 1)}
+      </div>
       <div>
         <strong>{value}</strong>
         <span>{label}</span>

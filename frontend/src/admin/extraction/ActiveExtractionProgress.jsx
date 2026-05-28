@@ -1,6 +1,8 @@
 import React from "react";
+import { BookOpen } from "lucide-react";
 import ProgressBar from "../components/ProgressBar.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
+import ExtractionStatusIcon from "./ExtractionStatusIcon.jsx";
 import { formatRunDate, runProgress, runTitle, statusTone } from "./extractionUtils.js";
 
 function summaryValue(run, key) {
@@ -61,7 +63,12 @@ function ExtractionRunHeader({ isActive, run }) {
     <div className="extraction-operation-header">
       <div className="extraction-run-title-line">
         <div>
-          <h3><span className="extraction-book-icon">B</span>{runTitle(run)}</h3>
+          <h3>
+            <span className="extraction-book-icon">
+              <BookOpen aria-hidden="true" size={17} strokeWidth={1.9} />
+            </span>
+            {runTitle(run)}
+          </h3>
           <p>
             {run.chapter_start && run.chapter_end
               ? `${isActive ? "Extracting" : "Extracted"} Chapters ${run.chapter_start}-${run.chapter_end} (${run.total_chapters} chapters)`
@@ -150,6 +157,10 @@ function RecentProcessedChaptersList({ run }) {
         {visibleChapters.length ? visibleChapters.map((runChapter) => {
           const status = runChapter.status;
           const chapter = runChapter.chapter || {};
+          const displayTitle = (chapter.title || "").replace(
+            new RegExp(`^\\s*Chapter\\s+${chapter.chapter_number}\\s*:?\\s*`, "i"),
+            "",
+          ) || chapter.title;
           const isFinished = status === "completed" || status === "failed";
           const recordsText = isFinished ? `${runChapter.records_created || 0} records` : "— records";
           const warningsText = isFinished ? `${runChapter.warning_count || 0} warnings` : "— warnings";
@@ -157,14 +168,11 @@ function RecentProcessedChaptersList({ run }) {
 
           return (
             <div className={`extraction-stream-row ${status}`} key={runChapter.id}>
-              <span className="extraction-stream-icon">
-                {status === "completed" ? "✓" : status === "processing" ? "…" : status === "failed" ? "!" : "•"}
-              </span>
+              <ExtractionStatusIcon className="extraction-stream-icon" status={status} />
               <strong className="extraction-stream-number">{chapter.chapter_number}</strong>
               <div className="extraction-stream-title">
-                <b title={chapter.title}>{chapter.title}</b>
+                <b title={chapter.title}>{displayTitle}</b>
               </div>
-              <StatusBadge tone={statusTone(status)}>{status}</StatusBadge>
               <em className="extraction-stream-records">{recordsText}</em>
               <em className="extraction-stream-warnings">⚠ {warningsText}</em>
               <em className="extraction-stream-duration">{durationText}</em>
