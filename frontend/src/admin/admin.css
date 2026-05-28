@@ -1429,19 +1429,24 @@ body:has(.wiki-shell) {
 }
 
 .extraction-summary-inline p {
+  display: grid;
+  grid-template-rows: minmax(34px, auto) auto;
+  align-content: start;
   margin: 0;
 }
 
 .extraction-summary-inline small {
   display: block;
+  min-height: 34px;
   color: #9aacbf;
+  line-height: 1.25;
 }
 
 .extraction-summary-inline strong {
   display: block;
   color: #ffffff;
   font-size: 20px;
-  margin-top: 6px;
+  margin-top: 2px;
 }
 
 .extraction-recent-stream {
@@ -1586,93 +1591,172 @@ body:has(.wiki-shell) {
 
 .extraction-run-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .extraction-run-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px 88px;
-  grid-template-areas: "main progress counts";
-  gap: 12px;
-  align-items: center;
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  gap: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
   border-radius: 9px;
-  padding: 12px;
-  background: rgba(2, 6, 23, 0.22);
+  padding: 11px 13px;
+  background: rgba(2, 6, 23, 0.18);
 }
 
-.extraction-run-card strong,
-.extraction-run-card span,
-.extraction-run-card small {
-  display: block;
-}
-
-.extraction-run-main {
-  grid-area: main;
+.extraction-run-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content 28px;
+  gap: 8px;
+  align-items: center;
   min-width: 0;
 }
 
-.extraction-run-main strong {
+.extraction-run-header strong {
+  min-width: 0;
   overflow: hidden;
   color: #ffffff;
+  font-size: 15px;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.extraction-run-card span,
-.extraction-run-card small {
+.extraction-run-header span {
   color: #9aacbf;
   font-size: 12px;
-}
-
-.extraction-run-progress {
-  grid-area: progress;
-  min-width: 0;
-  display: grid;
-  gap: 7px;
-}
-
-.extraction-run-counts {
-  grid-area: counts;
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-  text-align: right;
   white-space: nowrap;
 }
 
-@container (max-width: 520px) {
-  .extraction-run-card {
-    grid-template-columns: minmax(0, 1fr) max-content;
-    grid-template-areas:
-      "main counts"
-      "progress progress";
-    align-items: start;
-  }
-
-  .extraction-run-progress {
-    margin-top: 2px;
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
-    align-items: center;
-    gap: 10px;
-  }
+.admin-shell button.extraction-run-menu,
+.workspace-shell button.extraction-run-menu {
+  justify-self: end;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  border-color: transparent;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: #9aacbf;
+  box-shadow: none;
 }
 
-@container (max-width: 360px) {
+.admin-shell button.extraction-run-menu:hover,
+.workspace-shell button.extraction-run-menu:hover {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(148, 163, 184, 0.08);
+  transform: none;
+}
+
+.extraction-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  color: #aab8ca;
+  font-size: 12px;
+}
+
+.extraction-run-meta > * + *::before {
+  content: "•";
+  margin-right: 10px;
+  color: #64748b;
+}
+
+.extraction-run-meta b {
+  color: #93c5fd;
+  font-weight: 850;
+  text-transform: capitalize;
+}
+
+.extraction-run-card.completed .extraction-run-meta b {
+  color: #4ade80;
+}
+
+.extraction-run-card.failed .extraction-run-meta b {
+  color: #f87171;
+}
+
+.extraction-run-card.queued .extraction-run-meta b {
+  color: #f59e0b;
+}
+
+.extraction-run-card.cancelled .extraction-run-meta b,
+.extraction-run-card.skipped .extraction-run-meta b {
+  color: #94a3b8;
+}
+
+.extraction-run-meta .has-warnings {
+  color: #f59e0b;
+  font-weight: 750;
+}
+
+.extraction-run-error {
+  display: block;
+  font-size: 12px;
+}
+
+.extraction-run-bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.extraction-run-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #60a5fa, #8b5cf6);
+}
+
+.extraction-run-card.completed .extraction-run-bar span {
+  background: linear-gradient(90deg, #22c55e, #14b8a6);
+}
+
+.extraction-run-card.failed .extraction-run-bar span {
+  background: linear-gradient(90deg, #f97316, #ef4444);
+}
+
+.extraction-run-card.queued .extraction-run-bar span {
+  background: linear-gradient(90deg, #f59e0b, #facc15);
+}
+
+.extraction-run-card.cancelled .extraction-run-bar span,
+.extraction-run-card.skipped .extraction-run-bar span {
+  background: linear-gradient(90deg, #64748b, #94a3b8);
+}
+
+@container (max-width: 430px) {
   .extraction-run-card {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "main"
-      "progress"
-      "counts";
+    gap: 10px;
   }
 
-  .extraction-run-counts {
-    text-align: left;
+  .extraction-run-header {
+    grid-template-columns: minmax(0, 1fr) max-content 28px;
+    grid-template-areas: "title time menu";
+    gap: 8px;
   }
 
-  .extraction-run-progress {
-    grid-template-columns: 1fr;
+  .extraction-run-header strong {
+    grid-area: title;
+  }
+
+  .extraction-run-header span {
+    grid-area: time;
+  }
+
+  .extraction-run-menu {
+    grid-area: menu;
+  }
+
+  .extraction-run-meta {
+    gap: 5px 10px;
+  }
+
+  .extraction-run-meta > * + *::before {
+    content: none;
   }
 }
 
@@ -1809,19 +1893,6 @@ body:has(.wiki-shell) {
   .chapter-preview-panel {
     height: auto;
     overflow: visible;
-  }
-
-  .extraction-run-card {
-    grid-template-columns: 34px minmax(0, 1fr);
-  }
-
-  .extraction-run-counts {
-    text-align: left;
-  }
-
-  .extraction-run-progress,
-  .extraction-run-counts {
-    grid-column: 2;
   }
 
   .chapter-row-list {
