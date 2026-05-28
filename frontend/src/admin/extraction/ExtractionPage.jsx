@@ -34,7 +34,7 @@ export default function ExtractionPage({
   );
 
   function retryFromFailedRun(run) {
-    onStartExtraction({
+    return onStartExtraction({
       scope_type: "retry_failed",
       source_run_id: run.id,
     });

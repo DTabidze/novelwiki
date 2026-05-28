@@ -102,11 +102,38 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
         method: "POST",
         body: formData,
       });
-      setMessage(`Uploaded ${data.book.title} with ${data.chapter_count} chapters.`);
       await loadWorkspace();
+      return data;
     } catch (error) {
-      setMessage(error.message);
+      throw error;
     }
+  }
+
+  async function updateBook(bookId, payload) {
+    const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/books/${bookId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    await loadWorkspace();
+    return data;
+  }
+
+  async function replaceBookSource(bookId, formData) {
+    const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/books/${bookId}/source`, {
+      method: "POST",
+      body: formData,
+    });
+    await loadWorkspace();
+    return data;
+  }
+
+  async function reparseBook(bookId) {
+    const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/books/${bookId}/reparse`, {
+      method: "POST",
+    });
+    await loadWorkspace();
+    return data;
   }
 
   async function extractChapter(chapter) {
@@ -141,8 +168,8 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
       });
       setExtractionRuns((runs) => [data.run, ...runs.filter((run) => run.id !== data.run.id)]);
     } catch (error) {
-      setMessage(error.message);
       await loadWorkspace({ showLoading: false });
+      throw error;
     } finally {
       await loadExtractionRuns();
     }
@@ -233,6 +260,9 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
                 novel={novel}
                 onOpenChapters={openBookChapters}
                 onUploadBook={uploadBook}
+                onUpdateBook={updateBook}
+                onReplaceBookSource={replaceBookSource}
+                onReparseBook={reparseBook}
               />
             }
           />

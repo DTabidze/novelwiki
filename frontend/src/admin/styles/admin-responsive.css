@@ -90,6 +90,23 @@
 	    display: none;
 	  }
 
+  .book-table .admin-table-head {
+    display: none;
+  }
+
+  .book-table .admin-table-row:not(.admin-table-head) {
+    gap: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 14px;
+    margin: 0 0 12px;
+    padding: 16px;
+    background: rgba(8, 24, 39, 0.72);
+  }
+
+  .book-actions {
+    justify-content: flex-start;
+  }
+
 	  .admin-novel-card {
 	    gap: 16px;
 	    padding: 18px;
@@ -152,6 +169,24 @@
 
   .admin-stat-grid {
     grid-template-columns: 1fr;
+  }
+
+  .books-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .book-library-panel .admin-section-header {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .book-source-cell,
+  .book-actions {
+    flex-wrap: wrap;
+  }
+
+  .book-actions .admin-secondary-button {
+    flex: 1 1 180px;
   }
 
   .chapter-list-row {
