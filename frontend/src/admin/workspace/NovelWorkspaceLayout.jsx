@@ -6,6 +6,7 @@ import ChaptersPage from "../chapters/ChaptersPage.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import ExtractionPage from "../extraction/ExtractionPage.jsx";
 import EditNovelModal from "../novels/EditNovelModal.jsx";
+import ReviewQueuePage from "../review/ReviewQueuePage.jsx";
 import WorkspaceSidebar from "./WorkspaceSidebar.jsx";
 import NovelWorkspaceOverview from "./NovelWorkspaceOverview.jsx";
 
@@ -315,7 +316,16 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
           />
           <Route
             path="review"
-            element={<WorkspacePlaceholder title="Review Queue" message="Book and chapter grouped review arrives in Phase 5." />}
+            element={
+              <ReviewQueuePage
+                books={books}
+                chapters={chapters}
+                extractedData={extractedData}
+                novel={novel}
+                onOpenNovelSettings={() => setIsNovelSettingsOpen(true)}
+                onRefresh={loadWorkspace}
+              />
+            }
           />
           <Route path="*" element={<WorkspacePlaceholder title="Workspace Section" message="This section is not implemented yet." />} />
         </Routes>

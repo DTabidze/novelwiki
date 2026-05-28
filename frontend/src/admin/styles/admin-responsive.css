@@ -22,6 +22,26 @@
   }
 }
 
+@media (max-width: 1280px) {
+  .review-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .review-filter-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .review-workspace-grid {
+    grid-template-columns: minmax(180px, 0.7fr) minmax(360px, 1.55fr) minmax(340px, 1.05fr);
+  }
+
+  .review-books-panel,
+  .review-feed-panel,
+  .review-detail-panel {
+    grid-column: auto;
+  }
+}
+
 @media (max-width: 1180px) {
   body:has(.admin-shell),
   body:has(.workspace-shell.single-sidebar) {
@@ -89,6 +109,26 @@
 	    grid-template-columns: 1fr;
 	  }
 
+  .review-workspace-grid {
+    grid-template-columns: minmax(180px, 0.56fr) minmax(0, 1fr);
+    grid-template-areas:
+      "books feed"
+      "detail detail";
+  }
+
+  .review-books-panel {
+    grid-area: books;
+  }
+
+  .review-feed-panel {
+    grid-area: feed;
+  }
+
+  .review-detail-panel {
+    grid-area: detail;
+    min-height: 520px;
+  }
+
 	  .library-novel-head {
 	    display: none;
 	  }
@@ -146,6 +186,32 @@
 
   .chapter-row-list {
     max-height: 70vh;
+  }
+}
+
+@media (max-width: 900px) {
+  .review-stat-grid,
+  .review-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .review-workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "books"
+      "feed"
+      "detail";
+    overflow: visible;
+  }
+
+  .review-page-body {
+    overflow-y: auto;
+  }
+
+  .review-books-panel,
+  .review-feed-panel,
+  .review-detail-panel {
+    min-height: 420px;
   }
 }
 
@@ -253,5 +319,30 @@
   .extraction-time-stack {
     justify-items: start;
     text-align: left;
+  }
+
+  .review-stat-grid,
+  .review-filter-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .review-item-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .review-status-badge,
+  .review-confidence {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+
+  .review-row-arrow {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .review-action-grid,
+  .review-data-table div {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
