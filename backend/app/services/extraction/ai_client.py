@@ -1,5 +1,11 @@
 import json
 import os
+from datetime import datetime, timezone
+from pathlib import Path
+from uuid import uuid4
+
+
+TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 def get_ai_config():
@@ -51,6 +57,7 @@ def parse_ai_json_response(client, provider, model, temperature, system_prompt, 
             ],
             text_format=schema_model,
         )
+        log_ai_response(provider, model, schema_model, getattr(response, "output_text", ""))
         return response.output_parsed
 
     messages = [
@@ -97,7 +104,33 @@ def parse_ai_json_response(client, provider, model, temperature, system_prompt, 
         )
 
     content = response.choices[0].message.content or ""
+    log_ai_response(provider, model, schema_model, content)
     return schema_model.model_validate_json(extract_json_content(content))
+
+
+def log_ai_response(provider, model, schema_model, content):
+    if os.getenv("AI_LOG_RAW_RESPONSES", "").strip().lower() not in TRUTHY_ENV_VALUES:
+        return
+
+    log_dir = Path(os.getenv("AI_LOG_DIR", "backend/instance/ai_logs"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    schema_name = getattr(schema_model, "__name__", "AIResponse")
+    safe_model = "".join(
+        character if character.isalnum() or character in {"-", "_"} else "-"
+        for character in model
+    ).strip("-")
+    filename = f"{timestamp}-{provider}-{safe_model}-{schema_name}-{uuid4().hex[:8]}.json"
+    payload = {
+        "timestamp": timestamp,
+        "provider": provider,
+        "model": model,
+        "schema": schema_name,
+        "content": content,
+    }
+
+    (log_dir / filename).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def extract_json_content(content):

@@ -32,8 +32,7 @@ export default function WikiNovelOverview({
           <h1>{novel.title}</h1>
           <span className="wiki-novel-tag">Cultivation Novel</span>
           <div className="wiki-novel-meta">
-            <span>Author: Unknown</span>
-            <span>Status: Tracking</span>
+            <span>Author: {novel.author || "Unknown"}</span>
             <span>Chapters Tracked: {formatNumber(novel.chapter_count)}</span>
           </div>
           <p>

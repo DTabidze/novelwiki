@@ -245,6 +245,7 @@ def public_novel(novel):
         "author": novel.author,
         "description": novel.description,
         "cover_image_url": novel.cover_image_url,
+        "status": novel.status,
         "chapter_count": len(novel.chapters),
         "approved_character_count": Character.query.filter_by(
             novel_id=novel.id,

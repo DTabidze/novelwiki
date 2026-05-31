@@ -68,7 +68,16 @@ ALLOWED_LIFE_EVENT_TYPES = {
 }
 
 
-def extract_chapter_with_ai(novel, chapter):
+class ExtractionCancelled(RuntimeError):
+    pass
+
+
+def ensure_extraction_can_continue(should_continue):
+    if should_continue and not should_continue():
+        raise ExtractionCancelled("Extraction was canceled before saving chapter output.")
+
+
+def extract_chapter_with_ai(novel, chapter, should_continue=None):
     try:
         from openai import OpenAI
         from app.services.ai_extraction_schemas import (
@@ -111,6 +120,7 @@ def extract_chapter_with_ai(novel, chapter):
         user_content=user_content,
         schema_model=ChapterExtraction,
     )
+    ensure_extraction_can_continue(should_continue)
 
     progression_audit = parse_ai_json_response(
         client=client,
@@ -121,6 +131,7 @@ def extract_chapter_with_ai(novel, chapter):
         user_content=user_content,
         schema_model=ProgressionAuditExtraction,
     )
+    ensure_extraction_can_continue(should_continue)
     extraction.progression_events.extend(progression_audit.progression_events)
     extraction.progression_events.extend(
         detect_direct_cultivation_progression(
@@ -131,6 +142,7 @@ def extract_chapter_with_ai(novel, chapter):
         )
     )
 
+    ensure_extraction_can_continue(should_continue)
     return save_chapter_extraction(novel, chapter, extraction)
 
 

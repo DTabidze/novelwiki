@@ -47,9 +47,31 @@ def ensure_development_schema(app):
         if "book_id" not in chapter_column_names:
             connection.execute(text("ALTER TABLE chapters ADD COLUMN book_id INTEGER"))
 
+        connection.execute(
+            text(
+                "DELETE FROM books "
+                "WHERE number = 1 "
+                "AND title = 'Book 1' "
+                "AND COALESCE(source_filename, '') = '' "
+                "AND NOT EXISTS (SELECT 1 FROM chapters WHERE chapters.book_id = books.id) "
+                "AND EXISTS ("
+                "  SELECT 1 FROM novels "
+                "  WHERE novels.id = books.novel_id "
+                "  AND COALESCE(novels.original_filename, '') = ''"
+                ")"
+            )
+        )
+
         novels = connection.execute(text("SELECT id, title, original_filename FROM novels")).fetchall()
 
         for novel_id, novel_title, original_filename in novels:
+            unassigned_chapter_count = connection.execute(
+                text(
+                    "SELECT COUNT(*) FROM chapters "
+                    "WHERE novel_id = :novel_id AND book_id IS NULL"
+                ),
+                {"novel_id": novel_id},
+            ).scalar()
             default_book = connection.execute(
                 text("SELECT id FROM books WHERE novel_id = :novel_id ORDER BY number LIMIT 1"),
                 {"novel_id": novel_id},
@@ -57,6 +79,8 @@ def ensure_development_schema(app):
 
             if default_book:
                 default_book_id = default_book[0]
+            elif not original_filename and not unassigned_chapter_count:
+                continue
             else:
                 connection.execute(
                     text(

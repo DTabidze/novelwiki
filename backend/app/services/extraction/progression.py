@@ -53,7 +53,8 @@ BREAKTHROUGH_QI_RE = re.compile(
     re.IGNORECASE,
 )
 CURRENT_QI_CONTEXT_RE = re.compile(
-    r"\b(now|currently|current|foundation|base|cultivation|at|is|was|am|had reached|has reached|achieved)\b",
+    r"\b(now|currently|current|foundation|base|cultivation|at|is|was|am|"
+    r"had reached|has reached|have reached|finally reached|reached|achieved)\b",
     re.IGNORECASE,
 )
 PROPER_NAME_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b")
@@ -101,7 +102,7 @@ def detect_direct_cultivation_progression(novel, chapter, extraction, event_mode
         seen_keys.add(key)
 
     for match in DIRECT_QI_LEVEL_RE.finditer(text):
-        evidence = snippet_around_match(text, match)
+        evidence = snippet_around_match(text, match, following_sentences=2)
         evidence_lower = evidence.lower()
 
         if any(phrase in evidence_lower for phrase in ("away from", "not yet", "almost", "close to")):
@@ -192,7 +193,7 @@ def infer_progression_character(text, start, end, candidate_names):
     return fallback_matches[-1] if fallback_matches else None
 
 
-def snippet_around_match(text, match):
+def snippet_around_match(text, match, following_sentences=0):
     start = match.start()
     end = match.end()
     left_boundary = max(
@@ -201,23 +202,38 @@ def snippet_around_match(text, match):
         text.rfind("?", 0, start),
         text.rfind("\n", 0, start),
     )
-    right_candidates = [
-        index
-        for index in (
-            text.find(".", end),
-            text.find("!", end),
-            text.find("?", end),
-            text.find("\n", end),
-        )
-        if index != -1
-    ]
-    right_boundary = min(right_candidates) if right_candidates else min(len(text), end + 220)
+    right_boundary = sentence_boundary_after(text, end, following_sentences)
     snippet = text[left_boundary + 1: right_boundary + 1].strip()
 
     if len(snippet) > 500:
         snippet = text[max(0, start - 180): min(len(text), end + 220)].strip()
 
     return _normalize_evidence_text(snippet)
+
+
+def sentence_boundary_after(text, start, following_sentences=0):
+    search_from = start
+    boundary = -1
+
+    for _ in range(following_sentences + 1):
+        right_candidates = [
+            index
+            for index in (
+                text.find(".", search_from),
+                text.find("!", search_from),
+                text.find("?", search_from),
+                text.find("\n", search_from),
+            )
+            if index != -1
+        ]
+
+        if not right_candidates:
+            return min(len(text) - 1, start + 220)
+
+        boundary = min(right_candidates)
+        search_from = boundary + 1
+
+    return boundary
 
 
 def qi_level_value(level):
@@ -568,6 +584,7 @@ def recalculate_character_current_progression(character, progression_type):
         .filter(
             CharacterProgressionEvent.character_id == character.id,
             CharacterProgressionEvent.progression_type == progression_type,
+            CharacterProgressionEvent.review_status != "rejected",
         )
         .order_by(Chapter.chapter_number.desc(), CharacterProgressionEvent.id.desc())
         .first()
@@ -585,7 +602,7 @@ def find_existing_progression(character, progression_type, new_value):
     progression_rows = CharacterProgressionEvent.query.filter_by(
         character_id=character.id,
         progression_type=progression_type,
-    ).all()
+    ).filter(CharacterProgressionEvent.review_status != "rejected").all()
 
     for progression in progression_rows:
         existing_key = progression_compare_key(progression.progression_type, progression.new_value)

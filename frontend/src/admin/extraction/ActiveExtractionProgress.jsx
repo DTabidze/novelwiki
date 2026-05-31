@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen } from "lucide-react";
+import { BookOpen, RotateCcw, Square } from "lucide-react";
 import ProgressBar from "../components/ProgressBar.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import ExtractionStatusIcon from "./ExtractionStatusIcon.jsx";
@@ -190,7 +190,54 @@ function firstFailedRunChapter(run) {
   return (run?.run_chapters || []).find((runChapter) => runChapter.status === "failed") || null;
 }
 
+function ExtractionConfirmModal({ action, chapterNumber, onCancel, onConfirm }) {
+  if (!action) return null;
+
+  const isRetry = action === "retry";
+
+  return (
+    <div className="extraction-confirm-backdrop" role="presentation" onMouseDown={onCancel}>
+      <div
+        className="extraction-confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="extraction-confirm-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header>
+          <span className={isRetry ? "retry" : "stop"}>
+            {isRetry ? <RotateCcw aria-hidden="true" size={20} /> : <Square aria-hidden="true" size={20} />}
+          </span>
+          <div>
+            <h3 id="extraction-confirm-title">
+              {isRetry ? `Continue from Chapter ${chapterNumber}` : "Stop Extraction"}
+            </h3>
+            <p>
+              {isRetry
+                ? `Continue extraction from Chapter ${chapterNumber} through the original run end?`
+                : "Stop this extraction run? The current chapter may finish, but later chapters will be skipped."}
+            </p>
+          </div>
+        </header>
+        <footer>
+          <button type="button" className="admin-secondary-button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={isRetry ? "" : "admin-danger-button"}
+            onClick={onConfirm}
+          >
+            {isRetry ? "Continue Extraction" : "Stop Extraction"}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 export default function ActiveExtractionProgress({ focusRun, isRunningExtraction, onRetryRun, onStopRun }) {
+  const [confirmAction, setConfirmAction] = React.useState(null);
   const fallbackRunning = isRunningExtraction && !focusRun;
   const progress = runProgress(focusRun);
   const isActive = focusRun?.status === "running" || fallbackRunning;
@@ -213,11 +260,7 @@ export default function ActiveExtractionProgress({ focusRun, isRunningExtraction
             <button
               className="admin-secondary-button"
               type="button"
-              onClick={() => {
-                if (window.confirm(`Continue extraction from Chapter ${failedChapterNumber} through the original run end?`)) {
-                  onRetryRun(focusRun);
-                }
-              }}
+              onClick={() => setConfirmAction("retry")}
             >
               Continue from Chapter {failedChapterNumber}
             </button>
@@ -226,11 +269,7 @@ export default function ActiveExtractionProgress({ focusRun, isRunningExtraction
             <button
               className="admin-danger-button"
               type="button"
-              onClick={() => {
-                if (window.confirm("Stop this extraction run? The current chapter may finish, but later chapters will be skipped.")) {
-                  onStopRun(focusRun);
-                }
-              }}
+              onClick={() => setConfirmAction("stop")}
             >
               Stop Extraction
             </button>
@@ -258,6 +297,23 @@ export default function ActiveExtractionProgress({ focusRun, isRunningExtraction
           </p>
         </div>
       )}
+      <ExtractionConfirmModal
+        action={confirmAction}
+        chapterNumber={failedChapterNumber}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          const action = confirmAction;
+          setConfirmAction(null);
+
+          if (action === "retry") {
+            onRetryRun(focusRun);
+          }
+
+          if (action === "stop") {
+            onStopRun(focusRun);
+          }
+        }}
+      />
     </section>
   );
 }
