@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Eye,
   Pencil,
-  SkipForward,
   X,
 } from "lucide-react";
 import {
@@ -26,17 +25,21 @@ export default function ReviewDetailPanel({
   isSaving,
   onApprove,
   onReject,
-  onSkip,
-  onClose,
   onNext,
   onPrevious,
+  onViewContext,
+  onEdit,
+  canGoNext = true,
+  canGoPrevious = true,
+  emptyTitle = "Select a review item",
+  emptyDescription = "Choose an extracted record from the queue to inspect evidence and moderate it.",
 }) {
   if (!item) {
     return (
       <aside className="review-detail-panel admin-panel">
         <div className="review-detail-empty">
-          <strong>Select a review item</strong>
-          <p>Choose an extracted record from the queue to inspect evidence and moderate it.</p>
+          <strong>{emptyTitle}</strong>
+          <p>{emptyDescription}</p>
         </div>
       </aside>
     );
@@ -55,16 +58,21 @@ export default function ReviewDetailPanel({
           <span>Review Item</span>
           <strong>{formatReviewType(item.entityType)}</strong>
         </div>
-        <div className="review-detail-tools">
-          <button type="button" className="admin-icon-button" onClick={onPrevious} aria-label="Previous item">
-            <ChevronLeft size={16} />
-          </button>
-          <button type="button" className="admin-icon-button" onClick={onNext} aria-label="Next item">
-            <ChevronRight size={16} />
-          </button>
-          <button type="button" className="admin-icon-button" onClick={onClose} aria-label="Close inspector">
-            <X size={16} />
-          </button>
+        <div className="review-detail-header-actions">
+          <div className="review-detail-quick-actions">
+            <button type="button" className="review-approve-button" disabled={isSaving} onClick={() => onApprove(item)}>
+              <Check size={16} /> Approve
+            </button>
+            <button type="button" className="review-reject-button" disabled={isSaving} onClick={() => onReject(item)}>
+              <X size={16} /> Reject
+            </button>
+            <button type="button" className="admin-icon-button" onClick={onPrevious} disabled={!canGoPrevious} aria-label="Previous item">
+              <ChevronLeft size={16} />
+            </button>
+            <button type="button" className="admin-icon-button" onClick={onNext} disabled={!canGoNext} aria-label="Next item">
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -75,9 +83,12 @@ export default function ReviewDetailPanel({
             {chapter ? <small>Chapter {chapter.chapter_number}</small> : null}
           </div>
           <h2>{reviewTitle(item)}</h2>
-          <p>
-            Confidence: <i className={`review-confidence-dot ${level}`} /> {confidenceText(item)}
-          </p>
+          <div className="review-detail-state-row">
+            <span className={`review-status-badge ${item.review_status}`}>{item.review_status}</span>
+            <p>
+              Confidence: <i className={`review-confidence-dot ${level}`} /> {confidenceText(item)}
+            </p>
+          </div>
           {isAssumedSpeciesOverride(item) ? (
             <div className="review-assumption-note">
               This is overriding an assumed default species, not replacing confirmed extracted metadata.
@@ -101,17 +112,6 @@ export default function ReviewDetailPanel({
           </div>
         </section>
 
-        {warnings.length > 0 ? (
-          <section className="review-detail-section">
-            <h3>Warnings</h3>
-            <div className="review-warning-box">
-              {warnings.map((warning) => (
-                <p key={warning}>{warning}</p>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
         <section className="review-detail-section">
           <h3>Evidence (from source)</h3>
           {evidence.length === 0 ? (
@@ -122,7 +122,7 @@ export default function ReviewDetailPanel({
                 <p>{row.evidence_text}</p>
                 <footer>
                   <span>{chapter ? `Chapter ${chapter.chapter_number}` : "Source chapter"}</span>
-                  <button type="button" className="admin-secondary-button">
+                  <button type="button" className="admin-secondary-button" onClick={() => onViewContext?.(row)}>
                     <Eye size={15} /> View Full Context
                   </button>
                 </footer>
@@ -135,22 +135,23 @@ export default function ReviewDetailPanel({
           <h3>AI Notes</h3>
           <p className="review-ai-notes">{item.extraction_reason || recordSummary(item)}</p>
         </section>
+
+        {warnings.length > 0 ? (
+          <section className="review-detail-section">
+            <h3>Warnings</h3>
+            <div className="review-warning-box">
+              {warnings.map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
 
       <footer className="review-action-footer">
-        <strong>Actions</strong>
         <div className="review-action-grid">
-          <button type="button" className="review-approve-button" disabled={isSaving} onClick={() => onApprove(item)}>
-            <Check size={17} /> Approve
-          </button>
-          <button type="button" className="review-reject-button" disabled={isSaving} onClick={() => onReject(item)}>
-            <X size={17} /> Reject
-          </button>
-          <button type="button" className="admin-secondary-button" disabled={isSaving}>
+          <button type="button" className="admin-secondary-button" disabled={isSaving} onClick={() => onEdit?.(item)}>
             <Pencil size={16} /> Edit
-          </button>
-          <button type="button" className="admin-secondary-button review-skip-button" disabled={isSaving} onClick={onSkip}>
-            <SkipForward size={16} /> Skip for Now
           </button>
         </div>
       </footer>

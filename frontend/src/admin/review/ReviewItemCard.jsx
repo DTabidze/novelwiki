@@ -33,9 +33,11 @@ export default function ReviewItemCard({ item, isSelected, onSelect }) {
   const Icon = iconMap[item.entityType] || ClipboardList;
   const warnings = reviewWarnings(item);
   const level = confidenceLevel(item);
+  const itemKey = recordKey(item);
 
   return (
     <button
+      id={`review-item-${itemKey}`}
       type="button"
       className={isSelected ? "review-item-card active" : "review-item-card"}
       onClick={() => onSelect(item)}
@@ -55,7 +57,7 @@ export default function ReviewItemCard({ item, isSelected, onSelect }) {
       <span className="review-row-arrow" aria-hidden="true">
         <ChevronRight size={15} strokeWidth={2} />
       </span>
-      <span className="sr-only">{recordKey(item)}</span>
+      <span className="sr-only">{itemKey}</span>
     </button>
   );
 }

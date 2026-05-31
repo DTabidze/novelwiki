@@ -1,7 +1,7 @@
 import React from "react";
 import { Search } from "lucide-react";
 
-export default function ReviewFilters({ books, filters, onChange }) {
+export default function ReviewFilters({ books, countsByBook = {}, filters, onChange }) {
   function update(key, value) {
     onChange({ ...filters, [key]: value });
   }
@@ -11,10 +11,10 @@ export default function ReviewFilters({ books, filters, onChange }) {
       <label>
         Book
         <select value={filters.bookId} onChange={(event) => update("bookId", event.target.value)}>
-          <option value="all">All books</option>
+          <option value="all">All books ({countsByBook.all || 0} pending)</option>
           {books.map((book) => (
             <option key={book.id} value={book.id}>
-              Book {book.number}: {book.title}
+              Book {book.number}: {book.title} ({countsByBook[book.id] || 0} pending)
             </option>
           ))}
         </select>

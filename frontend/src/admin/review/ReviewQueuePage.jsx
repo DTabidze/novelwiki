@@ -1,5 +1,4 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import {
   ClipboardCheck,
   Download,
@@ -10,10 +9,10 @@ import {
   Users,
 } from "lucide-react";
 import { API_BASE_URL, fetchJson } from "../../api.js";
-import StatCard from "../components/StatCard.jsx";
-import ReviewBookList from "./ReviewBookList.jsx";
 import ReviewChapterGroup from "./ReviewChapterGroup.jsx";
+import ReviewContextModal from "./ReviewContextModal.jsx";
 import ReviewDetailPanel from "./ReviewDetailPanel.jsx";
+import ReviewEditProposalModal from "./ReviewEditProposalModal.jsx";
 import ReviewFilters from "./ReviewFilters.jsx";
 import {
   flattenReviewData,
@@ -22,6 +21,9 @@ import {
   reviewWarnings,
   sourceChapter,
 } from "./reviewUtils.js";
+
+const CHAPTER_GROUP_PAGE_SIZE = 10;
+const CHAPTER_ITEM_PREVIEW_LIMIT = 8;
 
 function parseChapterRange(value) {
   const trimmed = value.trim();
@@ -71,6 +73,15 @@ function groupByChapter(items, booksById) {
   });
 }
 
+function chapterGroupKey(group) {
+  return String(group.key);
+}
+
+function chapterKeyForItem(item) {
+  const chapter = sourceChapter(item);
+  return chapter?.id ? String(chapter.id) : "unlinked";
+}
+
 function countPending(items, predicate) {
   return items.filter((item) => item.review_status === "pending" && predicate(item)).length;
 }
@@ -83,9 +94,12 @@ export default function ReviewQueuePage({
   onOpenNovelSettings,
   onRefresh,
 }) {
-  const navigate = useNavigate();
   const allItems = React.useMemo(() => flattenReviewData(extractedData), [extractedData]);
   const booksById = React.useMemo(() => new Map(books.map((book) => [book.id, book])), [books]);
+  const persistedSelectionKey = React.useMemo(
+    () => `novelwiki-review-selection-${novel?.id || "global"}`,
+    [novel?.id]
+  );
   const [filters, setFilters] = React.useState({
     bookId: "all",
     chapterRange: "",
@@ -94,8 +108,19 @@ export default function ReviewQueuePage({
     warningsOnly: false,
     search: "",
   });
-  const [selectedKey, setSelectedKey] = React.useState("");
+  const [selectedKey, setSelectedKey] = React.useState(() => window.sessionStorage.getItem(persistedSelectionKey) || "");
   const [isSaving, setIsSaving] = React.useState(false);
+  const [expandedChapterKeys, setExpandedChapterKeys] = React.useState(() => new Set());
+  const [revealedChapterKeys, setRevealedChapterKeys] = React.useState(() => new Set());
+  const [chapterPage, setChapterPage] = React.useState(1);
+  const [contextEvidence, setContextEvidence] = React.useState(null);
+  const [editingItem, setEditingItem] = React.useState(null);
+  const [editError, setEditError] = React.useState("");
+  const feedListRef = React.useRef(null);
+  const scrollModeRef = React.useRef("nearest");
+  const pendingSelectionKeyRef = React.useRef(undefined);
+  const filterChangeSelectionKeyRef = React.useRef("");
+  const filterSignature = `${filters.bookId}|${filters.chapterRange}|${filters.typeGroup}|${filters.status}|${filters.warningsOnly}|${filters.search}`;
 
   const filteredItems = React.useMemo(() => {
     const chapterRange = parseChapterRange(filters.chapterRange);
@@ -147,18 +172,173 @@ export default function ReviewQueuePage({
   }, [allItems, filters]);
 
   const groups = React.useMemo(() => groupByChapter(filteredItems, booksById), [filteredItems, booksById]);
-  const selectedItem = filteredItems.find((item) => recordKey(item) === selectedKey) || filteredItems[0] || null;
+  const orderedItems = React.useMemo(() => groups.flatMap((group) => group.items), [groups]);
+  const firstQueueItem = orderedItems[0] || null;
+  const selectedItem = orderedItems.find((item) => recordKey(item) === selectedKey) || null;
+  const selectedChapter = selectedItem ? sourceChapter(selectedItem) : null;
+  const selectedGroupKey = selectedChapter?.id ? String(selectedChapter.id) : "unlinked";
+  const totalChapterPages = Math.max(1, Math.ceil(groups.length / CHAPTER_GROUP_PAGE_SIZE));
+  const clampedChapterPage = Math.min(chapterPage, totalChapterPages);
+  const visibleGroups = groups.slice(
+    (clampedChapterPage - 1) * CHAPTER_GROUP_PAGE_SIZE,
+    clampedChapterPage * CHAPTER_GROUP_PAGE_SIZE
+  );
+  const firstVisibleGroup = visibleGroups[0];
+  const lastVisibleGroup = visibleGroups[visibleGroups.length - 1];
+  const firstQueueItemKey = firstQueueItem ? recordKey(firstQueueItem) : "";
+  const selectedIndex = selectedItem
+    ? orderedItems.findIndex((item) => recordKey(item) === recordKey(selectedItem))
+    : -1;
+  const isFirstSelected = selectedIndex <= 0;
+  const isLastSelected = selectedIndex < 0 || selectedIndex >= orderedItems.length - 1;
 
   React.useEffect(() => {
-    if (!selectedItem) {
+    pendingSelectionKeyRef.current = undefined;
+    const candidateSelectionKey = filterChangeSelectionKeyRef.current || selectedKey;
+    const existingSelectionIsVisible = candidateSelectionKey
+      && orderedItems.some((item) => recordKey(item) === candidateSelectionKey);
+    const nextSelectedKey = existingSelectionIsVisible ? candidateSelectionKey : firstQueueItemKey;
+    setChapterPage(1);
+    setRevealedChapterKeys(new Set());
+
+    if (nextSelectedKey) {
+      const nextItem = orderedItems.find((item) => recordKey(item) === nextSelectedKey) || firstQueueItem;
+      const firstChapter = sourceChapter(nextItem);
+      const firstGroupKey = firstChapter?.id ? String(firstChapter.id) : "unlinked";
+
+      setSelectedKey(nextSelectedKey);
+      setExpandedChapterKeys(new Set([firstGroupKey]));
+    } else {
       setSelectedKey("");
+      setExpandedChapterKeys(new Set());
+    }
+  }, [filterSignature]);
+
+  React.useEffect(() => {
+    filterChangeSelectionKeyRef.current = selectedKey;
+
+    if (selectedKey) {
+      window.sessionStorage.setItem(persistedSelectionKey, selectedKey);
+    } else {
+      window.sessionStorage.removeItem(persistedSelectionKey);
+    }
+  }, [persistedSelectionKey, selectedKey]);
+
+  React.useEffect(() => {
+    const pendingSelectionKey = pendingSelectionKeyRef.current;
+
+    if (pendingSelectionKey !== undefined) {
+      pendingSelectionKeyRef.current = undefined;
+
+      if (pendingSelectionKey && orderedItems.some((item) => recordKey(item) === pendingSelectionKey)) {
+        setSelectedKey(pendingSelectionKey);
+      } else if (!pendingSelectionKey) {
+        setSelectedKey("");
+      } else {
+        setSelectedKey(firstQueueItemKey);
+      }
+
       return;
     }
 
-    if (recordKey(selectedItem) !== selectedKey) {
-      setSelectedKey(recordKey(selectedItem));
+    if (selectedKey && orderedItems.some((item) => recordKey(item) === selectedKey)) {
+      return;
     }
-  }, [selectedItem, selectedKey]);
+
+    if (firstQueueItemKey) {
+      setSelectedKey(firstQueueItemKey);
+    } else if (selectedKey) {
+      setSelectedKey("");
+    }
+  }, [firstQueueItemKey, orderedItems, selectedKey]);
+
+  React.useEffect(() => {
+    if (groups.length === 0) {
+      setExpandedChapterKeys(new Set());
+      return;
+    }
+
+    const keyToExpand = selectedItem
+      ? selectedGroupKey
+      : chapterGroupKey(groups[0]);
+
+    setExpandedChapterKeys((current) => {
+      if (current.has(keyToExpand)) return current;
+      const next = new Set(current);
+      next.add(keyToExpand);
+      return next;
+    });
+  }, [groups, selectedGroupKey, selectedItem]);
+
+  React.useEffect(() => {
+    if (!selectedItem || groups.length === 0) return;
+
+    const selectedGroupIndex = groups.findIndex((group) => chapterGroupKey(group) === selectedGroupKey);
+    if (selectedGroupIndex < 0) return;
+
+    const selectedPage = Math.floor(selectedGroupIndex / CHAPTER_GROUP_PAGE_SIZE) + 1;
+    if (selectedPage !== chapterPage) {
+      setChapterPage(selectedPage);
+    }
+  }, [chapterPage, groups, selectedGroupKey, selectedItem]);
+
+  React.useEffect(() => {
+    if (!selectedItem) return;
+
+    const selectedGroup = groups.find((group) => chapterGroupKey(group) === selectedGroupKey);
+    if (!selectedGroup) return;
+
+    const selectedItemIndex = selectedGroup.items.findIndex((item) => recordKey(item) === recordKey(selectedItem));
+    if (selectedItemIndex < CHAPTER_ITEM_PREVIEW_LIMIT) return;
+
+    setRevealedChapterKeys((current) => {
+      if (current.has(selectedGroupKey)) return current;
+      const next = new Set(current);
+      next.add(selectedGroupKey);
+      return next;
+    });
+  }, [groups, selectedGroupKey, selectedItem]);
+
+  React.useEffect(() => {
+    if (!selectedKey) return;
+
+    const scrollMode = scrollModeRef.current;
+    const frame = window.requestAnimationFrame(() => {
+      const scrollContainer = feedListRef.current;
+      const selectedElement = document.getElementById(`review-item-${selectedKey}`);
+      if (!scrollContainer || !selectedElement) return;
+
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const itemRect = selectedElement.getBoundingClientRect();
+      const isFullyVisible = itemRect.top >= containerRect.top && itemRect.bottom <= containerRect.bottom;
+
+      if (isFullyVisible && scrollMode === "nearest") {
+        scrollModeRef.current = "nearest";
+        return;
+      }
+
+      const currentScrollTop = scrollContainer.scrollTop;
+      const itemTop = itemRect.top - containerRect.top + currentScrollTop;
+      const itemBottom = itemTop + selectedElement.offsetHeight;
+      let nextScrollTop = currentScrollTop;
+
+      if (scrollMode === "center") {
+        nextScrollTop = itemTop - (scrollContainer.clientHeight / 2) + (selectedElement.offsetHeight / 2);
+      } else if (itemRect.top < containerRect.top) {
+        nextScrollTop = itemTop;
+      } else if (itemRect.bottom > containerRect.bottom) {
+        nextScrollTop = itemBottom - scrollContainer.clientHeight;
+      }
+
+      scrollContainer.scrollTo({
+        top: Math.max(0, nextScrollTop),
+        behavior: "smooth",
+      });
+      scrollModeRef.current = "nearest";
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedKey, revealedChapterKeys, clampedChapterPage]);
 
   const pendingItems = allItems.filter((item) => item.review_status === "pending");
   const pendingWarnings = pendingItems.filter((item) => reviewWarnings(item).length > 0).length;
@@ -176,25 +356,83 @@ export default function ReviewQueuePage({
     { all: 0 }
   );
 
-  function selectBook(bookId) {
-    setFilters((current) => ({ ...current, bookId }));
-  }
-
   function selectItem(item) {
+    scrollModeRef.current = "nearest";
     setSelectedKey(recordKey(item));
   }
 
   function moveSelection(direction) {
-    if (filteredItems.length === 0) return;
+    if (orderedItems.length === 0) return;
 
-    const currentIndex = filteredItems.findIndex((item) => recordKey(item) === selectedKey);
+    const currentIndex = orderedItems.findIndex((item) => recordKey(item) === selectedKey);
     const nextIndex = currentIndex < 0
       ? 0
-      : Math.min(Math.max(currentIndex + direction, 0), filteredItems.length - 1);
-    setSelectedKey(recordKey(filteredItems[nextIndex]));
+      : Math.min(Math.max(currentIndex + direction, 0), orderedItems.length - 1);
+    const nextItem = orderedItems[nextIndex];
+    const nextGroupKey = chapterKeyForItem(nextItem);
+    const currentGroupKey = selectedGroupKey;
+
+    scrollModeRef.current = nextGroupKey === currentGroupKey ? "nearest" : "center";
+    setExpandedChapterKeys((current) => {
+      if (current.has(nextGroupKey)) return current;
+      const next = new Set(current);
+      next.add(nextGroupKey);
+      return next;
+    });
+    setSelectedKey(recordKey(nextItem));
+  }
+
+  function toggleChapter(groupKey) {
+    setExpandedChapterKeys((current) => {
+      const next = new Set(current);
+
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+
+      return next;
+    });
+  }
+
+  function revealChapter(groupKey) {
+    setRevealedChapterKeys((current) => {
+      const next = new Set(current);
+      next.add(groupKey);
+      return next;
+    });
   }
 
   async function updateReviewItem(item, reviewStatus) {
+    const currentIndex = orderedItems.findIndex((orderedItem) => recordKey(orderedItem) === recordKey(item));
+    const nextItem = currentIndex >= 0
+      ? orderedItems[currentIndex + 1] || orderedItems[currentIndex - 1] || null
+      : null;
+    const statusFilterWillStillShowItem = filters.status === "all" || filters.status === reviewStatus;
+    const nextSelectionKey = statusFilterWillStillShowItem
+      ? recordKey(item)
+      : nextItem
+        ? recordKey(nextItem)
+        : "";
+
+    pendingSelectionKeyRef.current = nextSelectionKey;
+
+    if (!statusFilterWillStillShowItem && nextItem) {
+      const nextGroupKey = chapterKeyForItem(nextItem);
+      const currentGroupKey = chapterKeyForItem(item);
+
+      scrollModeRef.current = nextGroupKey === currentGroupKey ? "nearest" : "center";
+      setExpandedChapterKeys((current) => {
+        if (current.has(nextGroupKey)) return current;
+        const next = new Set(current);
+        next.add(nextGroupKey);
+        return next;
+      });
+    } else if (statusFilterWillStillShowItem) {
+      scrollModeRef.current = "nearest";
+    }
+
     setIsSaving(true);
 
     try {
@@ -204,6 +442,28 @@ export default function ReviewQueuePage({
         body: JSON.stringify({ review_status: reviewStatus }),
       });
       await onRefresh?.({ showLoading: false });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveReviewProposalEdits(payload) {
+    if (!editingItem) return;
+
+    setEditError("");
+    setIsSaving(true);
+    pendingSelectionKeyRef.current = recordKey(editingItem);
+
+    try {
+      await fetchJson(`${API_BASE_URL}/admin/review/${editingItem.entityType}/${editingItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      await onRefresh?.({ showLoading: false });
+      setEditingItem(null);
+    } catch (err) {
+      setEditError(err.message || "Could not save proposal changes.");
     } finally {
       setIsSaving(false);
     }
@@ -237,29 +497,22 @@ export default function ReviewQueuePage({
       </header>
 
       <div className="workspace-page-body review-page-body">
-        <div className="admin-stat-grid review-stat-grid">
-          {summaryCards.map((card) => (
-            <StatCard
-              key={card.label}
-              label={card.label}
-              value={card.value}
-              detail={card.detail}
-              tone={card.color}
-              icon={card.Icon}
-            />
-          ))}
+        <div className="review-status-strip" aria-label="Review queue status summary">
+          {summaryCards.map((card) => {
+            const Icon = card.Icon;
+            return (
+              <span className={`review-status-pill ${card.color}`} key={card.label}>
+                <Icon aria-hidden="true" size={14} strokeWidth={1.9} />
+                <strong>{card.value}</strong>
+                {card.label}
+              </span>
+            );
+          })}
         </div>
 
-        <ReviewFilters books={books} filters={filters} onChange={setFilters} />
+        <ReviewFilters books={books} countsByBook={countsByBook} filters={filters} onChange={setFilters} />
 
-        <div className="review-workspace-grid">
-          <ReviewBookList
-            books={books}
-            countsByBook={countsByBook}
-            selectedBookId={filters.bookId}
-            onSelectBook={selectBook}
-          />
-
+        <div className={selectedItem ? "review-workspace-grid review-focused" : "review-workspace-grid"}>
           <main className="review-feed-panel admin-panel">
             <div className="review-panel-title">
               <div>
@@ -268,34 +521,66 @@ export default function ReviewQueuePage({
                     ? "All Review Items"
                     : `Book ${booksById.get(Number(filters.bookId))?.number || filters.bookId}: ${booksById.get(Number(filters.bookId))?.title || ""}`}
                 </h2>
-                <span>{filteredItems.length} shown</span>
+                <span>
+                  {filteredItems.length} shown
+                  {filters.bookId !== "all" ? ` - ${countsByBook[Number(filters.bookId)] || 0} pending in this book` : ""}
+                </span>
               </div>
             </div>
 
-            <div className="review-feed-list">
+            <div className="review-feed-list" ref={feedListRef}>
               {groups.length === 0 ? (
                 <div className="review-empty-feed">
                   <strong>No review items match the current filters.</strong>
                   <p>Try a different book, status, type, or search term.</p>
                 </div>
               ) : (
-                groups.map((group) => (
-                  <ReviewChapterGroup
-                    key={group.key}
-                    group={group}
-                    selectedKey={selectedKey}
-                    onSelect={selectItem}
-                  />
-                ))
+                visibleGroups.map((group) => {
+                  const groupKey = chapterGroupKey(group);
+
+                  return (
+                    <ReviewChapterGroup
+                      key={groupKey}
+                      group={group}
+                      selectedKey={selectedKey}
+                      onSelect={selectItem}
+                      isExpanded={expandedChapterKeys.has(groupKey)}
+                      isRevealed={revealedChapterKeys.has(groupKey)}
+                      onToggle={() => toggleChapter(groupKey)}
+                      onShowAll={() => revealChapter(groupKey)}
+                      visibleLimit={CHAPTER_ITEM_PREVIEW_LIMIT}
+                    />
+                  );
+                })
               )}
             </div>
 
             <footer className="review-feed-footer">
-              <span>Showing {Math.min(filteredItems.length, 1)} to {filteredItems.length} of {filteredItems.length} items</span>
+              <span>
+                {groups.length === 0
+                  ? "No chapters shown"
+                  : `Showing chapters ${firstVisibleGroup?.chapter?.chapter_number || "-"}-${lastVisibleGroup?.chapter?.chapter_number || "-"} - ${filteredItems.length} pending items`}
+              </span>
               <div>
-                <button type="button" className="admin-icon-button">1</button>
-                <button type="button" className="admin-icon-button admin-secondary-button">2</button>
-                <button type="button" className="admin-icon-button admin-secondary-button">3</button>
+                <button
+                  type="button"
+                  className="admin-secondary-button review-feed-page-button"
+                  disabled={clampedChapterPage <= 1}
+                  onClick={() => setChapterPage((page) => Math.max(1, page - 1))}
+                >
+                  Prev
+                </button>
+                <button type="button" className="admin-secondary-button review-feed-page-button" disabled>
+                  {clampedChapterPage}
+                </button>
+                <button
+                  type="button"
+                  className="admin-secondary-button review-feed-page-button"
+                  disabled={clampedChapterPage >= totalChapterPages}
+                  onClick={() => setChapterPage((page) => Math.min(totalChapterPages, page + 1))}
+                >
+                  Next
+                </button>
               </div>
             </footer>
           </main>
@@ -305,13 +590,46 @@ export default function ReviewQueuePage({
             isSaving={isSaving}
             onApprove={(item) => updateReviewItem(item, "approved")}
             onReject={(item) => updateReviewItem(item, "rejected")}
-            onSkip={() => moveSelection(1)}
-            onClose={() => setSelectedKey("")}
             onNext={() => moveSelection(1)}
             onPrevious={() => moveSelection(-1)}
+            onViewContext={setContextEvidence}
+            onEdit={(item) => {
+              setEditError("");
+              setEditingItem(item);
+            }}
+            canGoNext={!isLastSelected}
+            canGoPrevious={!isFirstSelected}
+            emptyTitle={filteredItems.length === 0 ? "No pending review items" : "Select a review item"}
+            emptyDescription={
+              filteredItems.length === 0
+                ? "There are no review items matching the current filters."
+                : "Choose an extracted record from the queue to inspect evidence and moderate it."
+            }
           />
         </div>
       </div>
+      {contextEvidence ? (
+        <ReviewContextModal
+          evidence={contextEvidence}
+          fallbackChapter={selectedChapter}
+          onClose={() => setContextEvidence(null)}
+        />
+      ) : null}
+      {editingItem ? (
+        <ReviewEditProposalModal
+          item={editingItem}
+          isSaving={isSaving}
+          error={editError}
+          onClose={() => {
+            if (!isSaving) {
+              setEditError("");
+              setEditingItem(null);
+            }
+          }}
+          onSave={saveReviewProposalEdits}
+          onViewContext={setContextEvidence}
+        />
+      ) : null}
     </section>
   );
 }

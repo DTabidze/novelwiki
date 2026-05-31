@@ -23,21 +23,18 @@
 }
 
 @media (max-width: 1280px) {
-  .review-stat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .review-filter-bar {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .review-workspace-grid {
-    grid-template-columns: minmax(180px, 0.7fr) minmax(360px, 1.55fr) minmax(340px, 1.05fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .review-books-panel,
   .review-feed-panel,
-  .review-detail-panel {
+  .review-detail-panel,
+  .review-focused .review-feed-panel,
+  .review-focused .review-detail-panel {
     grid-column: auto;
   }
 }
@@ -110,14 +107,10 @@
 	  }
 
   .review-workspace-grid {
-    grid-template-columns: minmax(180px, 0.56fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "books feed"
-      "detail detail";
-  }
-
-  .review-books-panel {
-    grid-area: books;
+      "feed"
+      "detail";
   }
 
   .review-feed-panel {
@@ -127,6 +120,14 @@
   .review-detail-panel {
     grid-area: detail;
     min-height: 520px;
+  }
+
+  .review-detail-header {
+    display: grid;
+  }
+
+  .review-detail-header-actions {
+    justify-content: space-between;
   }
 
 	  .library-novel-head {
@@ -190,7 +191,6 @@
 }
 
 @media (max-width: 900px) {
-  .review-stat-grid,
   .review-filter-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -198,7 +198,6 @@
   .review-workspace-grid {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "books"
       "feed"
       "detail";
     overflow: visible;
@@ -208,7 +207,6 @@
     overflow-y: auto;
   }
 
-  .review-books-panel,
   .review-feed-panel,
   .review-detail-panel {
     min-height: 420px;
@@ -321,7 +319,6 @@
     text-align: left;
   }
 
-  .review-stat-grid,
   .review-filter-bar {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -344,5 +341,29 @@
   .review-action-grid,
   .review-data-table div {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container review-page (max-width: 900px) {
+  .review-workspace-grid,
+  .review-workspace-grid.review-focused {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(420px, auto) minmax(540px, auto);
+    grid-template-areas:
+      "feed"
+      "detail";
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .review-feed-panel {
+    grid-area: feed;
+    min-height: 420px;
+  }
+
+  .review-detail-panel {
+    grid-area: detail;
+    min-height: 540px;
   }
 }
