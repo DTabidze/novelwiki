@@ -142,9 +142,8 @@ export default function BooksPage({
 
           {books.length === 0 ? (
             <EmptyState
-          title="No books uploaded"
-          message="Upload a source text file to parse chapters into this novel workspace."
-              action={<button type="button" onClick={() => setIsUploadOpen(true)}>Upload Book</button>}
+              title="No books uploaded"
+              message="Upload a source text file to parse chapters into this novel workspace."
             />
           ) : (
             <BookTable

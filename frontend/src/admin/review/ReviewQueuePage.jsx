@@ -82,6 +82,16 @@ function chapterKeyForItem(item) {
   return chapter?.id ? String(chapter.id) : "unlinked";
 }
 
+function pageForChapterGroup(groups, groupKey) {
+  const groupIndex = groups.findIndex((group) => chapterGroupKey(group) === groupKey);
+  return groupIndex < 0 ? 1 : Math.floor(groupIndex / CHAPTER_GROUP_PAGE_SIZE) + 1;
+}
+
+function pageForReviewItem(groups, item) {
+  if (!item) return 1;
+  return pageForChapterGroup(groups, chapterKeyForItem(item));
+}
+
 function countPending(items, predicate) {
   return items.filter((item) => item.review_status === "pending" && predicate(item)).length;
 }
@@ -198,7 +208,6 @@ export default function ReviewQueuePage({
     const existingSelectionIsVisible = candidateSelectionKey
       && orderedItems.some((item) => recordKey(item) === candidateSelectionKey);
     const nextSelectedKey = existingSelectionIsVisible ? candidateSelectionKey : firstQueueItemKey;
-    setChapterPage(1);
     setRevealedChapterKeys(new Set());
 
     if (nextSelectedKey) {
@@ -206,9 +215,11 @@ export default function ReviewQueuePage({
       const firstChapter = sourceChapter(nextItem);
       const firstGroupKey = firstChapter?.id ? String(firstChapter.id) : "unlinked";
 
+      setChapterPage(pageForReviewItem(groups, nextItem));
       setSelectedKey(nextSelectedKey);
       setExpandedChapterKeys(new Set([firstGroupKey]));
     } else {
+      setChapterPage(1);
       setSelectedKey("");
       setExpandedChapterKeys(new Set());
     }
@@ -230,11 +241,18 @@ export default function ReviewQueuePage({
     if (pendingSelectionKey !== undefined) {
       pendingSelectionKeyRef.current = undefined;
 
-      if (pendingSelectionKey && orderedItems.some((item) => recordKey(item) === pendingSelectionKey)) {
+      const pendingItem = pendingSelectionKey
+        ? orderedItems.find((item) => recordKey(item) === pendingSelectionKey)
+        : null;
+
+      if (pendingItem) {
+        setChapterPage(pageForReviewItem(groups, pendingItem));
         setSelectedKey(pendingSelectionKey);
       } else if (!pendingSelectionKey) {
+        setChapterPage(1);
         setSelectedKey("");
       } else {
+        setChapterPage(firstQueueItem ? pageForReviewItem(groups, firstQueueItem) : 1);
         setSelectedKey(firstQueueItemKey);
       }
 
@@ -246,8 +264,10 @@ export default function ReviewQueuePage({
     }
 
     if (firstQueueItemKey) {
+      setChapterPage(firstQueueItem ? pageForReviewItem(groups, firstQueueItem) : 1);
       setSelectedKey(firstQueueItemKey);
     } else if (selectedKey) {
+      setChapterPage(1);
       setSelectedKey("");
     }
   }, [firstQueueItemKey, orderedItems, selectedKey]);
@@ -269,18 +289,6 @@ export default function ReviewQueuePage({
       return next;
     });
   }, [groups, selectedGroupKey, selectedItem]);
-
-  React.useEffect(() => {
-    if (!selectedItem || groups.length === 0) return;
-
-    const selectedGroupIndex = groups.findIndex((group) => chapterGroupKey(group) === selectedGroupKey);
-    if (selectedGroupIndex < 0) return;
-
-    const selectedPage = Math.floor(selectedGroupIndex / CHAPTER_GROUP_PAGE_SIZE) + 1;
-    if (selectedPage !== chapterPage) {
-      setChapterPage(selectedPage);
-    }
-  }, [chapterPage, groups, selectedGroupKey, selectedItem]);
 
   React.useEffect(() => {
     if (!selectedItem) return;
@@ -361,6 +369,29 @@ export default function ReviewQueuePage({
     setSelectedKey(recordKey(item));
   }
 
+  function changeChapterPage(nextPage) {
+    const normalizedPage = Math.min(Math.max(nextPage, 1), totalChapterPages);
+    const nextGroups = groups.slice(
+      (normalizedPage - 1) * CHAPTER_GROUP_PAGE_SIZE,
+      normalizedPage * CHAPTER_GROUP_PAGE_SIZE
+    );
+    const nextItem = nextGroups.flatMap((group) => group.items)[0] || null;
+
+    setChapterPage(normalizedPage);
+
+    if (!nextItem) return;
+
+    const nextGroupKey = chapterKeyForItem(nextItem);
+    scrollModeRef.current = "nearest";
+    setExpandedChapterKeys((current) => {
+      if (current.has(nextGroupKey)) return current;
+      const next = new Set(current);
+      next.add(nextGroupKey);
+      return next;
+    });
+    setSelectedKey(recordKey(nextItem));
+  }
+
   function moveSelection(direction) {
     if (orderedItems.length === 0) return;
 
@@ -373,6 +404,7 @@ export default function ReviewQueuePage({
     const currentGroupKey = selectedGroupKey;
 
     scrollModeRef.current = nextGroupKey === currentGroupKey ? "nearest" : "center";
+    setChapterPage(pageForReviewItem(groups, nextItem));
     setExpandedChapterKeys((current) => {
       if (current.has(nextGroupKey)) return current;
       const next = new Set(current);
@@ -566,7 +598,7 @@ export default function ReviewQueuePage({
                   type="button"
                   className="admin-secondary-button review-feed-page-button"
                   disabled={clampedChapterPage <= 1}
-                  onClick={() => setChapterPage((page) => Math.max(1, page - 1))}
+                  onClick={() => changeChapterPage(clampedChapterPage - 1)}
                 >
                   Prev
                 </button>
@@ -577,7 +609,7 @@ export default function ReviewQueuePage({
                   type="button"
                   className="admin-secondary-button review-feed-page-button"
                   disabled={clampedChapterPage >= totalChapterPages}
-                  onClick={() => setChapterPage((page) => Math.min(totalChapterPages, page + 1))}
+                  onClick={() => changeChapterPage(clampedChapterPage + 1)}
                 >
                   Next
                 </button>

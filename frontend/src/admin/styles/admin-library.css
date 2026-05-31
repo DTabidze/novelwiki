@@ -49,27 +49,25 @@
 
 .library-search-field {
   min-width: 320px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 8px;
-  padding: 0 13px;
-  background: #081827;
+  position: relative;
+  display: block;
+}
+
+.library-search-field svg {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  z-index: 1;
+  transform: translateY(-50%);
   color: #7f92aa;
+  pointer-events: none;
 }
 
 .library-search-field input {
   min-width: 0;
   width: 100%;
-  border: 0;
-  padding: 0;
-  background: transparent;
-}
-
-.library-search-field input:focus {
-  outline: none;
+  min-height: 44px;
+  padding-left: 40px !important;
 }
 
 .library-page-header .admin-header-actions button,

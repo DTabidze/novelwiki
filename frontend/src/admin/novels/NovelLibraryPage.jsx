@@ -69,14 +69,15 @@ export default function NovelLibraryPage({ novels, loading, onCreateNovel, onOpe
           <p>Editorial workspace for AI extraction, review coverage, and wiki publishing.</p>
         </div>
         <div className="admin-header-actions">
-          <label className="library-search-field">
+          <div className="library-search-field" role="search">
             <Search aria-hidden="true" size={17} strokeWidth={1.8} />
             <input
+              aria-label="Search novels"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search novels..."
             />
-          </label>
+          </div>
           <button type="button" onClick={() => setIsCreateOpen(true)}>
             <Plus aria-hidden="true" size={17} strokeWidth={1.9} />
             Create Novel
@@ -150,13 +151,6 @@ export default function NovelLibraryPage({ novels, loading, onCreateNovel, onOpe
               novels.length === 0
                 ? "Create a novel workspace, then upload books inside it."
                 : "Try a different search term."
-            }
-            action={
-              novels.length === 0 ? (
-                <button type="button" onClick={() => setIsCreateOpen(true)}>
-                  Create Novel
-                </button>
-              ) : null
             }
           />
         ) : (

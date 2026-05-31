@@ -27,7 +27,7 @@ from app.models import (
     serialize_datetime,
     utc_now,
 )
-from app.services.ai_extraction_service import extract_chapter_with_ai
+from app.services.ai_extraction_service import ExtractionCancelled, extract_chapter_with_ai
 from app.services.chapter_parser import split_txt_into_chapters
 from app.services.extraction_service import get_extracted_data, run_placeholder_extraction
 
@@ -492,6 +492,18 @@ def mark_pending_run_chapters_skipped(run):
             run_chapter.finished_at = utc_now()
 
 
+def extraction_run_can_save_chapter(run_id, run_chapter_id):
+    db.session.expire_all()
+    run = ExtractionRun.query.get(run_id)
+    run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
+    return (
+        run
+        and run.status == "running"
+        and run_chapter
+        and run_chapter.status == "processing"
+    )
+
+
 def run_extraction_scope(novel, run):
     aggregate_summary = empty_extraction_summary()
     chapter_summaries = []
@@ -542,15 +554,65 @@ def run_extraction_scope(novel, run):
         run.current_chapter_id = chapter.id
         db.session.commit()
 
-        try:
-            summary = extract_chapter_with_ai(novel, chapter)
-        except Exception as error:
-            run_chapter.status = "failed"
-            run_chapter.error_message = str(error)
-            run_chapter.finished_at = utc_now()
-            refresh_run_totals(run)
-            db.session.commit()
-            raise
+        last_error = None
+        run_id = run.id
+        run_chapter_id = run_chapter.id
+
+        for attempt in range(2):
+            try:
+                summary = extract_chapter_with_ai(
+                    novel,
+                    chapter,
+                    should_continue=lambda: extraction_run_can_save_chapter(run_id, run_chapter_id),
+                )
+                break
+            except ExtractionCancelled:
+                db.session.rollback()
+                run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
+                run = ExtractionRun.query.get(run_id)
+
+                if run_chapter:
+                    run_chapter.status = "cancelled"
+                    run_chapter.error_message = "Canceled before saving chapter output."
+                    run_chapter.finished_at = utc_now()
+
+                if run:
+                    run.status = "cancelled"
+                    run.error_message = "Canceled by user."
+                    run.finished_at = utc_now()
+                    run.current_chapter_id = None
+                    mark_pending_run_chapters_skipped(run)
+                    refresh_run_totals(run)
+
+                    if run.book:
+                        run.book.extraction_status = "cancelled"
+
+                novel.status = "ready"
+                novel.error_message = None
+                db.session.commit()
+                return aggregate_summary, chapter_summaries
+            except Exception as error:
+                last_error = error
+                db.session.rollback()
+
+                if attempt == 0:
+                    current_app.logger.warning(
+                        "AI extraction failed for chapter %s; retrying once: %s",
+                        chapter.chapter_number,
+                        error,
+                    )
+                    run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
+                    run = ExtractionRun.query.get(run_id)
+                    continue
+
+                run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
+                run = ExtractionRun.query.get(run_id)
+                run_chapter.status = "failed"
+                run_chapter.error_message = str(error)
+                run_chapter.finished_at = utc_now()
+                refresh_run_totals(run)
+                db.session.commit()
+                raise last_error
 
         review_data = get_extracted_data(novel)
         run_chapter.records_created = count_created_records(summary)
@@ -1060,7 +1122,7 @@ def cancel_extraction_run(novel_id, run_id):
     )
 
     run.status = "cancelled"
-    run.error_message = "Stopped by admin."
+    run.error_message = "Canceled by user."
     run.finished_at = None if has_processing_chapter else utc_now()
     run.current_chapter_id = run.current_chapter_id if has_processing_chapter else None
     novel.status = "ready"

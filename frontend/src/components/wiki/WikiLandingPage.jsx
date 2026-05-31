@@ -23,8 +23,8 @@ export default function WikiLandingPage({ novels, onLoadNovel }) {
           <option value="long">250+</option>
         </select>
         <select defaultValue="recent">
-          <option value="recent">Sort: Recently Updated</option>
-          <option value="title">Sort: Title</option>
+          <option value="recent">Recently Updated</option>
+          <option value="title">Title</option>
         </select>
         <span>{formatNumber(novels.length)} novels</span>
       </section>
@@ -54,8 +54,8 @@ export default function WikiLandingPage({ novels, onLoadNovel }) {
                   <small>Cultivation Novel</small>
                 </div>
               </div>
-              <span>Unknown</span>
-              <span className="wiki-status-tag">Tracking</span>
+              <span>{wikiNovel.author || "Unknown"}</span>
+              <span className="wiki-status-tag">Completed</span>
               <strong>{formatNumber(wikiNovel.chapter_count)}</strong>
               <span>{formatDate(wikiNovel.updated_at)}</span>
               <span className="wiki-row-action">›</span>
