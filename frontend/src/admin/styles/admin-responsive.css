@@ -22,6 +22,23 @@
   }
 }
 
+@media (max-width: 1280px) {
+  .review-filter-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .review-workspace-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .review-feed-panel,
+  .review-detail-panel,
+  .review-focused .review-feed-panel,
+  .review-focused .review-detail-panel {
+    grid-column: auto;
+  }
+}
+
 @media (max-width: 1180px) {
   body:has(.admin-shell),
   body:has(.workspace-shell.single-sidebar) {
@@ -89,6 +106,30 @@
 	    grid-template-columns: 1fr;
 	  }
 
+  .review-workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "feed"
+      "detail";
+  }
+
+  .review-feed-panel {
+    grid-area: feed;
+  }
+
+  .review-detail-panel {
+    grid-area: detail;
+    min-height: 520px;
+  }
+
+  .review-detail-header {
+    display: grid;
+  }
+
+  .review-detail-header-actions {
+    justify-content: space-between;
+  }
+
 	  .library-novel-head {
 	    display: none;
 	  }
@@ -146,6 +187,29 @@
 
   .chapter-row-list {
     max-height: 70vh;
+  }
+}
+
+@media (max-width: 900px) {
+  .review-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .review-workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "feed"
+      "detail";
+    overflow: visible;
+  }
+
+  .review-page-body {
+    overflow-y: auto;
+  }
+
+  .review-feed-panel,
+  .review-detail-panel {
+    min-height: 420px;
   }
 }
 
@@ -253,5 +317,53 @@
   .extraction-time-stack {
     justify-items: start;
     text-align: left;
+  }
+
+  .review-filter-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .review-item-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .review-status-badge,
+  .review-confidence {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+
+  .review-row-arrow {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .review-action-grid,
+  .review-data-table div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container review-page (max-width: 900px) {
+  .review-workspace-grid,
+  .review-workspace-grid.review-focused {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(420px, auto) minmax(540px, auto);
+    grid-template-areas:
+      "feed"
+      "detail";
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .review-feed-panel {
+    grid-area: feed;
+    min-height: 420px;
+  }
+
+  .review-detail-panel {
+    grid-area: detail;
+    min-height: 540px;
   }
 }

@@ -1,3 +1,5 @@
+import re
+
 from flask import Blueprint, jsonify, request
 
 from app.models import (
@@ -109,6 +111,37 @@ def failure(message, status=400):
     return jsonify({"data": None, "error": message}), status
 
 
+def normalize_text(value):
+    return re.sub(r"\s+", " ", value or "").strip().lower()
+
+
+def split_context_paragraphs(content):
+    paragraphs = [
+        paragraph.strip()
+        for paragraph in re.split(r"\n\s*\n+", content or "")
+        if paragraph.strip()
+    ]
+
+    if paragraphs:
+        return paragraphs
+
+    fallback = " ".join((content or "").split())
+    return [fallback] if fallback else []
+
+
+def locate_evidence_paragraph(paragraphs, evidence_text):
+    normalized_evidence = normalize_text(evidence_text)
+
+    if not normalized_evidence:
+        return None
+
+    for index, paragraph in enumerate(paragraphs):
+        if normalized_evidence in normalize_text(paragraph):
+            return index
+
+    return None
+
+
 def merge_text(target_text, source_text):
     if not source_text:
         return target_text
@@ -137,6 +170,46 @@ def chapter_reference(chapter_id):
         return None
 
     return chapter.to_reference_dict()
+
+
+@admin_review_bp.get("/chapters/<int:chapter_id>/context")
+def chapter_evidence_context(chapter_id):
+    chapter = Chapter.query.get_or_404(chapter_id)
+    evidence_text = request.args.get("evidence", "")
+    radius = request.args.get("radius", 1, type=int)
+    radius = max(1, min(radius, 2))
+    paragraphs = split_context_paragraphs(chapter.content)
+    evidence_index = locate_evidence_paragraph(paragraphs, evidence_text)
+
+    if evidence_index is None:
+        return success(
+            {
+                "chapter": chapter.to_reference_dict(),
+                "evidence_text": evidence_text,
+                "exact_match": False,
+                "paragraphs": [],
+                "message": "Could not locate exact paragraph in chapter text.",
+            }
+        )
+
+    start_index = max(0, evidence_index - radius)
+    end_index = min(len(paragraphs), evidence_index + radius + 1)
+
+    return success(
+        {
+            "chapter": chapter.to_reference_dict(),
+            "evidence_text": evidence_text,
+            "exact_match": True,
+            "paragraphs": [
+                {
+                    "index": index,
+                    "text": paragraphs[index],
+                    "is_evidence": index == evidence_index,
+                }
+                for index in range(start_index, end_index)
+            ],
+        }
+    )
 
 
 def admin_review_response(entity_type, record):

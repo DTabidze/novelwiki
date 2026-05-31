@@ -1,0 +1,635 @@
+import React from "react";
+import {
+  ClipboardCheck,
+  Download,
+  FileText,
+  Gauge,
+  Package,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
+import { API_BASE_URL, fetchJson } from "../../api.js";
+import ReviewChapterGroup from "./ReviewChapterGroup.jsx";
+import ReviewContextModal from "./ReviewContextModal.jsx";
+import ReviewDetailPanel from "./ReviewDetailPanel.jsx";
+import ReviewEditProposalModal from "./ReviewEditProposalModal.jsx";
+import ReviewFilters from "./ReviewFilters.jsx";
+import {
+  flattenReviewData,
+  recordKey,
+  reviewTitle,
+  reviewWarnings,
+  sourceChapter,
+} from "./reviewUtils.js";
+
+const CHAPTER_GROUP_PAGE_SIZE = 10;
+const CHAPTER_ITEM_PREVIEW_LIMIT = 8;
+
+function parseChapterRange(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
+  if (rangeMatch) {
+    return [Number(rangeMatch[1]), Number(rangeMatch[2])].sort((a, b) => a - b);
+  }
+
+  const single = Number(trimmed);
+  if (Number.isFinite(single)) {
+    return [single, single];
+  }
+
+  return null;
+}
+
+function groupByChapter(items, booksById) {
+  const map = new Map();
+
+  items.forEach((item) => {
+    const chapter = sourceChapter(item);
+    const key = chapter?.id || "unlinked";
+
+    if (!map.has(key)) {
+      const book = booksById.get(chapter?.book_id);
+      map.set(key, {
+        key,
+        chapter,
+        bookTitle: book ? `Book ${book.number}: ${book.title}` : "Unlinked source",
+        items: [],
+      });
+    }
+
+    map.get(key).items.push(item);
+  });
+
+  return Array.from(map.values()).sort((a, b) => {
+    const aChapter = a.chapter;
+    const bChapter = b.chapter;
+    const aBook = booksById.get(aChapter?.book_id)?.number || 9999;
+    const bBook = booksById.get(bChapter?.book_id)?.number || 9999;
+
+    if (aBook !== bBook) return aBook - bBook;
+    return (aChapter?.chapter_number || 999999) - (bChapter?.chapter_number || 999999);
+  });
+}
+
+function chapterGroupKey(group) {
+  return String(group.key);
+}
+
+function chapterKeyForItem(item) {
+  const chapter = sourceChapter(item);
+  return chapter?.id ? String(chapter.id) : "unlinked";
+}
+
+function countPending(items, predicate) {
+  return items.filter((item) => item.review_status === "pending" && predicate(item)).length;
+}
+
+export default function ReviewQueuePage({
+  books,
+  chapters,
+  extractedData,
+  novel,
+  onOpenNovelSettings,
+  onRefresh,
+}) {
+  const allItems = React.useMemo(() => flattenReviewData(extractedData), [extractedData]);
+  const booksById = React.useMemo(() => new Map(books.map((book) => [book.id, book])), [books]);
+  const persistedSelectionKey = React.useMemo(
+    () => `novelwiki-review-selection-${novel?.id || "global"}`,
+    [novel?.id]
+  );
+  const [filters, setFilters] = React.useState({
+    bookId: "all",
+    chapterRange: "",
+    typeGroup: "all",
+    status: "pending",
+    warningsOnly: false,
+    search: "",
+  });
+  const [selectedKey, setSelectedKey] = React.useState(() => window.sessionStorage.getItem(persistedSelectionKey) || "");
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [expandedChapterKeys, setExpandedChapterKeys] = React.useState(() => new Set());
+  const [revealedChapterKeys, setRevealedChapterKeys] = React.useState(() => new Set());
+  const [chapterPage, setChapterPage] = React.useState(1);
+  const [contextEvidence, setContextEvidence] = React.useState(null);
+  const [editingItem, setEditingItem] = React.useState(null);
+  const [editError, setEditError] = React.useState("");
+  const feedListRef = React.useRef(null);
+  const scrollModeRef = React.useRef("nearest");
+  const pendingSelectionKeyRef = React.useRef(undefined);
+  const filterChangeSelectionKeyRef = React.useRef("");
+  const filterSignature = `${filters.bookId}|${filters.chapterRange}|${filters.typeGroup}|${filters.status}|${filters.warningsOnly}|${filters.search}`;
+
+  const filteredItems = React.useMemo(() => {
+    const chapterRange = parseChapterRange(filters.chapterRange);
+    const search = filters.search.trim().toLowerCase();
+
+    return allItems.filter((item) => {
+      const chapter = sourceChapter(item);
+      const warnings = reviewWarnings(item);
+
+      if (filters.bookId !== "all" && String(chapter?.book_id) !== String(filters.bookId)) {
+        return false;
+      }
+
+      if (chapterRange && (!chapter || chapter.chapter_number < chapterRange[0] || chapter.chapter_number > chapterRange[1])) {
+        return false;
+      }
+
+      if (filters.typeGroup !== "all" && item.typeGroup !== filters.typeGroup) {
+        return false;
+      }
+
+      if (filters.status !== "all" && item.review_status !== filters.status) {
+        return false;
+      }
+
+      if (filters.warningsOnly && warnings.length === 0) {
+        return false;
+      }
+
+      if (search) {
+        const haystack = [
+          reviewTitle(item),
+          item.character_name,
+          item.name,
+          item.title,
+          item.description,
+          item.field_name,
+          item.proposed_value,
+          chapter?.title,
+        ].filter(Boolean).join(" ").toLowerCase();
+
+        if (!haystack.includes(search)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [allItems, filters]);
+
+  const groups = React.useMemo(() => groupByChapter(filteredItems, booksById), [filteredItems, booksById]);
+  const orderedItems = React.useMemo(() => groups.flatMap((group) => group.items), [groups]);
+  const firstQueueItem = orderedItems[0] || null;
+  const selectedItem = orderedItems.find((item) => recordKey(item) === selectedKey) || null;
+  const selectedChapter = selectedItem ? sourceChapter(selectedItem) : null;
+  const selectedGroupKey = selectedChapter?.id ? String(selectedChapter.id) : "unlinked";
+  const totalChapterPages = Math.max(1, Math.ceil(groups.length / CHAPTER_GROUP_PAGE_SIZE));
+  const clampedChapterPage = Math.min(chapterPage, totalChapterPages);
+  const visibleGroups = groups.slice(
+    (clampedChapterPage - 1) * CHAPTER_GROUP_PAGE_SIZE,
+    clampedChapterPage * CHAPTER_GROUP_PAGE_SIZE
+  );
+  const firstVisibleGroup = visibleGroups[0];
+  const lastVisibleGroup = visibleGroups[visibleGroups.length - 1];
+  const firstQueueItemKey = firstQueueItem ? recordKey(firstQueueItem) : "";
+  const selectedIndex = selectedItem
+    ? orderedItems.findIndex((item) => recordKey(item) === recordKey(selectedItem))
+    : -1;
+  const isFirstSelected = selectedIndex <= 0;
+  const isLastSelected = selectedIndex < 0 || selectedIndex >= orderedItems.length - 1;
+
+  React.useEffect(() => {
+    pendingSelectionKeyRef.current = undefined;
+    const candidateSelectionKey = filterChangeSelectionKeyRef.current || selectedKey;
+    const existingSelectionIsVisible = candidateSelectionKey
+      && orderedItems.some((item) => recordKey(item) === candidateSelectionKey);
+    const nextSelectedKey = existingSelectionIsVisible ? candidateSelectionKey : firstQueueItemKey;
+    setChapterPage(1);
+    setRevealedChapterKeys(new Set());
+
+    if (nextSelectedKey) {
+      const nextItem = orderedItems.find((item) => recordKey(item) === nextSelectedKey) || firstQueueItem;
+      const firstChapter = sourceChapter(nextItem);
+      const firstGroupKey = firstChapter?.id ? String(firstChapter.id) : "unlinked";
+
+      setSelectedKey(nextSelectedKey);
+      setExpandedChapterKeys(new Set([firstGroupKey]));
+    } else {
+      setSelectedKey("");
+      setExpandedChapterKeys(new Set());
+    }
+  }, [filterSignature]);
+
+  React.useEffect(() => {
+    filterChangeSelectionKeyRef.current = selectedKey;
+
+    if (selectedKey) {
+      window.sessionStorage.setItem(persistedSelectionKey, selectedKey);
+    } else {
+      window.sessionStorage.removeItem(persistedSelectionKey);
+    }
+  }, [persistedSelectionKey, selectedKey]);
+
+  React.useEffect(() => {
+    const pendingSelectionKey = pendingSelectionKeyRef.current;
+
+    if (pendingSelectionKey !== undefined) {
+      pendingSelectionKeyRef.current = undefined;
+
+      if (pendingSelectionKey && orderedItems.some((item) => recordKey(item) === pendingSelectionKey)) {
+        setSelectedKey(pendingSelectionKey);
+      } else if (!pendingSelectionKey) {
+        setSelectedKey("");
+      } else {
+        setSelectedKey(firstQueueItemKey);
+      }
+
+      return;
+    }
+
+    if (selectedKey && orderedItems.some((item) => recordKey(item) === selectedKey)) {
+      return;
+    }
+
+    if (firstQueueItemKey) {
+      setSelectedKey(firstQueueItemKey);
+    } else if (selectedKey) {
+      setSelectedKey("");
+    }
+  }, [firstQueueItemKey, orderedItems, selectedKey]);
+
+  React.useEffect(() => {
+    if (groups.length === 0) {
+      setExpandedChapterKeys(new Set());
+      return;
+    }
+
+    const keyToExpand = selectedItem
+      ? selectedGroupKey
+      : chapterGroupKey(groups[0]);
+
+    setExpandedChapterKeys((current) => {
+      if (current.has(keyToExpand)) return current;
+      const next = new Set(current);
+      next.add(keyToExpand);
+      return next;
+    });
+  }, [groups, selectedGroupKey, selectedItem]);
+
+  React.useEffect(() => {
+    if (!selectedItem || groups.length === 0) return;
+
+    const selectedGroupIndex = groups.findIndex((group) => chapterGroupKey(group) === selectedGroupKey);
+    if (selectedGroupIndex < 0) return;
+
+    const selectedPage = Math.floor(selectedGroupIndex / CHAPTER_GROUP_PAGE_SIZE) + 1;
+    if (selectedPage !== chapterPage) {
+      setChapterPage(selectedPage);
+    }
+  }, [chapterPage, groups, selectedGroupKey, selectedItem]);
+
+  React.useEffect(() => {
+    if (!selectedItem) return;
+
+    const selectedGroup = groups.find((group) => chapterGroupKey(group) === selectedGroupKey);
+    if (!selectedGroup) return;
+
+    const selectedItemIndex = selectedGroup.items.findIndex((item) => recordKey(item) === recordKey(selectedItem));
+    if (selectedItemIndex < CHAPTER_ITEM_PREVIEW_LIMIT) return;
+
+    setRevealedChapterKeys((current) => {
+      if (current.has(selectedGroupKey)) return current;
+      const next = new Set(current);
+      next.add(selectedGroupKey);
+      return next;
+    });
+  }, [groups, selectedGroupKey, selectedItem]);
+
+  React.useEffect(() => {
+    if (!selectedKey) return;
+
+    const scrollMode = scrollModeRef.current;
+    const frame = window.requestAnimationFrame(() => {
+      const scrollContainer = feedListRef.current;
+      const selectedElement = document.getElementById(`review-item-${selectedKey}`);
+      if (!scrollContainer || !selectedElement) return;
+
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const itemRect = selectedElement.getBoundingClientRect();
+      const isFullyVisible = itemRect.top >= containerRect.top && itemRect.bottom <= containerRect.bottom;
+
+      if (isFullyVisible && scrollMode === "nearest") {
+        scrollModeRef.current = "nearest";
+        return;
+      }
+
+      const currentScrollTop = scrollContainer.scrollTop;
+      const itemTop = itemRect.top - containerRect.top + currentScrollTop;
+      const itemBottom = itemTop + selectedElement.offsetHeight;
+      let nextScrollTop = currentScrollTop;
+
+      if (scrollMode === "center") {
+        nextScrollTop = itemTop - (scrollContainer.clientHeight / 2) + (selectedElement.offsetHeight / 2);
+      } else if (itemRect.top < containerRect.top) {
+        nextScrollTop = itemTop;
+      } else if (itemRect.bottom > containerRect.bottom) {
+        nextScrollTop = itemBottom - scrollContainer.clientHeight;
+      }
+
+      scrollContainer.scrollTo({
+        top: Math.max(0, nextScrollTop),
+        behavior: "smooth",
+      });
+      scrollModeRef.current = "nearest";
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedKey, revealedChapterKeys, clampedChapterPage]);
+
+  const pendingItems = allItems.filter((item) => item.review_status === "pending");
+  const pendingWarnings = pendingItems.filter((item) => reviewWarnings(item).length > 0).length;
+  const countsByBook = pendingItems.reduce(
+    (counts, item) => {
+      const chapter = sourceChapter(item);
+      counts.all += 1;
+
+      if (chapter?.book_id) {
+        counts[chapter.book_id] = (counts[chapter.book_id] || 0) + 1;
+      }
+
+      return counts;
+    },
+    { all: 0 }
+  );
+
+  function selectItem(item) {
+    scrollModeRef.current = "nearest";
+    setSelectedKey(recordKey(item));
+  }
+
+  function moveSelection(direction) {
+    if (orderedItems.length === 0) return;
+
+    const currentIndex = orderedItems.findIndex((item) => recordKey(item) === selectedKey);
+    const nextIndex = currentIndex < 0
+      ? 0
+      : Math.min(Math.max(currentIndex + direction, 0), orderedItems.length - 1);
+    const nextItem = orderedItems[nextIndex];
+    const nextGroupKey = chapterKeyForItem(nextItem);
+    const currentGroupKey = selectedGroupKey;
+
+    scrollModeRef.current = nextGroupKey === currentGroupKey ? "nearest" : "center";
+    setExpandedChapterKeys((current) => {
+      if (current.has(nextGroupKey)) return current;
+      const next = new Set(current);
+      next.add(nextGroupKey);
+      return next;
+    });
+    setSelectedKey(recordKey(nextItem));
+  }
+
+  function toggleChapter(groupKey) {
+    setExpandedChapterKeys((current) => {
+      const next = new Set(current);
+
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+
+      return next;
+    });
+  }
+
+  function revealChapter(groupKey) {
+    setRevealedChapterKeys((current) => {
+      const next = new Set(current);
+      next.add(groupKey);
+      return next;
+    });
+  }
+
+  async function updateReviewItem(item, reviewStatus) {
+    const currentIndex = orderedItems.findIndex((orderedItem) => recordKey(orderedItem) === recordKey(item));
+    const nextItem = currentIndex >= 0
+      ? orderedItems[currentIndex + 1] || orderedItems[currentIndex - 1] || null
+      : null;
+    const statusFilterWillStillShowItem = filters.status === "all" || filters.status === reviewStatus;
+    const nextSelectionKey = statusFilterWillStillShowItem
+      ? recordKey(item)
+      : nextItem
+        ? recordKey(nextItem)
+        : "";
+
+    pendingSelectionKeyRef.current = nextSelectionKey;
+
+    if (!statusFilterWillStillShowItem && nextItem) {
+      const nextGroupKey = chapterKeyForItem(nextItem);
+      const currentGroupKey = chapterKeyForItem(item);
+
+      scrollModeRef.current = nextGroupKey === currentGroupKey ? "nearest" : "center";
+      setExpandedChapterKeys((current) => {
+        if (current.has(nextGroupKey)) return current;
+        const next = new Set(current);
+        next.add(nextGroupKey);
+        return next;
+      });
+    } else if (statusFilterWillStillShowItem) {
+      scrollModeRef.current = "nearest";
+    }
+
+    setIsSaving(true);
+
+    try {
+      await fetchJson(`${API_BASE_URL}/admin/review/${item.entityType}/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_status: reviewStatus }),
+      });
+      await onRefresh?.({ showLoading: false });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveReviewProposalEdits(payload) {
+    if (!editingItem) return;
+
+    setEditError("");
+    setIsSaving(true);
+    pendingSelectionKeyRef.current = recordKey(editingItem);
+
+    try {
+      await fetchJson(`${API_BASE_URL}/admin/review/${editingItem.entityType}/${editingItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      await onRefresh?.({ showLoading: false });
+      setEditingItem(null);
+    } catch (err) {
+      setEditError(err.message || "Could not save proposal changes.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const summaryCards = [
+    { label: "Total Pending", value: pendingItems.length, detail: "items", color: "orange", Icon: ClipboardCheck },
+    { label: "Characters", value: countPending(allItems, (item) => item.typeGroup === "characters"), detail: "items", color: "purple", Icon: Users },
+    { label: "Metadata", value: countPending(allItems, (item) => item.typeGroup === "metadata"), detail: "items", color: "blue", Icon: FileText },
+    { label: "Progression", value: countPending(allItems, (item) => item.typeGroup === "progression"), detail: "items", color: "green", Icon: Gauge },
+    { label: "Skills & Items", value: countPending(allItems, (item) => item.typeGroup === "skills_items"), detail: "items", color: "orange", Icon: Package },
+    { label: "Warnings", value: pendingWarnings, detail: "items", color: "red", Icon: TriangleAlert },
+  ];
+
+  return (
+    <section className="workspace-page review-page">
+      <header className="workspace-page-header">
+        <div>
+          <h1>Review Queue</h1>
+          <p>Review and approve extracted content before it becomes public wiki data.</p>
+        </div>
+        <div className="admin-header-actions">
+          <button type="button" className="admin-secondary-button">
+            <Download size={16} /> Export Review Report
+          </button>
+          <button type="button" className="admin-secondary-button" onClick={() => window.open(`/wiki/novels/${novel?.id}`, "_blank")}>
+            View Novel
+          </button>
+          <button type="button" onClick={onOpenNovelSettings}>Novel Settings</button>
+        </div>
+      </header>
+
+      <div className="workspace-page-body review-page-body">
+        <div className="review-status-strip" aria-label="Review queue status summary">
+          {summaryCards.map((card) => {
+            const Icon = card.Icon;
+            return (
+              <span className={`review-status-pill ${card.color}`} key={card.label}>
+                <Icon aria-hidden="true" size={14} strokeWidth={1.9} />
+                <strong>{card.value}</strong>
+                {card.label}
+              </span>
+            );
+          })}
+        </div>
+
+        <ReviewFilters books={books} countsByBook={countsByBook} filters={filters} onChange={setFilters} />
+
+        <div className={selectedItem ? "review-workspace-grid review-focused" : "review-workspace-grid"}>
+          <main className="review-feed-panel admin-panel">
+            <div className="review-panel-title">
+              <div>
+                <h2>
+                  {filters.bookId === "all"
+                    ? "All Review Items"
+                    : `Book ${booksById.get(Number(filters.bookId))?.number || filters.bookId}: ${booksById.get(Number(filters.bookId))?.title || ""}`}
+                </h2>
+                <span>
+                  {filteredItems.length} shown
+                  {filters.bookId !== "all" ? ` - ${countsByBook[Number(filters.bookId)] || 0} pending in this book` : ""}
+                </span>
+              </div>
+            </div>
+
+            <div className="review-feed-list" ref={feedListRef}>
+              {groups.length === 0 ? (
+                <div className="review-empty-feed">
+                  <strong>No review items match the current filters.</strong>
+                  <p>Try a different book, status, type, or search term.</p>
+                </div>
+              ) : (
+                visibleGroups.map((group) => {
+                  const groupKey = chapterGroupKey(group);
+
+                  return (
+                    <ReviewChapterGroup
+                      key={groupKey}
+                      group={group}
+                      selectedKey={selectedKey}
+                      onSelect={selectItem}
+                      isExpanded={expandedChapterKeys.has(groupKey)}
+                      isRevealed={revealedChapterKeys.has(groupKey)}
+                      onToggle={() => toggleChapter(groupKey)}
+                      onShowAll={() => revealChapter(groupKey)}
+                      visibleLimit={CHAPTER_ITEM_PREVIEW_LIMIT}
+                    />
+                  );
+                })
+              )}
+            </div>
+
+            <footer className="review-feed-footer">
+              <span>
+                {groups.length === 0
+                  ? "No chapters shown"
+                  : `Showing chapters ${firstVisibleGroup?.chapter?.chapter_number || "-"}-${lastVisibleGroup?.chapter?.chapter_number || "-"} - ${filteredItems.length} pending items`}
+              </span>
+              <div>
+                <button
+                  type="button"
+                  className="admin-secondary-button review-feed-page-button"
+                  disabled={clampedChapterPage <= 1}
+                  onClick={() => setChapterPage((page) => Math.max(1, page - 1))}
+                >
+                  Prev
+                </button>
+                <button type="button" className="admin-secondary-button review-feed-page-button" disabled>
+                  {clampedChapterPage}
+                </button>
+                <button
+                  type="button"
+                  className="admin-secondary-button review-feed-page-button"
+                  disabled={clampedChapterPage >= totalChapterPages}
+                  onClick={() => setChapterPage((page) => Math.min(totalChapterPages, page + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </footer>
+          </main>
+
+          <ReviewDetailPanel
+            item={selectedItem}
+            isSaving={isSaving}
+            onApprove={(item) => updateReviewItem(item, "approved")}
+            onReject={(item) => updateReviewItem(item, "rejected")}
+            onNext={() => moveSelection(1)}
+            onPrevious={() => moveSelection(-1)}
+            onViewContext={setContextEvidence}
+            onEdit={(item) => {
+              setEditError("");
+              setEditingItem(item);
+            }}
+            canGoNext={!isLastSelected}
+            canGoPrevious={!isFirstSelected}
+            emptyTitle={filteredItems.length === 0 ? "No pending review items" : "Select a review item"}
+            emptyDescription={
+              filteredItems.length === 0
+                ? "There are no review items matching the current filters."
+                : "Choose an extracted record from the queue to inspect evidence and moderate it."
+            }
+          />
+        </div>
+      </div>
+      {contextEvidence ? (
+        <ReviewContextModal
+          evidence={contextEvidence}
+          fallbackChapter={selectedChapter}
+          onClose={() => setContextEvidence(null)}
+        />
+      ) : null}
+      {editingItem ? (
+        <ReviewEditProposalModal
+          item={editingItem}
+          isSaving={isSaving}
+          error={editError}
+          onClose={() => {
+            if (!isSaving) {
+              setEditError("");
+              setEditingItem(null);
+            }
+          }}
+          onSave={saveReviewProposalEdits}
+          onViewContext={setContextEvidence}
+        />
+      ) : null}
+    </section>
+  );
+}
