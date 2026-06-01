@@ -230,7 +230,10 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
   }
 
   function openReviewForExtractionRun(run) {
-    const params = new URLSearchParams({ status: "pending" });
+    const params = new URLSearchParams({
+      source: "extraction_run",
+      status: "pending",
+    });
 
     if (run.book_id) {
       params.set("book_id", String(run.book_id));
