@@ -22,9 +22,12 @@ export default function ExtractionPage({
   novel,
   onStartExtraction,
   onStopExtraction,
+  onDeleteExtractionRun,
+  onViewReviewItems,
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [modalDefaults, setModalDefaults] = React.useState(null);
   const activeRun = latestRunWithStatus(extractionRuns, "running");
   const focusRun = activeRun || extractionRuns[0] || null;
   const failedRuns = countRuns(extractionRuns, "failed");
@@ -44,7 +47,28 @@ export default function ExtractionPage({
 
   function closeNewExtractionModal() {
     setIsModalOpen(false);
+    setModalDefaults(null);
     setSearchParams({});
+  }
+
+  function continueFromNextChapter(run) {
+    if (!run.book_id || !run.chapter_end) return;
+
+    setModalDefaults({
+      bookId: String(run.book_id),
+      chapterStart: String(run.chapter_end + 1),
+      scopeType: "chapter_range",
+    });
+    setIsModalOpen(true);
+  }
+
+  function canContinueFromNextChapter(run) {
+    if (run.status !== "completed" || !run.book_id || !run.chapter_end) return false;
+
+    return chapters.some((chapter) =>
+      Number(chapter.book_id) === Number(run.book_id) &&
+      Number(chapter.chapter_number) > Number(run.chapter_end)
+    );
   }
 
   React.useEffect(() => {
@@ -80,8 +104,14 @@ export default function ExtractionPage({
             onStopRun={onStopExtraction}
           />
           <ExtractionRunsPanel
+            canContinueFromNextChapter={canContinueFromNextChapter}
             extractionRuns={extractionRuns}
+            onCancelRun={onStopExtraction}
+            onContinueFromNextChapter={continueFromNextChapter}
+            onContinueRun={retryFromFailedRun}
+            onDeleteRun={onDeleteExtractionRun}
             onNewExtraction={() => setIsModalOpen(true)}
+            onViewReviewItems={onViewReviewItems}
           />
         </section>
       </section>
@@ -90,6 +120,8 @@ export default function ExtractionPage({
         <NewExtractionModal
           books={books}
           chapters={chapters}
+          extractionRuns={extractionRuns}
+          initialValues={modalDefaults}
           onClose={closeNewExtractionModal}
           onStart={onStartExtraction}
         />

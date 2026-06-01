@@ -1,8 +1,13 @@
 import React from "react";
-import { Search } from "lucide-react";
+import { RotateCcw, Search } from "lucide-react";
 
-export default function ReviewFilters({ books, countsByBook = {}, filters, onChange }) {
+export default function ReviewFilters({ books, countsByBook = {}, filters, onChange, onClearFilters }) {
   function update(key, value) {
+    if (key === "bookId") {
+      onChange({ ...filters, bookId: value, chapterRange: "" });
+      return;
+    }
+
     onChange({ ...filters, [key]: value });
   }
 
@@ -67,6 +72,11 @@ export default function ReviewFilters({ books, countsByBook = {}, filters, onCha
           placeholder="Search in results..."
         />
       </label>
+
+      <button className="admin-secondary-button review-clear-filters-button" type="button" onClick={onClearFilters}>
+        <RotateCcw aria-hidden="true" size={15} strokeWidth={1.9} />
+        Clear filters
+      </button>
     </section>
   );
 }

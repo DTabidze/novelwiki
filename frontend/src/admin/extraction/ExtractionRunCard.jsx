@@ -1,8 +1,15 @@
 import React from "react";
-import { MoreHorizontal } from "lucide-react";
+import {
+  Ban,
+  FileSearch,
+  MoreHorizontal,
+  RotateCcw,
+  StepForward,
+  Trash2,
+} from "lucide-react";
 import { runProgress, runTitle } from "./extractionUtils.js";
 
-function relativeRunTime(value) {
+export function relativeRunTime(value) {
   if (!value) {
     return "Queued";
   }
@@ -18,11 +25,11 @@ function relativeRunTime(value) {
   return "Just now";
 }
 
-function compactRunTitle(run) {
+export function compactRunTitle(run) {
   return runTitle(run).replace(": ", " · ");
 }
 
-function formatDuration(startedAt, finishedAt) {
+export function formatDuration(startedAt, finishedAt) {
   if (!startedAt || !finishedAt) return "-";
 
   const seconds = Math.max(0, Math.floor((new Date(finishedAt) - new Date(startedAt)) / 1000));
@@ -41,7 +48,7 @@ function formatDuration(startedAt, finishedAt) {
   return `${remainingSeconds}s`;
 }
 
-function estimateRemaining(run) {
+export function estimateRemaining(run) {
   if (run.status !== "running") return null;
 
   const completed = (run.run_chapters || []).filter((runChapter) =>
@@ -61,7 +68,7 @@ function estimateRemaining(run) {
   return formatDuration(new Date(0).toISOString(), new Date(estimatedSeconds * 1000).toISOString());
 }
 
-function chapterLabel(runChapter) {
+export function chapterLabel(runChapter) {
   const chapter = runChapter?.chapter;
 
   if (!chapter) return "Unknown chapter";
@@ -74,7 +81,7 @@ function chapterLabel(runChapter) {
   return `Chapter ${chapter.chapter_number}${title ? ` - ${title}` : ""}`;
 }
 
-function chapterRangeLabel(runChapters, emptyLabel = "None") {
+export function chapterRangeLabel(runChapters, emptyLabel = "None") {
   const chapterNumbers = runChapters
     .map((runChapter) => runChapter.chapter?.chapter_number)
     .filter((number) => Number.isFinite(Number(number)))
@@ -90,7 +97,7 @@ function chapterRangeLabel(runChapters, emptyLabel = "None") {
   return `Chapters ${first}-${last}`;
 }
 
-function requestedRangeLabel(run) {
+export function requestedRangeLabel(run) {
   const runChapters = run.run_chapters || [];
 
   if (run.chapter_start && run.chapter_end) {
@@ -102,18 +109,18 @@ function requestedRangeLabel(run) {
   return chapterRangeLabel(runChapters, "No chapters requested");
 }
 
-function completedRangeLabel(run) {
+export function completedRangeLabel(run) {
   return chapterRangeLabel(
     (run.run_chapters || []).filter((runChapter) => runChapter.status === "completed"),
     "None",
   );
 }
 
-function failedRunChapter(run) {
+export function failedRunChapter(run) {
   return (run.run_chapters || []).find((runChapter) => runChapter.status === "failed") || null;
 }
 
-function cancelledRunChapter(run) {
+export function cancelledRunChapter(run) {
   return (run.run_chapters || []).find((runChapter) => runChapter.status === "cancelled") ||
     (run.run_chapters || []).find((runChapter) => runChapter.status === "processing") ||
     (run.current_chapter_id
@@ -123,13 +130,13 @@ function cancelledRunChapter(run) {
     null;
 }
 
-function currentRunChapter(run) {
+export function currentRunChapter(run) {
   return (run.run_chapters || []).find((runChapter) => runChapter.status === "processing") ||
     (run.run_chapters || []).find((runChapter) => runChapter.chapter_id === run.current_chapter_id) ||
     null;
 }
 
-function RunStatusDetails({ run, warningCount }) {
+export function RunStatusDetails({ run, warningCount }) {
   const recordsLabel = `${run.created_records_count || 0} records created`;
   const warningsLabel = `${warningCount} warning${warningCount === 1 ? "" : "s"}`;
   const requestedLabel = `Requested Range: ${requestedRangeLabel(run)}`;
@@ -209,18 +216,164 @@ function RunStatusDetails({ run, warningCount }) {
   );
 }
 
-export default function ExtractionRunCard({ run }) {
+function actionsForRun(run, canContinueFromNextChapter = false) {
+  const status = run.status;
+  const actions = [
+    {
+      key: "details",
+      label: "View Details",
+      icon: FileSearch,
+    },
+  ];
+
+  if (status === "completed") {
+    actions.push(
+      {
+        key: "records",
+        label: "View Review Items",
+        icon: FileSearch,
+      },
+    );
+
+    if (canContinueFromNextChapter) {
+      actions.push({
+        key: "continue_next",
+        label: "Continue Next",
+        icon: StepForward,
+      });
+    }
+
+    actions.push(
+      {
+        key: "delete",
+        label: "Delete Run",
+        icon: Trash2,
+        destructive: true,
+      },
+    );
+  }
+
+  if (status === "failed") {
+    actions.push(
+      {
+        key: "continue",
+        label: "Continue From Failure",
+        icon: RotateCcw,
+      },
+      {
+        key: "delete",
+        label: "Delete Run",
+        icon: Trash2,
+        destructive: true,
+      },
+    );
+  }
+
+  if (status === "running" || status === "queued") {
+    actions.push({
+      key: "cancel",
+      label: "Cancel Extraction",
+      icon: Ban,
+      destructive: true,
+    });
+  }
+
+  return actions;
+}
+
+export default function ExtractionRunCard({
+  run,
+  onCancelRun,
+  canContinueFromNextChapter,
+  onContinueRun,
+  onDeleteRun,
+  onViewCreatedRecords,
+  onViewDetails,
+}) {
   const progress = runProgress(run);
   const warningCount = run.warning_count || 0;
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const menuRef = React.useRef(null);
+  const actions = actionsForRun(run, canContinueFromNextChapter);
+
+  React.useEffect(() => {
+    if (!isMenuOpen) return undefined;
+
+    function closeOnOutsideClick(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    }
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isMenuOpen]);
+
+  function handleAction(actionKey) {
+    setIsMenuOpen(false);
+
+    if (actionKey === "details") {
+      onViewDetails?.(run);
+    } else if (actionKey === "records") {
+      onViewCreatedRecords?.(run);
+    } else if (actionKey === "continue") {
+      onContinueRun?.(run);
+    } else if (actionKey === "continue_next") {
+      onContinueRun?.(run, { fromNextChapter: true });
+    } else if (actionKey === "cancel") {
+      onCancelRun?.(run);
+    } else if (actionKey === "delete") {
+      onDeleteRun?.(run);
+    }
+  }
 
   return (
     <article className={`extraction-run-card ${run.status}`}>
       <div className="extraction-run-header">
         <strong title={runTitle(run)}>{compactRunTitle(run)}</strong>
         <span>{relativeRunTime(run.finished_at || run.started_at || run.created_at)}</span>
-        <button className="admin-icon-button extraction-run-menu" type="button" aria-label="Extraction run actions">
-          <MoreHorizontal aria-hidden="true" size={16} strokeWidth={1.9} />
-        </button>
+        <div className="extraction-run-actions" ref={menuRef}>
+          <button
+            className="admin-icon-button extraction-run-menu"
+            type="button"
+            aria-expanded={isMenuOpen}
+            aria-label="Extraction run actions"
+            onClick={() => setIsMenuOpen((open) => !open)}
+          >
+            <MoreHorizontal aria-hidden="true" size={16} strokeWidth={1.9} />
+          </button>
+          {isMenuOpen ? (
+            <div className="extraction-run-action-menu" role="menu">
+              {actions.map((action) => {
+                const Icon = action.icon;
+
+                return (
+                  <button
+                    key={action.key}
+                    className={action.destructive ? "destructive" : ""}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleAction(action.key)}
+                  >
+                    <Icon aria-hidden="true" size={15} strokeWidth={1.9} />
+                    <span>{action.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <RunStatusDetails run={run} warningCount={warningCount} />

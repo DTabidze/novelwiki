@@ -1,6 +1,6 @@
 .review-page-body {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 12px;
   overflow: hidden;
   container-type: inline-size;
@@ -54,7 +54,8 @@
     minmax(140px, 0.7fr)
     minmax(140px, 0.7fr)
     minmax(120px, auto)
-    minmax(240px, 1.4fr);
+    minmax(240px, 1.4fr)
+    max-content;
   gap: 12px;
   align-items: end;
   border: 1px solid rgba(148, 163, 184, 0.16);
@@ -67,6 +68,83 @@
   display: grid;
   gap: 7px;
   min-width: 0;
+}
+
+.review-clear-filters-button {
+  align-self: end;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.review-active-filter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(8, 24, 39, 0.58);
+}
+
+.review-active-filter-strip > div:first-child {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+
+.review-active-filter-strip strong {
+  color: #dbeafe;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.review-active-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.review-active-filter-chips button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(124, 58, 237, 0.34);
+  border-radius: 999px;
+  padding: 0 9px;
+  background: rgba(79, 70, 229, 0.16);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: none;
+}
+
+.review-active-filter-chips button:hover {
+  border-color: rgba(167, 139, 250, 0.56);
+  background: rgba(79, 70, 229, 0.26);
+  color: #ffffff;
+  transform: none;
+}
+
+.review-active-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.review-active-filter-actions button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .review-toggle-row {

@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   ClipboardCheck,
   Download,
@@ -7,6 +8,7 @@ import {
   Package,
   TriangleAlert,
   Users,
+  X,
 } from "lucide-react";
 import { API_BASE_URL, fetchJson } from "../../api.js";
 import ReviewChapterGroup from "./ReviewChapterGroup.jsx";
@@ -24,6 +26,73 @@ import {
 
 const CHAPTER_GROUP_PAGE_SIZE = 10;
 const CHAPTER_ITEM_PREVIEW_LIMIT = 8;
+const VALID_REVIEW_STATUSES = new Set(["pending", "approved", "rejected", "all"]);
+const DEFAULT_REVIEW_FILTERS = {
+  bookId: "all",
+  chapterRange: "",
+  typeGroup: "all",
+  status: "pending",
+  warningsOnly: false,
+  search: "",
+};
+
+function filtersFromSearchParams(searchParams) {
+  const chapterStart = searchParams.get("chapter_start");
+  const chapterEnd = searchParams.get("chapter_end");
+  const status = searchParams.get("status") || "pending";
+  const chapterRange = chapterStart && chapterEnd
+    ? chapterStart === chapterEnd
+      ? chapterStart
+      : `${chapterStart}-${chapterEnd}`
+    : "";
+
+  return {
+    ...DEFAULT_REVIEW_FILTERS,
+    bookId: searchParams.get("book_id") || DEFAULT_REVIEW_FILTERS.bookId,
+    chapterRange,
+    typeGroup: searchParams.get("type") || DEFAULT_REVIEW_FILTERS.typeGroup,
+    status: VALID_REVIEW_STATUSES.has(status) ? status : "pending",
+    warningsOnly: searchParams.get("warnings") === "1",
+    search: searchParams.get("search") || "",
+  };
+}
+
+function filtersToSearchParams(filters, source = "") {
+  const params = new URLSearchParams();
+
+  if (source) params.set("source", source);
+  if (filters.bookId !== DEFAULT_REVIEW_FILTERS.bookId) params.set("book_id", filters.bookId);
+  if (filters.chapterRange) {
+    const range = parseChapterRange(filters.chapterRange);
+
+    if (range) {
+      params.set("chapter_start", String(range[0]));
+      params.set("chapter_end", String(range[1]));
+    }
+  }
+  if (filters.typeGroup !== DEFAULT_REVIEW_FILTERS.typeGroup) params.set("type", filters.typeGroup);
+  if (filters.status !== DEFAULT_REVIEW_FILTERS.status || source) params.set("status", filters.status);
+  if (filters.warningsOnly) params.set("warnings", "1");
+  if (filters.search.trim()) params.set("search", filters.search.trim());
+
+  return params;
+}
+
+function statusLabel(value) {
+  if (value === "all") return "All statuses";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function typeGroupLabel(value) {
+  const labels = {
+    characters: "Character",
+    metadata: "Metadata",
+    progression: "Progression",
+    skills_items: "Skills & Items",
+  };
+
+  return labels[value] || value;
+}
 
 function parseChapterRange(value) {
   const trimmed = value.trim();
@@ -96,28 +165,97 @@ function countPending(items, predicate) {
   return items.filter((item) => item.review_status === "pending" && predicate(item)).length;
 }
 
+function ReviewActiveFilterStrip({
+  booksById,
+  filters,
+  onClearAll,
+  onClearExtractionScope,
+  onRemoveFilter,
+  source,
+}) {
+  const selectedBook = filters.bookId !== "all" ? booksById.get(Number(filters.bookId)) : null;
+  const isExtractionScope = source === "extraction_run";
+  const chips = [];
+
+  if (selectedBook) {
+    chips.push({ key: "bookId", label: `Book ${selectedBook.number}` });
+  }
+
+  if (filters.chapterRange) {
+    chips.push({ key: "chapterRange", label: `Chapters ${filters.chapterRange}` });
+  }
+
+  if (filters.status !== DEFAULT_REVIEW_FILTERS.status || isExtractionScope) {
+    chips.push({ key: "status", label: statusLabel(filters.status) });
+  }
+
+  if (filters.typeGroup !== DEFAULT_REVIEW_FILTERS.typeGroup) {
+    chips.push({ key: "typeGroup", label: `Type: ${typeGroupLabel(filters.typeGroup)}` });
+  }
+
+  if (filters.warningsOnly) {
+    chips.push({ key: "warningsOnly", label: "Warnings only" });
+  }
+
+  if (filters.search.trim()) {
+    chips.push({ key: "search", label: `Search: "${filters.search.trim()}"` });
+  }
+
+  if (!chips.length && !isExtractionScope) return null;
+
+  const sourceLabel = [
+    selectedBook ? `Book ${selectedBook.number}` : null,
+    filters.chapterRange ? `Chapters ${filters.chapterRange}` : null,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <section className="review-active-filter-strip" aria-label="Active review filters">
+      <div>
+        {isExtractionScope ? (
+          <strong>Showing items from extraction run{sourceLabel ? `: ${sourceLabel}` : ""}</strong>
+        ) : (
+          <strong>Filtered by</strong>
+        )}
+        <div className="review-active-filter-chips">
+          {chips.map((chip) => (
+            <button key={chip.key} type="button" onClick={() => onRemoveFilter(chip.key)}>
+              <span>{chip.label}</span>
+              <X aria-hidden="true" size={13} strokeWidth={2} />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="review-active-filter-actions">
+        {isExtractionScope && filters.chapterRange ? (
+          <button className="admin-secondary-button" type="button" onClick={onClearExtractionScope}>
+            Clear extraction scope
+          </button>
+        ) : null}
+        <button className="admin-secondary-button" type="button" onClick={onClearAll}>
+          Clear filters
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export default function ReviewQueuePage({
   books,
   chapters,
   extractedData,
   novel,
-  onOpenNovelSettings,
   onRefresh,
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchSignature = searchParams.toString();
+  const reviewSource = searchParams.get("source") || "";
   const allItems = React.useMemo(() => flattenReviewData(extractedData), [extractedData]);
   const booksById = React.useMemo(() => new Map(books.map((book) => [book.id, book])), [books]);
   const persistedSelectionKey = React.useMemo(
     () => `novelwiki-review-selection-${novel?.id || "global"}`,
     [novel?.id]
   );
-  const [filters, setFilters] = React.useState({
-    bookId: "all",
-    chapterRange: "",
-    typeGroup: "all",
-    status: "pending",
-    warningsOnly: false,
-    search: "",
-  });
+  const [filters, setFilters] = React.useState(() => filtersFromSearchParams(searchParams));
   const [selectedKey, setSelectedKey] = React.useState(() => window.sessionStorage.getItem(persistedSelectionKey) || "");
   const [isSaving, setIsSaving] = React.useState(false);
   const [expandedChapterKeys, setExpandedChapterKeys] = React.useState(() => new Set());
@@ -131,6 +269,10 @@ export default function ReviewQueuePage({
   const pendingSelectionKeyRef = React.useRef(undefined);
   const filterChangeSelectionKeyRef = React.useRef("");
   const filterSignature = `${filters.bookId}|${filters.chapterRange}|${filters.typeGroup}|${filters.status}|${filters.warningsOnly}|${filters.search}`;
+
+  React.useEffect(() => {
+    setFilters(filtersFromSearchParams(new URLSearchParams(searchSignature)));
+  }, [searchSignature]);
 
   const filteredItems = React.useMemo(() => {
     const chapterRange = parseChapterRange(filters.chapterRange);
@@ -369,6 +511,48 @@ export default function ReviewQueuePage({
     setSelectedKey(recordKey(item));
   }
 
+  function updateFilters(nextFilters, options = {}) {
+    const nextSource = options.source !== undefined ? options.source : (
+      reviewSource === "extraction_run"
+      && nextFilters.bookId === filters.bookId
+      && nextFilters.chapterRange === filters.chapterRange
+        ? reviewSource
+        : ""
+    );
+
+    setFilters(nextFilters);
+    setSearchParams(filtersToSearchParams(nextFilters, nextSource), { replace: true });
+  }
+
+  function clearAllFilters() {
+    updateFilters(DEFAULT_REVIEW_FILTERS, { source: "" });
+  }
+
+  function clearExtractionScope() {
+    updateFilters({ ...filters, chapterRange: "" }, { source: "" });
+  }
+
+  function removeFilter(key) {
+    const nextFilters = { ...filters };
+
+    if (key === "bookId") {
+      nextFilters.bookId = DEFAULT_REVIEW_FILTERS.bookId;
+      nextFilters.chapterRange = "";
+    } else if (key === "chapterRange") {
+      nextFilters.chapterRange = "";
+    } else if (key === "typeGroup") {
+      nextFilters.typeGroup = DEFAULT_REVIEW_FILTERS.typeGroup;
+    } else if (key === "status") {
+      nextFilters.status = DEFAULT_REVIEW_FILTERS.status;
+    } else if (key === "warningsOnly") {
+      nextFilters.warningsOnly = DEFAULT_REVIEW_FILTERS.warningsOnly;
+    } else if (key === "search") {
+      nextFilters.search = DEFAULT_REVIEW_FILTERS.search;
+    }
+
+    updateFilters(nextFilters, { source: key === "chapterRange" || key === "bookId" ? "" : reviewSource });
+  }
+
   function changeChapterPage(nextPage) {
     const normalizedPage = Math.min(Math.max(nextPage, 1), totalChapterPages);
     const nextGroups = groups.slice(
@@ -524,7 +708,6 @@ export default function ReviewQueuePage({
           <button type="button" className="admin-secondary-button" onClick={() => window.open(`/wiki/novels/${novel?.id}`, "_blank")}>
             View Novel
           </button>
-          <button type="button" onClick={onOpenNovelSettings}>Novel Settings</button>
         </div>
       </header>
 
@@ -542,7 +725,22 @@ export default function ReviewQueuePage({
           })}
         </div>
 
-        <ReviewFilters books={books} countsByBook={countsByBook} filters={filters} onChange={setFilters} />
+        <ReviewFilters
+          books={books}
+          countsByBook={countsByBook}
+          filters={filters}
+          onChange={updateFilters}
+          onClearFilters={clearAllFilters}
+        />
+
+        <ReviewActiveFilterStrip
+          booksById={booksById}
+          filters={filters}
+          onClearAll={clearAllFilters}
+          onClearExtractionScope={clearExtractionScope}
+          onRemoveFilter={removeFilter}
+          source={reviewSource}
+        />
 
         <div className={selectedItem ? "review-workspace-grid review-focused" : "review-workspace-grid"}>
           <main className="review-feed-panel admin-panel">
