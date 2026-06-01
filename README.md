@@ -3,13 +3,14 @@
 NovelWiki is a local-first web app for turning uploaded novels into reviewed,
 wiki-style reference pages.
 
-The current implementation is an end-to-end MVP:
+The current implementation is an end-to-end editorial operations MVP:
 
 - Flask backend with SQLAlchemy and SQLite
-- React frontend with admin and public wiki views
-- `.txt` upload and chapter splitting
-- Per-chapter AI extraction
-- Admin review, edit, reject, approve, and merge workflow
+- React frontend with a dark admin workspace and public wiki views
+- Novel workspaces with book/source-file upload and chapter parsing
+- AI extraction runs for single chapters, ranges, full books, and resume scopes
+- Extraction run history with explicit requested/completed/failed/canceled ranges
+- Admin Review Queue with chapter-collapsible moderation, evidence context, edit-before-approve, reject, approve, and merge workflow
 - Field-level character metadata proposals
 - Public wiki pages that show approved data only
 
@@ -25,20 +26,21 @@ novelwiki/
 Start with the docs in this order:
 
 1. `docs/architecture.md`
-2. `docs/database-schema.md`
-3. `docs/api-endpoints.md`
-4. `docs/implementation-plan.md`
+2. `docs/admin-workflow.md`
+3. `docs/database-schema.md`
+4. `docs/api-endpoints.md`
+5. `docs/implementation-plan.md`
 
 ## MVP Principle
 
 The app separates uncertain extraction from public wiki data:
 
-1. Upload a `.txt` file.
-2. Split it into chapters.
-3. Store the novel and chapters in SQLite.
+1. Create a novel workspace.
+2. Upload source books/volumes.
+3. Split source text into chapters.
 4. Run AI extraction chapter by chapter.
 5. Store extracted records as pending review data.
-6. Let an admin approve, reject, edit, or merge extracted records.
+6. Let an admin inspect evidence, edit proposals, approve, reject, or merge records.
 7. For existing characters, store changed metadata as field-level proposals instead of resetting the whole character to pending.
 8. Show only approved characters, skills, items, relationships, life events, evidence, and progression in the public wiki.
 
@@ -48,12 +50,13 @@ The public wiki must not expose full chapter text. It should show reviewed facts
 
 Admin workflow:
 
-1. Upload a novel text file.
-2. Verify parsed chapters.
-3. Run AI extraction for selected chapters or the whole book.
-4. Review a chapter-sorted queue of pending records.
-5. Approve, reject, edit, or merge records.
-6. Approve metadata proposals to update individual character fields.
+1. Create or edit a novel workspace.
+2. Upload book source files and verify parsed chapters.
+3. Run extraction for one chapter, a chapter range, a full book, or a continuation range.
+4. Inspect run history and continue failed/canceled runs as new historical runs.
+5. Review a chapter-collapsible queue of pending records.
+6. Open evidence context, edit proposals, approve, reject, or merge records.
+7. Approve metadata proposals to update individual character fields.
 
 Public wiki workflow:
 
