@@ -3,6 +3,11 @@ import { Search } from "lucide-react";
 
 export default function ReviewFilters({ books, countsByBook = {}, filters, onChange }) {
   function update(key, value) {
+    if (key === "bookId") {
+      onChange({ ...filters, bookId: value, chapterRange: "" });
+      return;
+    }
+
     onChange({ ...filters, [key]: value });
   }
 

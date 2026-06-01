@@ -372,6 +372,32 @@ def chapters_for_extraction_scope(novel, payload):
         if not book:
             return None, "Book not found."
         query = query.filter_by(book_id=book.id)
+        first_book_chapter = query.order_by(Chapter.chapter_number.asc()).first()
+        last_book_chapter = query.order_by(Chapter.chapter_number.desc()).first()
+
+        if not first_book_chapter or not last_book_chapter:
+            return None, "This book has no parsed chapters yet. Reparse the book before starting extraction."
+
+        if chapter_start is None:
+            chapter_start = first_book_chapter.chapter_number
+        if chapter_end is None:
+            chapter_end = last_book_chapter.chapter_number
+
+        if chapter_start > chapter_end:
+            return None, "Chapter start cannot be greater than chapter end."
+
+        if (
+            chapter_start < first_book_chapter.chapter_number
+            or chapter_start > last_book_chapter.chapter_number
+            or chapter_end < first_book_chapter.chapter_number
+            or chapter_end > last_book_chapter.chapter_number
+        ):
+            return None, (
+                f"Book {book.number} contains chapters "
+                f"{first_book_chapter.chapter_number}-{last_book_chapter.chapter_number}. "
+                "Choose a chapter range inside this book."
+            )
+
         if chapter_start:
             query = query.filter(Chapter.chapter_number >= chapter_start)
         if chapter_end:
@@ -1136,6 +1162,21 @@ def cancel_extraction_run(novel_id, run_id):
     db.session.commit()
 
     return success({"run": run.to_admin_dict()})
+
+
+@admin_novels_bp.delete("/novels/<int:novel_id>/extraction-runs/<int:run_id>")
+def delete_extraction_run(novel_id, run_id):
+    novel = Novel.query.get_or_404(novel_id)
+    run = ExtractionRun.query.filter_by(id=run_id, novel_id=novel.id).first_or_404()
+
+    if run.status not in {"completed", "failed"}:
+        return failure("Only completed or failed extraction run history can be deleted.")
+
+    deleted_run_id = run.id
+    db.session.delete(run)
+    db.session.commit()
+
+    return success({"deleted_run_id": deleted_run_id})
 
 
 @admin_novels_bp.post("/novels/<int:novel_id>/extraction-runs")

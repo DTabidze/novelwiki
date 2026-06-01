@@ -10,24 +10,106 @@ function cleanChapterTitle(chapter) {
   return (chapter.title || "").replace(prefix, "").trim() || `Chapter ${chapter.chapter_number}`;
 }
 
-export default function NewExtractionModal({ books, chapters, onClose, onStart }) {
+export default function NewExtractionModal({
+  books,
+  chapters,
+  extractionRuns = [],
+  initialValues = null,
+  onClose,
+  onStart,
+}) {
   const firstParsedBook = books.find((book) => (book.chapter_count || 0) > 0) || books[0];
-  const [bookId, setBookId] = React.useState(firstParsedBook?.id ? String(firstParsedBook.id) : "");
-  const [chapterEnd, setChapterEnd] = React.useState("");
+  const [bookId, setBookId] = React.useState(initialValues?.bookId || (firstParsedBook?.id ? String(firstParsedBook.id) : ""));
+  const [chapterEnd, setChapterEnd] = React.useState(initialValues?.chapterEnd || "");
   const [chapterId, setChapterId] = React.useState("");
-  const [chapterStart, setChapterStart] = React.useState("");
+  const [chapterStart, setChapterStart] = React.useState(initialValues?.chapterStart || "");
   const [error, setError] = React.useState("");
   const [isStarting, setIsStarting] = React.useState(false);
-  const [scopeType, setScopeType] = React.useState("book");
+  const [scopeType, setScopeType] = React.useState(initialValues?.scopeType || "book");
 
-  const bookChapters = chapters.filter((chapter) => String(chapter.book_id) === bookId);
+  const bookChapters = chapters
+    .filter((chapter) => String(chapter.book_id) === bookId)
+    .sort((a, b) => a.chapter_number - b.chapter_number);
   const parsedBooks = books.filter((book) => (book.chapter_count || 0) > 0);
   const selectedBook = books.find((book) => String(book.id) === bookId);
   const novelChapterCount = chapters.length;
+  const firstBookChapter = bookChapters[0] || null;
+  const lastBookChapter = bookChapters[bookChapters.length - 1] || null;
+  const extractedChapterIds = React.useMemo(() => {
+    const ids = new Set();
+
+    extractionRuns.forEach((run) => {
+      (run.run_chapters || []).forEach((runChapter) => {
+        if (runChapter.status === "completed" && runChapter.chapter_id) {
+          ids.add(runChapter.chapter_id);
+        }
+      });
+    });
+
+    return ids;
+  }, [extractionRuns]);
+  const firstUnextractedChapter = bookChapters.find((chapter) => !extractedChapterIds.has(chapter.id)) || null;
+  const bookRangeLabel = firstBookChapter && lastBookChapter
+    ? firstBookChapter.chapter_number === lastBookChapter.chapter_number
+      ? `Chapter ${firstBookChapter.chapter_number}`
+      : `Chapters ${firstBookChapter.chapter_number}-${lastBookChapter.chapter_number}`
+    : "";
 
   React.useEffect(() => {
     setChapterId("");
   }, [bookId, scopeType]);
+
+  React.useEffect(() => {
+    if (scopeType !== "chapter_range" || !firstBookChapter || !lastBookChapter) return;
+
+    const defaultStart = initialValues?.chapterStart
+      ? clampChapterRangeValue(initialValues.chapterStart)
+      : String((firstUnextractedChapter || firstBookChapter).chapter_number);
+
+    setChapterStart(defaultStart);
+    setChapterEnd(initialValues?.chapterEnd ? clampChapterRangeValue(initialValues.chapterEnd) : String(lastBookChapter.chapter_number));
+  }, [bookId, firstBookChapter, firstUnextractedChapter, initialValues, lastBookChapter, scopeType]);
+
+  function clampChapterRangeValue(value) {
+    if (!firstBookChapter || !lastBookChapter || value === "") return value;
+
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) return value;
+
+    return String(Math.min(
+      Math.max(numberValue, firstBookChapter.chapter_number),
+      lastBookChapter.chapter_number,
+    ));
+  }
+
+  function validateChapterRange() {
+    if (scopeType !== "chapter_range") return true;
+
+    const startNumber = Number(chapterStart);
+    const endNumber = Number(chapterEnd);
+
+    if (!chapterStart || !chapterEnd || !Number.isFinite(startNumber) || !Number.isFinite(endNumber)) {
+      setError("Enter a start and end chapter inside the selected book.");
+      return false;
+    }
+
+    if (startNumber > endNumber) {
+      setError("Chapter start cannot be greater than chapter end.");
+      return false;
+    }
+
+    if (
+      firstBookChapter
+      && lastBookChapter
+      && (startNumber < firstBookChapter.chapter_number || endNumber > lastBookChapter.chapter_number)
+    ) {
+      setError(`${bookOptionLabel(selectedBook)} contains ${bookRangeLabel}. Choose a chapter range inside this book.`);
+      return false;
+    }
+
+    return true;
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -50,6 +132,10 @@ export default function NewExtractionModal({ books, chapters, onClose, onStart }
 
     if (scopeType === "novel" && novelChapterCount === 0) {
       setError("This novel has no parsed chapters yet. Upload and parse a book before starting extraction.");
+      return;
+    }
+
+    if (!validateChapterRange()) {
       return;
     }
 
@@ -132,30 +218,51 @@ export default function NewExtractionModal({ books, chapters, onClose, onStart }
         ) : null}
 
         {scopeType === "chapter_range" ? (
-          <div className="book-upload-grid">
-            <label>
-              Start
-              <input
-                min="1"
-                type="number"
-                value={chapterStart}
-                disabled={isStarting}
-                onChange={(event) => setChapterStart(event.target.value)}
-                placeholder="First chapter"
-              />
-            </label>
-            <label>
-              End
-              <input
-                min="1"
-                type="number"
-                value={chapterEnd}
-                disabled={isStarting}
-                onChange={(event) => setChapterEnd(event.target.value)}
-                placeholder="Last chapter"
-              />
-            </label>
-          </div>
+          <>
+            <div className="book-upload-grid">
+              <label>
+                Start
+                <input
+                  min={firstBookChapter?.chapter_number || 1}
+                  max={lastBookChapter?.chapter_number || undefined}
+                  type="number"
+                  value={chapterStart}
+                  disabled={isStarting}
+                  onBlur={() => setChapterStart((value) => clampChapterRangeValue(value))}
+                  onChange={(event) => {
+                    setChapterStart(event.target.value);
+                    setError("");
+                  }}
+                  placeholder="First chapter"
+                />
+              </label>
+              <label>
+                End
+                <input
+                  min={firstBookChapter?.chapter_number || 1}
+                  max={lastBookChapter?.chapter_number || undefined}
+                  type="number"
+                  value={chapterEnd}
+                  disabled={isStarting}
+                  onBlur={() => setChapterEnd((value) => clampChapterRangeValue(value))}
+                  onChange={(event) => {
+                    setChapterEnd(event.target.value);
+                    setError("");
+                  }}
+                  placeholder="Last chapter"
+                />
+              </label>
+            </div>
+            {bookRangeLabel ? (
+              <p className="admin-inline-warning extraction-range-note">
+                {bookOptionLabel(selectedBook)} contains {bookRangeLabel}. Range extraction uses these novel chapter numbers.
+                {" "}
+                {firstUnextractedChapter
+                  ? `Next unextracted chapter: Chapter ${firstUnextractedChapter.chapter_number}.`
+                  : "All parsed chapters in this book have completed extraction."}
+              </p>
+            ) : null}
+          </>
         ) : null}
 
         {scopeType === "single_chapter" ? (
@@ -174,6 +281,7 @@ export default function NewExtractionModal({ books, chapters, onClose, onStart }
               {bookChapters.map((chapter) => (
                 <option key={chapter.id} value={chapter.id}>
                   Chapter {chapter.chapter_number}: {cleanChapterTitle(chapter)}
+                  {extractedChapterIds.has(chapter.id) ? " (extracted)" : ""}
                 </option>
               ))}
             </select>
@@ -181,7 +289,9 @@ export default function NewExtractionModal({ books, chapters, onClose, onStart }
         ) : null}
 
         {scopeType === "book" && bookChapters.length ? (
-          <p className="admin-muted">This will extract {bookChapters.length} chapters from the selected book.</p>
+          <p className="admin-inline-warning extraction-range-note">
+            This will extract {bookChapters.length} chapters from the selected book.
+          </p>
         ) : null}
 
         {["book", "chapter_range", "single_chapter"].includes(scopeType) && selectedBook && bookChapters.length === 0 ? (

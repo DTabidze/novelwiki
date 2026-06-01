@@ -148,7 +148,7 @@ function RecentProcessedChaptersList({ run }) {
     run.completed_chapters ? run.completed_chapters - 1 : 0,
   );
   const startIndex = Math.max(0, currentIndex - 5);
-  const visibleChapters = runChapters.slice(startIndex, startIndex + 8);
+  const visibleChapters = runChapters.slice(startIndex, startIndex + 10);
 
   return (
     <div className="extraction-recent-stream">

@@ -207,6 +207,19 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
     }
   }
 
+  async function deleteExtractionRun(run) {
+    try {
+      const data = await fetchJson(`${API_BASE_URL}/admin/novels/${novelId}/extraction-runs/${run.id}`, {
+        method: "DELETE",
+      });
+      setExtractionRuns((runs) => runs.filter((existingRun) => existingRun.id !== data.deleted_run_id));
+      await loadExtractionRuns();
+    } catch (error) {
+      setMessage(error.message);
+      throw error;
+    }
+  }
+
   function openBookChapters(book) {
     setChapterBookFilter(book.id);
     navigate(`/admin/novels/${novelId}/chapters`);
@@ -214,6 +227,21 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
 
   function openReviewForChapter() {
     navigate(`/admin/novels/${novelId}/review`);
+  }
+
+  function openReviewForExtractionRun(run) {
+    const params = new URLSearchParams({ status: "pending" });
+
+    if (run.book_id) {
+      params.set("book_id", String(run.book_id));
+    }
+
+    if (run.chapter_start && run.chapter_end) {
+      params.set("chapter_start", String(run.chapter_start));
+      params.set("chapter_end", String(run.chapter_end));
+    }
+
+    navigate(`/admin/novels/${novelId}/review?${params.toString()}`);
   }
 
   React.useEffect(() => {
@@ -311,6 +339,8 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
                 novel={novel}
                 onStartExtraction={startExtractionRun}
                 onStopExtraction={stopExtractionRun}
+                onDeleteExtractionRun={deleteExtractionRun}
+                onViewReviewItems={openReviewForExtractionRun}
               />
             }
           />
@@ -322,7 +352,6 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
                 chapters={chapters}
                 extractedData={extractedData}
                 novel={novel}
-                onOpenNovelSettings={() => setIsNovelSettingsOpen(true)}
                 onRefresh={loadWorkspace}
               />
             }

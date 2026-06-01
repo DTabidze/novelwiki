@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   ClipboardCheck,
   Download,
@@ -24,6 +25,27 @@ import {
 
 const CHAPTER_GROUP_PAGE_SIZE = 10;
 const CHAPTER_ITEM_PREVIEW_LIMIT = 8;
+const VALID_REVIEW_STATUSES = new Set(["pending", "approved", "rejected", "all"]);
+
+function filtersFromSearchParams(searchParams) {
+  const chapterStart = searchParams.get("chapter_start");
+  const chapterEnd = searchParams.get("chapter_end");
+  const status = searchParams.get("status") || "pending";
+  const chapterRange = chapterStart && chapterEnd
+    ? chapterStart === chapterEnd
+      ? chapterStart
+      : `${chapterStart}-${chapterEnd}`
+    : "";
+
+  return {
+    bookId: searchParams.get("book_id") || "all",
+    chapterRange,
+    typeGroup: "all",
+    status: VALID_REVIEW_STATUSES.has(status) ? status : "pending",
+    warningsOnly: false,
+    search: "",
+  };
+}
 
 function parseChapterRange(value) {
   const trimmed = value.trim();
@@ -101,23 +123,17 @@ export default function ReviewQueuePage({
   chapters,
   extractedData,
   novel,
-  onOpenNovelSettings,
   onRefresh,
 }) {
+  const [searchParams] = useSearchParams();
+  const searchSignature = searchParams.toString();
   const allItems = React.useMemo(() => flattenReviewData(extractedData), [extractedData]);
   const booksById = React.useMemo(() => new Map(books.map((book) => [book.id, book])), [books]);
   const persistedSelectionKey = React.useMemo(
     () => `novelwiki-review-selection-${novel?.id || "global"}`,
     [novel?.id]
   );
-  const [filters, setFilters] = React.useState({
-    bookId: "all",
-    chapterRange: "",
-    typeGroup: "all",
-    status: "pending",
-    warningsOnly: false,
-    search: "",
-  });
+  const [filters, setFilters] = React.useState(() => filtersFromSearchParams(searchParams));
   const [selectedKey, setSelectedKey] = React.useState(() => window.sessionStorage.getItem(persistedSelectionKey) || "");
   const [isSaving, setIsSaving] = React.useState(false);
   const [expandedChapterKeys, setExpandedChapterKeys] = React.useState(() => new Set());
@@ -131,6 +147,10 @@ export default function ReviewQueuePage({
   const pendingSelectionKeyRef = React.useRef(undefined);
   const filterChangeSelectionKeyRef = React.useRef("");
   const filterSignature = `${filters.bookId}|${filters.chapterRange}|${filters.typeGroup}|${filters.status}|${filters.warningsOnly}|${filters.search}`;
+
+  React.useEffect(() => {
+    setFilters(filtersFromSearchParams(new URLSearchParams(searchSignature)));
+  }, [searchSignature]);
 
   const filteredItems = React.useMemo(() => {
     const chapterRange = parseChapterRange(filters.chapterRange);
@@ -524,7 +544,6 @@ export default function ReviewQueuePage({
           <button type="button" className="admin-secondary-button" onClick={() => window.open(`/wiki/novels/${novel?.id}`, "_blank")}>
             View Novel
           </button>
-          <button type="button" onClick={onOpenNovelSettings}>Novel Settings</button>
         </div>
       </header>
 
