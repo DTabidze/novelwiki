@@ -16,19 +16,24 @@ Flask REST API for uploads, chapter storage, AI extraction, admin review, and ap
 The current backend supports:
 
 - Flask app factory and SQLite via SQLAlchemy.
-- Admin `.txt` upload and chapter splitting.
-- Per-chapter AI extraction.
+- Admin novel workspace creation/editing.
+- Book/source-file upload, source replacement, and chapter parsing.
+- Single chapter, range, full book, and continuation extraction runs.
+- Historical extraction run tracking with per-chapter status.
+- Cancel behavior that keeps completed review data and prevents canceled in-flight output from being saved.
 - Pending review records for extracted wiki data.
 - Field-level character metadata proposals for existing characters.
 - Metadata normalization, dedupe, confidence, warnings, and safe auto-approval.
+- Direct cultivation/progression fallback detection in addition to AI progression audit extraction.
 - Admin review endpoints for approval, rejection, edits, metadata proposal application, and character merges.
+- Evidence context endpoint for Review Queue "View Full Context".
 - Public `/api/wiki/*` endpoints that expose approved data only.
 
 ## API Blueprints
 
 - `app/api/health.py`: `GET /api/health`.
-- `app/api/admin_novels.py`: novel upload, chapter inspection, extraction triggers, and admin extracted-data loading.
-- `app/api/admin_review.py`: review updates for extracted entities and character merges.
+- `app/api/admin_novels.py`: novel/book management, chapter inspection, extraction run lifecycle, and admin extracted-data loading.
+- `app/api/admin_review.py`: review updates, evidence context, and character merges.
 - `app/api/wiki.py`: approved public wiki data.
 
 ## Extraction Services
@@ -56,6 +61,19 @@ Existing-character metadata changes are reviewed as `CharacterMetadataProposal` 
 Character `status` is life-status only. Position, disciple rank, faction, and titles are stored separately.
 
 Race/species can be either confirmed from extracted evidence or assumed as the cultivation-domain default `Human` for newly approved characters with no explicit species.
+
+Progression dedupe ignores rejected rows so a later extraction with stronger evidence can create a fresh pending proposal for the same character/progression value.
+
+## AI Debug Logging
+
+Set this in `backend/.env` to log raw provider responses locally:
+
+```env
+AI_LOG_RAW_RESPONSES=true
+AI_LOG_DIR=instance/ai_logs
+```
+
+Use this only for local debugging. Raw AI responses may include source text snippets.
 
 ## Development Schema
 

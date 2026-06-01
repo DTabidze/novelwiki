@@ -2,16 +2,16 @@
 
 ## Current Status
 
-The project has completed the first real vertical slice:
+The project has completed the first operational admin/wiki slice:
 
-1. Admin can upload `.txt` novels.
-2. Backend splits novels into chapters.
-3. Admin can run AI extraction per chapter.
-4. Extracted characters, skills, items, progression events, life events, aliases, and evidence are stored.
-5. Admin can approve, reject, edit, and merge reviewed records.
-6. Public wiki endpoints expose approved data only.
-7. React has an Admin view and routed public Wiki pages for novels and characters.
-8. Approved character-skill relationships can be displayed on character pages.
+1. Admin can create/edit novel workspaces.
+2. Admin can upload book/source files and parse chapters.
+3. Admin can inspect books, chapters, extraction progress, and extraction run history.
+4. Admin can run extraction for single chapters, ranges, full books, and continuation ranges.
+5. Extracted characters, skills, items, progression events, life events, aliases, metadata proposals, and evidence are stored.
+6. Admin can review chapter-grouped proposals, inspect evidence context, edit proposals, approve, reject, and merge records.
+7. Public wiki endpoints expose approved data only.
+8. React has an Admin workspace and routed public Wiki pages for novels, characters, progression, skills, and items.
 
 ## Phase 1: Foundation
 
@@ -23,13 +23,13 @@ The project has completed the first real vertical slice:
 
 ## Phase 2: Upload and Chapter Storage
 
-1. Add admin upload endpoint for `.txt` files only.
+1. Add admin upload endpoint for source files.
 2. Save the uploaded file under `backend/instance/uploads`.
-3. Create a `novels` row.
-4. Split the text into chapters.
+3. Create `novels`, `books`, and `chapters` rows.
+4. Split source text into chapters.
 5. Save chapter rows.
 
-Start with `.txt`. Add `.epub` and `.docx` after the first flow works.
+Start with `.txt`. Add robust `.epub` and `.pdf` parsing after the text flow remains stable.
 
 ## Phase 3: Admin Chapter Review
 
@@ -60,18 +60,18 @@ Start with `.txt`. Add `.epub` and `.docx` after the first flow works.
 5. Derive current character cultivation or position from approved progression events.
 6. Do not expose raw chapter content in public responses.
 
-## Next Phase: Public Wiki Pages
+## Current Product Priorities
 
-1. Add dedicated public skill list/detail pages.
-2. Add dedicated public item list/detail pages.
-3. Add a cultivation/progression index for the selected novel.
-4. Add timeline, organization, and place pages after the core wiki pages are stable.
-5. Re-enable character-item relationships carefully, with stricter filtering for consumables and minor items.
+1. Improve Review Queue data quality and duplicate handling.
+2. Add safer admin cleanup tools for repeated extraction testing.
+3. Improve book source replacement/reparse safeguards when review data exists.
+4. Add robust `.epub` and `.pdf` parsing if those formats remain required.
+5. Add public organization/location/timeline pages after core character/progression quality stabilizes.
 
 ## Later: Better File Support
 
 1. Add `.epub` parsing.
-2. Add `.docx` parsing.
+2. Add `.pdf` parsing.
 3. Normalize chapter parsing across file types.
 
 ## Best Practices

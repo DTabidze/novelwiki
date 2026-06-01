@@ -7,7 +7,8 @@ React app for the admin upload/review flow and approved public wiki pages.
 - `src/main.jsx`: React entrypoint. Mounts the app and router.
 - `src/App.jsx`: Top-level app state and routes.
 - `src/api.js`: Small API client helpers for calling Flask.
-- `src/components/admin/`: Admin review UI pieces.
+- `src/admin/`: Admin application shell, novel library, workspace pages, review queue, extraction UI, and admin-only components.
+- `src/admin/styles/`: Admin CSS split by domain.
 - `src/components/wiki/`: Public wiki UI pieces.
 - `src/utils/`: Small frontend utility functions.
 
@@ -15,27 +16,29 @@ React app for the admin upload/review flow and approved public wiki pages.
 
 The current MVP has two top-level views:
 
-- Admin: upload novels, inspect chapters, run extraction, review extracted records.
+- Admin: manage novel workspaces, upload books, inspect chapters, run extraction, review extracted records.
 - Wiki: browse approved novels, characters, cultivation progression, skills, and items.
 
 Public wiki pages only show reviewed data returned by `/api/wiki/*`.
 
 ## Admin UI
 
-The admin UI is temporary but functional. It supports:
+The admin UI is an operational/editorial workspace. It supports:
 
-- Uploading `.txt` novels.
-- Inspecting parsed chapter metadata and previews.
-- Running AI extraction for a single chapter.
-- Running AI extraction for selected chapters or the whole book.
-- Reviewing extracted records in one chapter-sorted list.
-- Hiding approved and/or rejected cards while reviewing.
-- Editing extracted fields before saving.
+- Creating and editing novel workspaces.
+- Uploading book/source files.
+- Inspecting book ingestion, parsed chapters, pending counts, and warnings.
+- Running AI extraction for a single chapter, chapter range, full book, or continuation scope.
+- Viewing extraction run history with explicit requested/completed/failed/canceled ranges.
+- Canceling runs without deleting completed review output.
+- Reviewing extracted records in a chapter-collapsible queue.
+- Opening nearby evidence context.
+- Editing review proposals before approval.
 - Approving or rejecting records.
 - Merging duplicate character records.
 - Reviewing character metadata proposals as field-level updates.
 
-Review cards are tagged by entity type so mixed chapter review is easier to scan. Metadata proposal cards show old value, proposed value, raw value, normalized value, confidence, warnings, and evidence when available.
+Review cards are tagged by entity type so mixed chapter review is easier to scan. Metadata proposal cards show old value, proposed value, raw value, normalized value, confidence, warnings, and evidence when available. The edit modal changes only the proposal being reviewed and does not automatically approve it.
 
 ## Public Wiki Routes
 
