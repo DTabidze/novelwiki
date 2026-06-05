@@ -1,6 +1,7 @@
 import re
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy.exc import IntegrityError
 
 from app.models import (
     Character,
@@ -13,15 +14,31 @@ from app.models import (
     Chapter,
     Item,
     Skill,
+    SkillAlias,
     WikiEvent,
     WikiEvidence,
     db,
+    serialize_datetime,
+)
+from app.services.wiki_editor_payloads import (
+    PayloadValidationError,
+    apply_character_alias_payload,
+    apply_character_cultivation_payload,
+    apply_character_skill_payload,
+    apply_skill_alias_payload,
+    apply_skill_character_payload,
+    parse_boolean,
+    parse_optional_int,
+    request_json_object,
+    validate_chapter_for_novel,
+    validate_optional_text,
 )
 
 
 admin_review_bp = Blueprint("admin_review", __name__)
 
 REVIEW_STATUSES = {"pending", "approved", "rejected"}
+APPROVED_STATUS = "approved"
 
 ENTITY_CONFIG = {
     "characters": {
@@ -78,7 +95,7 @@ ENTITY_CONFIG = {
     },
     "character_skills": {
         "model": CharacterSkill,
-        "fields": {"relationship_type", "description", "review_status", "admin_notes"},
+        "fields": {"description", "review_status", "admin_notes"},
     },
     "character_items": {
         "model": CharacterItem,
@@ -111,8 +128,14 @@ def failure(message, status=400):
     return jsonify({"data": None, "error": message}), status
 
 
+@admin_review_bp.errorhandler(PayloadValidationError)
+def handle_payload_validation_error(error):
+    db.session.rollback()
+    return failure(str(error))
+
+
 def normalize_text(value):
-    return re.sub(r"\s+", " ", value or "").strip().lower()
+    return re.sub(r"\s+", " ", str(value or "")).strip().lower()
 
 
 def split_context_paragraphs(content):
@@ -259,6 +282,457 @@ def admin_review_response(entity_type, record):
         data["aliases"] = aliases
 
     return data
+
+
+def evidence_response(entity_type, entity_id):
+    return [
+        {
+            **evidence.to_admin_dict(),
+            "chapter": chapter_reference(evidence.chapter_id),
+            "created_at": serialize_datetime(evidence.created_at),
+        }
+        for evidence in WikiEvidence.query.filter_by(
+            entity_type=entity_type,
+            entity_id=entity_id,
+        )
+        .order_by(WikiEvidence.id)
+        .all()
+    ]
+
+
+def approved_character_relation_rows(model, character_id):
+    rows = (
+        model.query.filter_by(
+            character_id=character_id,
+            review_status=APPROVED_STATUS,
+        )
+        .order_by(model.id.desc())
+        .all()
+    )
+
+    enriched_rows = []
+
+    for row in rows:
+        row_data = row.to_admin_dict()
+        chapter_id = row_data.get("source_chapter_id") or row_data.get("chapter_id")
+        row_data["chapter"] = chapter_reference(chapter_id)
+        row_data["created_at"] = serialize_datetime(row.created_at)
+        row_data["evidence"] = evidence_response(EVIDENCE_ENTITY_TYPES.get(
+            {
+                CharacterProgressionEvent: "progression_events",
+                CharacterSkill: "character_skills",
+                CharacterItem: "character_items",
+                CharacterLifeEvent: "life_events",
+            }[model]
+        ), row.id)
+        enriched_rows.append(row_data)
+
+    return enriched_rows
+
+
+def character_editor_response(character):
+    data = admin_review_response("characters", character)
+    data["created_at"] = serialize_datetime(character.created_at)
+    data["evidence"] = evidence_response("character", character.id)
+
+    data["aliases"] = [
+        {
+            **alias.to_admin_dict(),
+            "first_seen_chapter": chapter_reference(alias.first_seen_chapter_id),
+            "created_at": serialize_datetime(alias.created_at),
+        }
+        for alias in character.aliases
+    ]
+    data["progression_events"] = approved_character_relation_rows(
+        CharacterProgressionEvent,
+        character.id,
+    )
+    data["skills"] = approved_character_relation_rows(CharacterSkill, character.id)
+    data["items"] = approved_character_relation_rows(CharacterItem, character.id)
+    data["life_events"] = approved_character_relation_rows(CharacterLifeEvent, character.id)
+    data["metadata_history"] = [
+        {
+            **proposal.to_admin_dict(),
+            "chapter": chapter_reference(proposal.chapter_id),
+            "created_at": serialize_datetime(proposal.created_at),
+            "updated_at": serialize_datetime(proposal.updated_at),
+        }
+        for proposal in CharacterMetadataProposal.query.filter_by(
+            character_id=character.id,
+            review_status=APPROVED_STATUS,
+        )
+        .order_by(CharacterMetadataProposal.id.desc())
+        .all()
+    ]
+    data["counts"] = {
+        "aliases": len(data["aliases"]),
+        "progression_events": len(data["progression_events"]),
+        "skills": len(data["skills"]),
+        "items": len(data["items"]),
+        "life_events": len(data["life_events"]),
+        "metadata_history": len(data["metadata_history"]),
+        "evidence": len(data["evidence"]),
+    }
+
+    return data
+
+
+def skill_editor_response(skill):
+    data = admin_review_response("skills", skill)
+    data["created_at"] = serialize_datetime(skill.created_at)
+    data["evidence"] = evidence_response("skill", skill.id)
+    data["aliases"] = [
+        {
+            **alias.to_admin_dict(),
+            "first_seen_chapter": chapter_reference(alias.first_seen_chapter_id),
+            "created_at": serialize_datetime(alias.created_at),
+        }
+        for alias in skill.aliases
+    ]
+    data["characters"] = [
+        {
+            **relationship.to_admin_dict(),
+            "chapter": chapter_reference(relationship.chapter_id),
+            "evidence": evidence_response("character_skill", relationship.id),
+            "created_at": serialize_datetime(relationship.created_at),
+        }
+        for relationship in CharacterSkill.query.filter_by(
+            skill_id=skill.id,
+            review_status=APPROVED_STATUS,
+        )
+        .order_by(CharacterSkill.id)
+        .all()
+    ]
+    data["counts"] = {
+        "aliases": len(data["aliases"]),
+        "characters": len(data["characters"]),
+        "evidence": len(data["evidence"]),
+    }
+    return data
+
+
+@admin_review_bp.get("/wiki-data/novels/<int:novel_id>/characters")
+def list_wiki_data_characters(novel_id):
+    characters = (
+        Character.query.filter_by(
+            novel_id=novel_id,
+            review_status=APPROVED_STATUS,
+        )
+        .order_by(Character.name)
+        .all()
+    )
+
+    return success({"characters": [character_editor_response(character) for character in characters]})
+
+
+@admin_review_bp.get("/wiki-data/novels/<int:novel_id>/chapters/search")
+def search_wiki_data_chapters(novel_id):
+    chapter_id = request.args.get("chapter_id", type=int)
+    chapter_number = request.args.get("number", type=int)
+    query_text = normalize_text(request.args.get("q", ""))
+    limit = min(max(request.args.get("limit", 12, type=int), 1), 25)
+    query = Chapter.query.filter_by(novel_id=novel_id)
+
+    if chapter_id:
+        chapter = query.filter_by(id=chapter_id).first()
+        return success({"chapters": [chapter.to_admin_verification_dict()] if chapter else []})
+
+    if chapter_number:
+        chapter = query.filter_by(chapter_number=chapter_number).first()
+        return success({"chapters": [chapter.to_admin_verification_dict()] if chapter else []})
+
+    if query_text:
+        query = query.filter(
+            db.or_(
+                db.cast(Chapter.chapter_number, db.String).ilike(f"%{query_text}%"),
+                Chapter.title.ilike(f"%{query_text}%"),
+            )
+        )
+
+    chapters = query.order_by(Chapter.chapter_number).limit(limit).all()
+
+    return success({"chapters": [chapter.to_admin_verification_dict() for chapter in chapters]})
+
+
+@admin_review_bp.get("/wiki-data/novels/<int:novel_id>/skills")
+def list_wiki_data_skills(novel_id):
+    query_text = normalize_text(request.args.get("q", ""))
+    query = Skill.query.filter_by(
+        novel_id=novel_id,
+        review_status=APPROVED_STATUS,
+    )
+
+    if query_text:
+        query = query.filter(Skill.name.ilike(f"%{query_text}%"))
+
+    skills = query.order_by(Skill.name).all()
+    return success({"skills": [skill_editor_response(skill) for skill in skills]})
+
+
+SKILL_EDITOR_FIELDS = {"name", "category", "description", "admin_notes"}
+
+
+@admin_review_bp.patch("/wiki-data/skills/<int:skill_id>")
+def update_wiki_data_skill(skill_id):
+    payload = request_json_object()
+    skill = Skill.query.filter_by(id=skill_id, review_status=APPROVED_STATUS).first_or_404()
+
+    if "name" in payload:
+        skill_name = (validate_optional_text(payload.get("name"), "Skill name") or "").strip()
+
+        if not skill_name:
+            return failure("Skill name is required.")
+
+        duplicate_skill = Skill.query.filter(
+            Skill.novel_id == skill.novel_id,
+            Skill.id != skill.id,
+            Skill.review_status == APPROVED_STATUS,
+            db.func.lower(Skill.name) == normalize_text(skill_name),
+        ).first()
+
+        if duplicate_skill:
+            return failure("A canonical skill with this name already exists.")
+
+        skill.name = skill_name
+
+    for field in SKILL_EDITOR_FIELDS - {"name"}:
+        if field in payload:
+            setattr(skill, field, validate_optional_text(payload.get(field), f"Skill {field.replace('_', ' ')}"))
+
+    if "aliases" in payload:
+        alias_error = apply_skill_alias_payload(skill, payload.get("aliases"))
+
+        if alias_error:
+            db.session.rollback()
+            return failure(alias_error)
+
+    if "character_relationships" in payload:
+        character_relationship_error = apply_skill_character_payload(
+            skill,
+            payload.get("character_relationships"),
+        )
+
+        if character_relationship_error:
+            db.session.rollback()
+            return failure(character_relationship_error)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return failure("This canonical skill or alias already exists.")
+
+    return success(skill_editor_response(skill))
+
+
+CHARACTER_EDITOR_FIELDS = {
+    "name",
+    "description",
+    "first_mentioned_chapter_id",
+    "first_appeared_chapter_id",
+    "first_seen_chapter_id",
+    "age_text",
+    "gender",
+    "race_or_species",
+    "race_or_species_source",
+    "race_or_species_confidence",
+    "origin",
+    "faction_or_affiliation",
+    "status",
+    "titles",
+    "current_cultivation_level",
+    "current_position",
+    "current_class_rank",
+    "current_power_rank",
+    "admin_notes",
+}
+
+CHARACTER_CHAPTER_FIELDS = {
+    "first_mentioned_chapter_id",
+    "first_appeared_chapter_id",
+    "first_seen_chapter_id",
+}
+
+
+@admin_review_bp.patch("/wiki-data/characters/<int:character_id>")
+def update_wiki_data_character(character_id):
+    payload = request_json_object()
+    character = Character.query.filter_by(
+        id=character_id,
+        review_status=APPROVED_STATUS,
+    ).first_or_404()
+
+    if "name" in payload:
+        if not isinstance(payload["name"], str) or not payload["name"].strip():
+            return failure("Character name is required.")
+
+    for field in CHARACTER_EDITOR_FIELDS:
+        if field not in payload:
+            continue
+
+        value = payload[field]
+
+        if field in CHARACTER_CHAPTER_FIELDS:
+            value = parse_optional_int(value)
+
+            if not validate_chapter_for_novel(value, character.novel_id):
+                return failure("Chapter reference must belong to this novel.")
+        else:
+            value = validate_optional_text(value, f"Character {field.replace('_', ' ')}")
+
+        setattr(character, field, value)
+
+    if "aliases" in payload:
+        alias_error = apply_character_alias_payload(character, payload.get("aliases"))
+
+        if alias_error:
+            db.session.rollback()
+            return failure(alias_error)
+
+    if "cultivation_events" in payload:
+        cultivation_error = apply_character_cultivation_payload(
+            character,
+            payload.get("cultivation_events"),
+        )
+
+        if cultivation_error:
+            db.session.rollback()
+            return failure(cultivation_error)
+
+    if "skill_relationships" in payload:
+        skill_error = apply_character_skill_payload(
+            character,
+            payload.get("skill_relationships"),
+        )
+
+        if skill_error:
+            db.session.rollback()
+            return failure(skill_error)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return failure("This canonical relationship already exists.")
+
+    return success(character_editor_response(character))
+
+
+@admin_review_bp.post("/wiki-data/characters/<int:character_id>/aliases")
+def create_wiki_data_character_alias(character_id):
+    payload = request_json_object()
+    character = Character.query.filter_by(
+        id=character_id,
+        review_status=APPROVED_STATUS,
+    ).first_or_404()
+    alias_text = (validate_optional_text(payload.get("alias"), "Alias") or "").strip()
+
+    if not alias_text:
+        return failure("Alias is required.")
+
+    first_seen_chapter_id = parse_optional_int(payload.get("first_seen_chapter_id"))
+
+    if not first_seen_chapter_id:
+        return failure("Alias first mentioned chapter is required.")
+
+    alias = CharacterAlias(
+        character_id=character.id,
+        alias=alias_text,
+        first_seen_chapter_id=first_seen_chapter_id,
+        evidence=validate_optional_text(payload.get("evidence"), "Alias evidence") or None,
+        is_primary=parse_boolean(payload.get("is_primary"), "Primary alias flag"),
+    )
+
+    if not validate_chapter_for_novel(alias.first_seen_chapter_id, character.novel_id):
+        return failure("Alias chapter reference must belong to this novel.")
+
+    if CharacterAlias.query.filter(
+        CharacterAlias.character_id == character.id,
+        db.func.lower(CharacterAlias.alias) == normalize_text(alias_text),
+    ).first():
+        return failure("This character already has this alias.")
+
+    db.session.add(alias)
+
+    if alias.is_primary:
+        for existing_alias in character.aliases:
+            existing_alias.is_primary = False
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return failure("This alias already exists for the character.")
+
+    return success(character_editor_response(character), status=201)
+
+
+@admin_review_bp.patch("/wiki-data/character-aliases/<int:alias_id>")
+def update_wiki_data_character_alias(alias_id):
+    payload = request_json_object()
+    alias = CharacterAlias.query.get_or_404(alias_id)
+    character = Character.query.filter_by(
+        id=alias.character_id,
+        review_status=APPROVED_STATUS,
+    ).first_or_404()
+
+    if "alias" in payload:
+        alias_text = (validate_optional_text(payload.get("alias"), "Alias") or "").strip()
+
+        if not alias_text:
+            return failure("Alias is required.")
+
+        duplicate_alias = CharacterAlias.query.filter(
+            CharacterAlias.character_id == character.id,
+            CharacterAlias.id != alias.id,
+            db.func.lower(CharacterAlias.alias) == normalize_text(alias_text),
+        ).first()
+
+        if duplicate_alias:
+            return failure("This character already has this alias.")
+
+        alias.alias = alias_text
+
+    if "first_seen_chapter_id" in payload:
+        alias.first_seen_chapter_id = parse_optional_int(payload.get("first_seen_chapter_id"))
+
+        if not alias.first_seen_chapter_id:
+            return failure("Alias first mentioned chapter is required.")
+
+        if not validate_chapter_for_novel(alias.first_seen_chapter_id, character.novel_id):
+            return failure("Alias chapter reference must belong to this novel.")
+
+    if "evidence" in payload:
+        alias.evidence = validate_optional_text(payload.get("evidence"), "Alias evidence") or None
+
+    if "is_primary" in payload:
+        alias.is_primary = parse_boolean(payload.get("is_primary"), "Primary alias flag")
+
+        if alias.is_primary:
+            for existing_alias in character.aliases:
+                if existing_alias.id != alias.id:
+                    existing_alias.is_primary = False
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return failure("This alias already exists for the character.")
+
+    return success(character_editor_response(character))
+
+
+@admin_review_bp.delete("/wiki-data/character-aliases/<int:alias_id>")
+def delete_wiki_data_character_alias(alias_id):
+    alias = CharacterAlias.query.get_or_404(alias_id)
+    character = Character.query.filter_by(
+        id=alias.character_id,
+        review_status=APPROVED_STATUS,
+    ).first_or_404()
+    db.session.delete(alias)
+    db.session.commit()
+
+    return success(character_editor_response(character))
 
 
 METADATA_PROPOSAL_FIELDS = {

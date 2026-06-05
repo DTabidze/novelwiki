@@ -384,6 +384,38 @@
   justify-content: flex-end;
 }
 
+.admin-notice-modal {
+  max-width: 520px;
+}
+
+.admin-notice-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.admin-notice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+}
+
+.admin-notice-icon.danger {
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.26);
+}
+
+.admin-notice-icon.info {
+  color: #bfdbfe;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: rgba(37, 99, 235, 0.18);
+}
+
 .admin-danger-zone {
   display: flex;
   align-items: center;

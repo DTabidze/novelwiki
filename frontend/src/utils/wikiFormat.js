@@ -17,7 +17,25 @@ export function initialsForName(name) {
 }
 
 export function chapterLabel(chapter) {
-  return chapter ? `Chapter ${chapter.chapter_number}` : "Unknown chapter";
+  if (!chapter) {
+    return "Unknown chapter";
+  }
+
+  const chapterNumber = chapter.chapter_number;
+  const title = cleanChapterTitle(chapter);
+
+  return title ? `Chapter ${chapterNumber} - ${title}` : `Chapter ${chapterNumber}`;
+}
+
+export function cleanChapterTitle(chapter) {
+  if (!chapter?.title) {
+    return "";
+  }
+
+  const chapterNumber = chapter.chapter_number;
+  const prefix = new RegExp(`^\\s*Chapter\\s+${chapterNumber}\\s*(?::|-|—|–)?\\s*`, "i");
+
+  return chapter.title.replace(prefix, "").trim();
 }
 
 export function relationshipLabel(relationship) {

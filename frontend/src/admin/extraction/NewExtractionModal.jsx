@@ -1,13 +1,9 @@
 import React from "react";
+import { chapterLabel } from "../../utils/wikiFormat.js";
 
 function bookOptionLabel(book) {
   const defaultTitle = `Book ${book.number}`;
   return !book.title || book.title === defaultTitle ? defaultTitle : `${defaultTitle}: ${book.title}`;
-}
-
-function cleanChapterTitle(chapter) {
-  const prefix = new RegExp(`^chapter\\s+${chapter.chapter_number}\\s*:?\\s*`, "i");
-  return (chapter.title || "").replace(prefix, "").trim() || `Chapter ${chapter.chapter_number}`;
 }
 
 export default function NewExtractionModal({
@@ -280,7 +276,7 @@ export default function NewExtractionModal({
               <option value="">Select chapter number</option>
               {bookChapters.map((chapter) => (
                 <option key={chapter.id} value={chapter.id}>
-                  Chapter {chapter.chapter_number}: {cleanChapterTitle(chapter)}
+                  {chapterLabel(chapter)}
                   {extractedChapterIds.has(chapter.id) ? " (extracted)" : ""}
                 </option>
               ))}

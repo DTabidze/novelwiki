@@ -1,5 +1,6 @@
 import React from "react";
 import { Eye, Info, Pencil, Save, X } from "lucide-react";
+import { chapterLabel } from "../../utils/wikiFormat.js";
 import {
   confidenceText,
   evidenceRows,
@@ -61,7 +62,6 @@ const EDIT_FIELD_CONFIG = {
   character_skills: [
     field("Character", "character_name", { readOnly: true }),
     field("Skill", "skill_name", { readOnly: true }),
-    field("Relationship", "relationship_type", { required: true }),
     field("Description", "description", { multiline: true }),
   ],
   character_items: [
@@ -94,11 +94,6 @@ function editablePayload(fields, formValues) {
     }
     return payload;
   }, {});
-}
-
-function chapterLabel(chapter) {
-  if (!chapter) return "No source chapter";
-  return `Chapter ${chapter.chapter_number}${chapter.title ? ` - ${chapter.title}` : ""}`;
 }
 
 function initialValues(item, fields) {

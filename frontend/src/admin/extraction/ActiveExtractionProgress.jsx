@@ -1,5 +1,6 @@
 import React from "react";
 import { BookOpen, RotateCcw, Square } from "lucide-react";
+import { cleanChapterTitle } from "../../utils/wikiFormat.js";
 import ProgressBar from "../components/ProgressBar.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import ExtractionStatusIcon from "./ExtractionStatusIcon.jsx";
@@ -157,10 +158,7 @@ function RecentProcessedChaptersList({ run }) {
         {visibleChapters.length ? visibleChapters.map((runChapter) => {
           const status = runChapter.status;
           const chapter = runChapter.chapter || {};
-          const displayTitle = (chapter.title || "").replace(
-            new RegExp(`^\\s*Chapter\\s+${chapter.chapter_number}\\s*:?\\s*`, "i"),
-            "",
-          ) || chapter.title;
+          const displayTitle = cleanChapterTitle(chapter) || chapter.title;
           const isFinished = status === "completed" || status === "failed";
           const recordsText = isFinished ? `${runChapter.records_created || 0} records` : "— records";
           const warningsText = isFinished ? `${runChapter.warning_count || 0} warnings` : "— warnings";
