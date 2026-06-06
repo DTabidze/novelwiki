@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 
 export default function CreateNovelModal({ onClose, onCreate }) {
   const [title, setTitle] = React.useState("");
@@ -43,8 +44,8 @@ export default function CreateNovelModal({ onClose, onCreate }) {
             <h2>Create Novel</h2>
             <p>Create an empty workspace. Books are uploaded inside the novel workspace.</p>
           </div>
-          <button className="admin-icon-button" type="button" onClick={onClose}>
-            X
+          <button className="admin-icon-button modal-close-button" type="button" onClick={onClose} aria-label="Close">
+            <X aria-hidden="true" size={16} />
           </button>
         </div>
 

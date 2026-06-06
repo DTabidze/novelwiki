@@ -25,7 +25,7 @@ export default function AdminNoticeModal({ title = "Something went wrong", messa
               <p>{message}</p>
             </div>
           </div>
-          <button className="admin-icon-button" type="button" onClick={onClose} aria-label="Close">
+          <button className="admin-icon-button modal-close-button" type="button" onClick={onClose} aria-label="Close">
             <X aria-hidden="true" size={17} />
           </button>
         </div>

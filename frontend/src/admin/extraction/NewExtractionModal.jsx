@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 import { chapterLabel } from "../../utils/wikiFormat.js";
 
 function bookOptionLabel(book) {
@@ -171,7 +172,9 @@ export default function NewExtractionModal({
             <h2>New Extraction</h2>
             <p>Choose a safe extraction scope.</p>
           </div>
-          <button className="admin-icon-button" disabled={isStarting} type="button" onClick={onClose}>x</button>
+          <button className="admin-icon-button modal-close-button" disabled={isStarting} type="button" onClick={onClose} aria-label="Close">
+            <X aria-hidden="true" size={16} />
+          </button>
         </div>
 
         <label>

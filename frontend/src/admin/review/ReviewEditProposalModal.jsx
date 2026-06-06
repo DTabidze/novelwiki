@@ -223,7 +223,7 @@ export default function ReviewEditProposalModal({
               <p>Update the proposed data for this review item.</p>
             </div>
           </div>
-          <button type="button" className="admin-icon-button" onClick={onClose} aria-label="Close edit modal">
+          <button type="button" className="admin-icon-button modal-close-button" onClick={onClose} aria-label="Close edit modal">
             <X size={18} />
           </button>
         </header>

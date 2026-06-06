@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 
 export default function EditNovelModal({ novel, onClose, onSave }) {
   const [title, setTitle] = React.useState(novel?.title || "");
@@ -38,8 +39,8 @@ export default function EditNovelModal({ novel, onClose, onSave }) {
             <h2>Edit Novel</h2>
             <p>Update workspace profile information. Books and extracted records are unchanged.</p>
           </div>
-          <button className="admin-icon-button" type="button" onClick={onClose}>
-            X
+          <button className="admin-icon-button modal-close-button" type="button" onClick={onClose} aria-label="Close">
+            <X aria-hidden="true" size={16} />
           </button>
         </div>
 

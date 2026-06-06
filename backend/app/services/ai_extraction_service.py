@@ -50,6 +50,8 @@ from app.services.extraction.identity import (
     select_canonical_character_name,
     should_promote_canonical_name,
 )
+from app.services.item_categories import normalize_item_category
+from app.services.skill_categories import normalize_skill_category
 
 ALLOWED_EVENT_TYPES = {
     "item_acquired",
@@ -707,17 +709,18 @@ def save_chapter_extraction(novel, chapter, extraction):
         ):
             continue
 
+        skill_category = normalize_skill_category(extracted_skill.category) or "Other"
         skill = find_existing_skill(novel, extracted_skill.name)
 
         if skill:
-            skill.category = skill.category or extracted_skill.category
+            skill.category = skill.category or skill_category
             skill.description = merge_description(skill.description, extracted_skill.description)
             summary["skills_updated"] += 1
         else:
             skill = Skill(
                 novel_id=novel.id,
                 name=extracted_skill.name,
-                category=extracted_skill.category,
+                category=skill_category,
                 description=extracted_skill.description,
                 review_status="pending",
             )
@@ -745,17 +748,18 @@ def save_chapter_extraction(novel, chapter, extraction):
         ):
             continue
 
+        item_category = normalize_item_category(extracted_item.category) or "Other"
         item = find_existing_by_name(Item, novel, extracted_item.name)
 
         if item:
-            item.category = item.category or extracted_item.category
+            item.category = item.category or item_category
             item.description = merge_description(item.description, extracted_item.description)
             summary["items_updated"] += 1
         else:
             item = Item(
                 novel_id=novel.id,
                 name=extracted_item.name,
-                category=extracted_item.category,
+                category=item_category,
                 description=extracted_item.description,
                 review_status="pending",
             )

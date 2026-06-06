@@ -3,9 +3,11 @@ from flask import request
 from app.models import (
     Character,
     CharacterAlias,
+    CharacterItem,
     CharacterProgressionEvent,
     CharacterSkill,
     Chapter,
+    Item,
     Skill,
     SkillAlias,
     WikiEvidence,
@@ -16,6 +18,7 @@ APPROVED_STATUS = "approved"
 
 EVIDENCE_ENTITY_TYPES = {
     "progression_events": "progression",
+    "character_items": "character_item",
     "character_skills": "character_skill",
 }
 
@@ -484,6 +487,135 @@ def apply_character_skill_payload(character, relationship_rows):
     return None
 
 
+def apply_character_item_payload(character, relationship_rows):
+    validate_payload_rows(relationship_rows, "Item relationships")
+    active_item_ids = set()
+
+    for relationship_data in relationship_rows or []:
+        if parse_boolean(relationship_data.get("_deleted"), "Item relationship deleted flag"):
+            continue
+
+        item_id = parse_optional_int(relationship_data.get("item_id"))
+        if item_id:
+            if item_id in active_item_ids:
+                return "This item is already attached to this character."
+
+            active_item_ids.add(item_id)
+
+    for relationship_data in relationship_rows:
+        relationship_id = parse_optional_int(relationship_data.get("id"))
+        should_delete = parse_boolean(
+            relationship_data.get("_deleted"),
+            "Item relationship deleted flag",
+        )
+
+        if relationship_id:
+            relationship = CharacterItem.query.filter_by(
+                id=relationship_id,
+                character_id=character.id,
+            ).first()
+            if not relationship:
+                return "Item relationship does not belong to this character."
+
+            if should_delete:
+                WikiEvidence.query.filter_by(
+                    entity_type=EVIDENCE_ENTITY_TYPES["character_items"],
+                    entity_id=relationship.id,
+                ).delete()
+                db.session.delete(relationship)
+                continue
+        elif should_delete:
+            continue
+        else:
+            relationship = None
+
+        item_id = parse_optional_int(relationship_data.get("item_id"))
+        chapter_id = parse_optional_int(relationship_data.get("chapter_id"))
+
+        if not item_id:
+            return "Item is required."
+
+        item = Item.query.filter_by(
+            id=item_id,
+            novel_id=character.novel_id,
+            review_status=APPROVED_STATUS,
+        ).first()
+
+        if not item:
+            return "Item must be an approved item from this novel."
+
+        if not chapter_id:
+            return "Item chapter is required."
+
+        if not validate_chapter_for_novel(chapter_id, character.novel_id):
+            return "Item chapter reference must belong to this novel."
+
+        duplicate_query = CharacterItem.query.filter_by(
+            character_id=character.id,
+            item_id=item_id,
+        )
+        if relationship_id:
+            duplicate_query = duplicate_query.filter(CharacterItem.id != relationship_id)
+
+        if duplicate_query.first():
+            return "This item is already attached to this character."
+
+        if relationship is None:
+            relationship = CharacterItem(
+                novel_id=character.novel_id,
+                character_id=character.id,
+                item_id=item_id,
+                chapter_id=chapter_id,
+                relationship_type="has",
+                description=validate_optional_text(
+                    relationship_data.get("description"),
+                    "Item relationship description",
+                ) or None,
+                review_status=APPROVED_STATUS,
+            )
+            db.session.add(relationship)
+            db.session.flush()
+        else:
+            relationship.item_id = item_id
+            relationship.chapter_id = chapter_id
+            relationship.relationship_type = "has"
+            relationship.description = validate_optional_text(
+                relationship_data.get("description"),
+                "Item relationship description",
+            ) or None
+
+        relationship.admin_notes = validate_optional_text(
+            relationship_data.get("admin_notes"),
+            "Item relationship admin notes",
+        ) or None
+        relationship.review_status = APPROVED_STATUS
+
+        evidence_text = (
+            validate_optional_text(relationship_data.get("evidence_text"), "Item relationship evidence")
+            or ""
+        ).strip()
+        evidence = WikiEvidence.query.filter_by(
+            entity_type=EVIDENCE_ENTITY_TYPES["character_items"],
+            entity_id=relationship.id,
+        ).first()
+
+        if evidence_text:
+            if not evidence:
+                evidence = WikiEvidence(
+                    novel_id=character.novel_id,
+                    entity_type=EVIDENCE_ENTITY_TYPES["character_items"],
+                    entity_id=relationship.id,
+                )
+                db.session.add(evidence)
+
+            evidence.chapter_id = chapter_id
+            evidence.evidence_text = evidence_text
+        elif evidence:
+            db.session.delete(evidence)
+
+    return None
+
+
 def apply_skill_character_payload(skill, relationship_rows):
     validate_payload_rows(relationship_rows, "Skill character relationships")
     active_character_ids = set()
@@ -612,3 +744,129 @@ def apply_skill_character_payload(skill, relationship_rows):
     return None
 
 
+def apply_item_character_payload(item, relationship_rows):
+    validate_payload_rows(relationship_rows, "Item character relationships")
+    active_character_ids = set()
+
+    for relationship_data in relationship_rows or []:
+        if parse_boolean(relationship_data.get("_deleted"), "Item character relationship deleted flag"):
+            continue
+
+        character_id = parse_optional_int(relationship_data.get("character_id"))
+        if character_id:
+            if character_id in active_character_ids:
+                return "This character is already attached to this item."
+
+            active_character_ids.add(character_id)
+
+    for relationship_data in relationship_rows or []:
+        relationship_id = parse_optional_int(relationship_data.get("id"))
+        should_delete = parse_boolean(
+            relationship_data.get("_deleted"),
+            "Item character relationship deleted flag",
+        )
+
+        if relationship_id:
+            relationship = CharacterItem.query.filter_by(
+                id=relationship_id,
+                item_id=item.id,
+            ).first()
+
+            if not relationship:
+                return "Character item relationship does not belong to this item."
+
+            if should_delete:
+                WikiEvidence.query.filter_by(
+                    entity_type=EVIDENCE_ENTITY_TYPES["character_items"],
+                    entity_id=relationship.id,
+                ).delete()
+                db.session.delete(relationship)
+                continue
+        else:
+            if should_delete:
+                continue
+            relationship = None
+
+        character_id = parse_optional_int(relationship_data.get("character_id"))
+        chapter_id = parse_optional_int(relationship_data.get("chapter_id"))
+
+        if not character_id:
+            return "Character is required."
+
+        character = Character.query.filter_by(
+            id=character_id,
+            novel_id=item.novel_id,
+            review_status=APPROVED_STATUS,
+        ).first()
+
+        if not character:
+            return "Character must be an approved character from this novel."
+
+        if not chapter_id:
+            return "Item chapter is required."
+
+        if not validate_chapter_for_novel(chapter_id, item.novel_id):
+            return "Item chapter reference must belong to this novel."
+
+        with db.session.no_autoflush:
+            duplicate_query = CharacterItem.query.filter_by(
+                character_id=character_id,
+                item_id=item.id,
+            )
+
+            if relationship_id:
+                duplicate_query = duplicate_query.filter(CharacterItem.id != relationship_id)
+
+            if duplicate_query.first():
+                return "This character is already attached to this item."
+
+        if relationship is None:
+            relationship = CharacterItem(
+                novel_id=item.novel_id,
+                character_id=character_id,
+                item_id=item.id,
+                chapter_id=chapter_id,
+                relationship_type="has",
+                review_status=APPROVED_STATUS,
+            )
+            db.session.add(relationship)
+            db.session.flush()
+
+        relationship.character_id = character_id
+        relationship.item_id = item.id
+        relationship.chapter_id = chapter_id
+        relationship.relationship_type = "has"
+        relationship.description = validate_optional_text(
+            relationship_data.get("description"),
+            "Item relationship description",
+        ) or None
+        relationship.admin_notes = validate_optional_text(
+            relationship_data.get("admin_notes"),
+            "Item relationship admin notes",
+        ) or None
+        relationship.review_status = APPROVED_STATUS
+
+        evidence_text = (
+            validate_optional_text(relationship_data.get("evidence_text"), "Item relationship evidence")
+            or ""
+        ).strip()
+        evidence = WikiEvidence.query.filter_by(
+            entity_type=EVIDENCE_ENTITY_TYPES["character_items"],
+            entity_id=relationship.id,
+        ).first()
+
+        if evidence_text:
+            if not evidence:
+                evidence = WikiEvidence(
+                    novel_id=item.novel_id,
+                    entity_type=EVIDENCE_ENTITY_TYPES["character_items"],
+                    entity_id=relationship.id,
+                )
+                db.session.add(evidence)
+
+            evidence.chapter_id = chapter_id
+            evidence.evidence_text = evidence_text
+        elif evidence:
+            db.session.delete(evidence)
+
+    return None

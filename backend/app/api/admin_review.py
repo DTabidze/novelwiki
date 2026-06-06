@@ -24,7 +24,9 @@ from app.services.wiki_editor_payloads import (
     PayloadValidationError,
     apply_character_alias_payload,
     apply_character_cultivation_payload,
+    apply_character_item_payload,
     apply_character_skill_payload,
+    apply_item_character_payload,
     apply_skill_alias_payload,
     apply_skill_character_payload,
     parse_boolean,
@@ -33,6 +35,8 @@ from app.services.wiki_editor_payloads import (
     validate_chapter_for_novel,
     validate_optional_text,
 )
+from app.services.item_categories import normalize_item_category
+from app.services.skill_categories import normalize_skill_category
 
 
 admin_review_bp = Blueprint("admin_review", __name__)
@@ -411,6 +415,31 @@ def skill_editor_response(skill):
     return data
 
 
+def item_editor_response(item):
+    data = admin_review_response("items", item)
+    data["created_at"] = serialize_datetime(item.created_at)
+    data["evidence"] = evidence_response("item", item.id)
+    data["characters"] = [
+        {
+            **relationship.to_admin_dict(),
+            "chapter": chapter_reference(relationship.chapter_id),
+            "evidence": evidence_response("character_item", relationship.id),
+            "created_at": serialize_datetime(relationship.created_at),
+        }
+        for relationship in CharacterItem.query.filter_by(
+            item_id=item.id,
+            review_status=APPROVED_STATUS,
+        )
+        .order_by(CharacterItem.id)
+        .all()
+    ]
+    data["counts"] = {
+        "characters": len(data["characters"]),
+        "evidence": len(data["evidence"]),
+    }
+    return data
+
+
 @admin_review_bp.get("/wiki-data/novels/<int:novel_id>/characters")
 def list_wiki_data_characters(novel_id):
     characters = (
@@ -469,7 +498,23 @@ def list_wiki_data_skills(novel_id):
     return success({"skills": [skill_editor_response(skill) for skill in skills]})
 
 
+@admin_review_bp.get("/wiki-data/novels/<int:novel_id>/items")
+def list_wiki_data_items(novel_id):
+    query_text = normalize_text(request.args.get("q", ""))
+    query = Item.query.filter_by(
+        novel_id=novel_id,
+        review_status=APPROVED_STATUS,
+    )
+
+    if query_text:
+        query = query.filter(Item.name.ilike(f"%{query_text}%"))
+
+    items = query.order_by(Item.name).all()
+    return success({"items": [item_editor_response(item) for item in items]})
+
+
 SKILL_EDITOR_FIELDS = {"name", "category", "description", "admin_notes"}
+ITEM_EDITOR_FIELDS = {"name", "category", "description", "admin_notes"}
 
 
 @admin_review_bp.patch("/wiki-data/skills/<int:skill_id>")
@@ -495,7 +540,14 @@ def update_wiki_data_skill(skill_id):
 
         skill.name = skill_name
 
-    for field in SKILL_EDITOR_FIELDS - {"name"}:
+    if "category" in payload:
+        category_text = validate_optional_text(payload.get("category"), "Skill category")
+        skill_category = normalize_skill_category(category_text)
+        if category_text not in (None, "") and not skill_category:
+            return failure("Skill category must be one of the supported categories.")
+        skill.category = skill_category
+
+    for field in SKILL_EDITOR_FIELDS - {"name", "category"}:
         if field in payload:
             setattr(skill, field, validate_optional_text(payload.get(field), f"Skill {field.replace('_', ' ')}"))
 
@@ -523,6 +575,59 @@ def update_wiki_data_skill(skill_id):
         return failure("This canonical skill or alias already exists.")
 
     return success(skill_editor_response(skill))
+
+
+@admin_review_bp.patch("/wiki-data/items/<int:item_id>")
+def update_wiki_data_item(item_id):
+    payload = request_json_object()
+    item = Item.query.filter_by(id=item_id, review_status=APPROVED_STATUS).first_or_404()
+
+    if "name" in payload:
+        item_name = (validate_optional_text(payload.get("name"), "Item name") or "").strip()
+
+        if not item_name:
+            return failure("Item name is required.")
+
+        duplicate_item = Item.query.filter(
+            Item.novel_id == item.novel_id,
+            Item.id != item.id,
+            Item.review_status == APPROVED_STATUS,
+            db.func.lower(Item.name) == normalize_text(item_name),
+        ).first()
+
+        if duplicate_item:
+            return failure("A canonical item with this name already exists.")
+
+        item.name = item_name
+
+    if "category" in payload:
+        category_text = validate_optional_text(payload.get("category"), "Item category")
+        item_category = normalize_item_category(category_text)
+        if category_text not in (None, "") and not item_category:
+            return failure("Item category must be one of the supported categories.")
+        item.category = item_category
+
+    for field in ITEM_EDITOR_FIELDS - {"name", "category"}:
+        if field in payload:
+            setattr(item, field, validate_optional_text(payload.get(field), f"Item {field.replace('_', ' ')}"))
+
+    if "character_relationships" in payload:
+        character_relationship_error = apply_item_character_payload(
+            item,
+            payload.get("character_relationships"),
+        )
+
+        if character_relationship_error:
+            db.session.rollback()
+            return failure(character_relationship_error)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return failure("This canonical item relationship already exists.")
+
+    return success(item_editor_response(item))
 
 
 CHARACTER_EDITOR_FIELDS = {
@@ -608,6 +713,16 @@ def update_wiki_data_character(character_id):
         if skill_error:
             db.session.rollback()
             return failure(skill_error)
+
+    if "item_relationships" in payload:
+        item_error = apply_character_item_payload(
+            character,
+            payload.get("item_relationships"),
+        )
+
+        if item_error:
+            db.session.rollback()
+            return failure(item_error)
 
     try:
         db.session.commit()

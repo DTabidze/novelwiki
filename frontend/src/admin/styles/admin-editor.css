@@ -88,6 +88,54 @@
   min-height: 0;
 }
 
+.editor-browser-trigger-row {
+  display: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.editor-browser-header {
+  display: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editor-browser-header h2,
+.editor-browser-header p {
+  margin: 0;
+}
+
+.editor-browser-header h2 {
+  color: #f4f8ff;
+  font-size: 1rem;
+}
+
+.editor-browser-header p {
+  margin-top: 4px;
+  color: #9fb0c5;
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.editor-browser-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  background: rgba(2, 8, 18, 0.58);
+}
+
+.editor-browser-drawer {
+  width: min(420px, calc(100vw - 28px));
+  max-width: 100%;
+  min-height: 0;
+  padding: 18px;
+  overflow: hidden;
+}
+
 .editor-list-panel,
 .editor-main-panel {
   border-radius: 10px;
@@ -99,6 +147,23 @@
   gap: 12px;
   min-height: 620px;
   padding: 14px;
+}
+
+.editor-list-panel.drawer {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  box-shadow: 22px 0 60px rgba(0, 0, 0, 0.42);
+}
+
+.editor-list-panel.drawer .editor-browser-header {
+  display: flex;
+}
+
+.editor-list-panel.drawer .editor-record-list {
+  max-height: none;
+  min-height: 0;
+  flex: 1;
 }
 
 .editor-search-field {
@@ -174,7 +239,7 @@
   gap: 11px;
   align-items: center;
   width: 100%;
-  min-height: 64px;
+  min-height: 56px;
   padding: 11px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 8px;
@@ -205,8 +270,7 @@
   background: rgba(124, 94, 255, 0.2);
 }
 
-.editor-record-card strong,
-.editor-record-card small {
+.editor-record-card strong {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -216,11 +280,6 @@
 .editor-record-card strong {
   color: #f1f6ff;
   font-size: 0.94rem;
-}
-
-.editor-record-card small {
-  margin-top: 3px;
-  color: #a9b8cc;
 }
 
 .editor-main-panel {
@@ -703,14 +762,14 @@
 
 .editor-cultivation-editor-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(320px, 1.1fr) minmax(320px, 1.1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   align-items: flex-start;
 }
 
 .editor-skill-editor-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   align-items: flex-start;
 }
@@ -880,9 +939,25 @@
 .editor-confirm-modal {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0;
   width: min(1100px, calc(100vw - 40px));
   max-height: min(86vh, 920px);
   overflow: hidden;
+  padding: 0;
+}
+
+.editor-confirm-modal.compact {
+  grid-template-rows: auto auto;
+  width: min(520px, calc(100vw - 40px));
+  max-height: min(76vh, 520px);
+}
+
+.editor-confirm-modal.compact .editor-save-confirm-header {
+  padding: 14px 16px 12px;
+}
+
+.editor-confirm-modal.compact .editor-save-confirm-footer {
+  padding: 10px 16px 14px;
 }
 
 .editor-save-confirm-header {
@@ -902,6 +977,14 @@
   min-height: 0;
   overflow-y: auto;
   padding: 0 24px 14px;
+}
+
+.editor-unsaved-modal .editor-save-confirm-body {
+  padding: 0 16px 12px;
+}
+
+.editor-unsaved-modal .editor-save-summary-box {
+  padding: 10px 12px;
 }
 
 .editor-save-summary-box {
@@ -1081,7 +1164,20 @@
 }
 
 .editor-save-confirm-footer > span svg {
-  color: #91a4bd;
+  color: #60a5fa;
+}
+
+.editor-unsaved-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  padding: 10px 16px 14px;
+  background: rgba(8, 24, 39, 0.96);
+}
+
+.editor-unsaved-actions button {
+  min-width: 104px;
 }
 
 .editor-focus-flash {
@@ -1329,9 +1425,27 @@
   margin: 0;
 }
 
+@media (max-width: 1499px) {
+  .editor-browser-trigger-row {
+    display: flex;
+  }
+
+  .editor-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editor-list-panel.desktop {
+    display: none;
+  }
+
+  .editor-main-panel {
+    width: 100%;
+  }
+}
+
 @media (max-width: 1280px) {
   .editor-layout {
-    grid-template-columns: minmax(230px, 290px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .editor-form-grid {

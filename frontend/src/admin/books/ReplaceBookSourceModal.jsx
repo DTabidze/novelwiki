@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 
 export default function ReplaceBookSourceModal({ book, onClose, onReplace }) {
   const [file, setFile] = React.useState(null);
@@ -35,8 +36,8 @@ export default function ReplaceBookSourceModal({ book, onClose, onReplace }) {
             <h2>Replace Source File</h2>
             <p>This stores a new source file for Book {book.number} and clears its current parsed chapters.</p>
           </div>
-          <button className="admin-icon-button" disabled={isReplacing} type="button" onClick={onClose}>
-            X
+          <button className="admin-icon-button modal-close-button" disabled={isReplacing} type="button" onClick={onClose} aria-label="Close">
+            <X aria-hidden="true" size={16} />
           </button>
         </div>
 

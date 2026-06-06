@@ -94,7 +94,7 @@ export default function ReviewContextModal({ evidence, fallbackChapter, onClose 
             <span>Source Context</span>
             <h2 id="review-context-title">{chapterLabel(chapter)}</h2>
           </div>
-          <button type="button" className="admin-icon-button" onClick={onClose} aria-label="Close context modal">
+          <button type="button" className="admin-icon-button modal-close-button" onClick={onClose} aria-label="Close context modal">
             <X size={17} />
           </button>
         </header>

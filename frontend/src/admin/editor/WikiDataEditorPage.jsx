@@ -28,6 +28,8 @@ import { EditorField, RelationList } from "./components/EditorPrimitives.jsx";
 import {
   AliasEditor,
   CultivationEventEditor,
+  ItemCharacterRelationshipEditor,
+  ItemRelationshipEditor,
   SkillCharacterRelationshipEditor,
   SkillRelationshipEditor,
 } from "./components/RelationshipEditors.jsx";
@@ -40,7 +42,14 @@ import {
   emptyDraft,
   formatChapter,
   getCharacterSubtitle,
+  ITEM_CATEGORIES,
+  ITEM_FIELDS,
+  ITEM_SECTIONS,
+  itemCharacterRelationshipsToDrafts,
+  itemRelationshipsToDrafts,
+  itemToDraft,
   normalizePayload,
+  SKILL_CATEGORIES,
   skillCharacterRelationshipsToDrafts,
   SKILL_FIELDS,
   SKILL_SECTIONS,
@@ -51,7 +60,7 @@ import {
 const ENTITY_TABS = [
   { id: "characters", label: "Characters", icon: Users, enabled: true },
   { id: "skills", label: "Skills", icon: Sparkles, enabled: true },
-  { id: "items", label: "Items", icon: Package, enabled: false },
+  { id: "items", label: "Items", icon: Package, enabled: true },
   { id: "progression", label: "Cultivation", icon: Timeline, enabled: false },
 ];
 
@@ -60,12 +69,16 @@ function isKnownEntity(entity) {
 }
 
 function isDataBackedEntity(entity) {
-  return ["characters", "skills"].includes(entity);
+  return ["characters", "skills", "items"].includes(entity);
 }
 
 function sectionsForEntity(entity) {
   if (entity === "skills") {
     return SKILL_SECTIONS;
+  }
+
+  if (entity === "items") {
+    return ITEM_SECTIONS;
   }
 
   if (entity === "characters") {
@@ -109,6 +122,13 @@ const CHARACTER_FIELD_LABELS = {
 };
 
 const SKILL_FIELD_LABELS = {
+  name: "Canonical name",
+  category: "Category",
+  description: "Description",
+  admin_notes: "Admin notes",
+};
+
+const ITEM_FIELD_LABELS = {
   name: "Canonical name",
   category: "Category",
   description: "Description",
@@ -319,6 +339,7 @@ function ChangeTypeIcon({ change }) {
   if (change.entityType === "field") return <Type aria-hidden="true" size={19} />;
   if (change.entityType === "alias") return <Star aria-hidden="true" size={19} />;
   if (change.entityType === "skill") return <Sparkles aria-hidden="true" size={19} />;
+  if (change.entityType === "item") return <Package aria-hidden="true" size={19} />;
   if (change.entityType === "character") return <Users aria-hidden="true" size={19} />;
   if (change.entityType === "cultivation breakthrough") return <Timeline aria-hidden="true" size={19} />;
   return <Pencil aria-hidden="true" size={19} />;
@@ -333,14 +354,18 @@ function EditorConfirmModal({ action, onCancel, onConfirm, onEditChange }) {
   const isAlias = action.type === "alias" || action.type === "skill_alias";
   const isSkill = action.type === "skill";
   const isSkillCharacter = action.type === "skill_character";
-  const title = isSave ? "Save Wiki Data Changes?" : isAlias ? "Delete Alias?" : isSkill ? "Remove Skill?" : isSkillCharacter ? "Remove Character?" : "Delete Cultivation Record?";
+  const isItem = action.type === "item";
+  const isItemCharacter = action.type === "item_character";
+  const title = isSave ? "Save Wiki Data Changes?" : isAlias ? "Delete Alias?" : isSkill ? "Remove Skill?" : isItem ? "Remove Item?" : isSkillCharacter || isItemCharacter ? "Remove Character?" : "Delete Cultivation Record?";
   const label = isAlias
     ? action.draft?.alias || "this alias"
     : action.type === "cultivation"
       ? action.draft?.cultivation_level || "this cultivation breakthrough"
       : isSkill
         ? action.draft?.skill_name || "this skill relationship"
-        : isSkillCharacter
+        : isItem
+          ? action.draft?.item_name || "this item relationship"
+        : isSkillCharacter || isItemCharacter
           ? action.draft?.character_name || "this character relationship"
           : action.draft?.name || "this character";
   const message = isSave
@@ -355,7 +380,7 @@ function EditorConfirmModal({ action, onCancel, onConfirm, onEditChange }) {
   return (
     <div className="admin-modal-backdrop" role="presentation" onMouseDown={onCancel}>
       <section
-        className="admin-modal editor-confirm-modal"
+        className={`admin-modal editor-confirm-modal ${isSave ? "" : "compact"}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="editor-confirm-title"
@@ -371,7 +396,7 @@ function EditorConfirmModal({ action, onCancel, onConfirm, onEditChange }) {
               <p>{message}</p>
             </div>
           </div>
-          <button className="admin-icon-button" type="button" onClick={onCancel} aria-label="Close">
+          <button className="admin-icon-button modal-close-button" type="button" onClick={onCancel} aria-label="Close">
             <X aria-hidden="true" size={17} />
           </button>
         </div>
@@ -451,7 +476,7 @@ function EditorUnsavedChangesModal({ action, isSaving, onCancel, onDiscard, onSa
   return (
     <div className="admin-modal-backdrop" role="presentation" onMouseDown={onCancel}>
       <section
-        className="admin-modal editor-confirm-modal"
+        className="admin-modal editor-confirm-modal compact editor-unsaved-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="editor-unsaved-title"
@@ -467,7 +492,7 @@ function EditorUnsavedChangesModal({ action, isSaving, onCancel, onDiscard, onSa
               <p>{action.recordLabel} has {action.changeCount} unsaved {action.changeCount === 1 ? "change" : "changes"}.</p>
             </div>
           </div>
-          <button className="admin-icon-button" type="button" onClick={onCancel} aria-label="Close">
+          <button className="admin-icon-button modal-close-button" type="button" onClick={onCancel} aria-label="Close">
             <X aria-hidden="true" size={17} />
           </button>
         </div>
@@ -479,8 +504,7 @@ function EditorUnsavedChangesModal({ action, isSaving, onCancel, onDiscard, onSa
           </div>
         </div>
 
-        <div className="admin-modal-actions editor-save-confirm-footer">
-          <span />
+        <div className="admin-modal-actions editor-unsaved-actions">
           <button className="admin-secondary-button" type="button" onClick={onCancel}>
             Cancel
           </button>
@@ -501,6 +525,7 @@ export default function WikiDataEditorPage({ novel }) {
   const queryString = searchParams.toString();
   const initialEntity = initialEntityFromParams(searchParams);
   const initialSection = initialSectionFromParams(searchParams, initialEntity);
+  const skipNextUrlSelectionSyncRef = React.useRef(false);
   const [activeEntity, setActiveEntity] = React.useState(() => initialEntity);
   const [activeSection, setActiveSection] = React.useState(() => initialSection);
   const [sectionByEntity, setSectionByEntity] = React.useState(() => ({
@@ -509,12 +534,16 @@ export default function WikiDataEditorPage({ novel }) {
   const [characters, setCharacters] = React.useState([]);
   const [selectedCharacterId, setSelectedCharacterId] = React.useState(null);
   const [selectedSkillId, setSelectedSkillId] = React.useState(null);
+  const [selectedItemId, setSelectedItemId] = React.useState(null);
   const [draft, setDraft] = React.useState(emptyDraft);
   const [canonicalSkillDraft, setCanonicalSkillDraft] = React.useState(() => skillToDraft(null));
   const [skillAliasDrafts, setSkillAliasDrafts] = React.useState([]);
   const [editingSkillAliasKey, setEditingSkillAliasKey] = React.useState(null);
   const [skillCharacterDrafts, setSkillCharacterDrafts] = React.useState([]);
   const [editingSkillCharacterKey, setEditingSkillCharacterKey] = React.useState(null);
+  const [canonicalItemDraft, setCanonicalItemDraft] = React.useState(() => itemToDraft(null));
+  const [itemCharacterDrafts, setItemCharacterDrafts] = React.useState([]);
+  const [editingItemCharacterKey, setEditingItemCharacterKey] = React.useState(null);
   const [aliasDrafts, setAliasDrafts] = React.useState([]);
   const [editingAliasKey, setEditingAliasKey] = React.useState(null);
   const [cultivationDrafts, setCultivationDrafts] = React.useState([]);
@@ -522,11 +551,15 @@ export default function WikiDataEditorPage({ novel }) {
   const [availableSkills, setAvailableSkills] = React.useState([]);
   const [skillDrafts, setSkillDrafts] = React.useState([]);
   const [editingSkillKey, setEditingSkillKey] = React.useState(null);
+  const [availableItems, setAvailableItems] = React.useState([]);
+  const [itemDrafts, setItemDrafts] = React.useState([]);
+  const [editingItemKey, setEditingItemKey] = React.useState(null);
   const [confirmDelete, setConfirmDelete] = React.useState(null);
   const [isConfirmingSave, setIsConfirmingSave] = React.useState(false);
   const [pendingNavigation, setPendingNavigation] = React.useState(null);
   const [showCharacterValidation, setShowCharacterValidation] = React.useState(false);
   const [showCanonicalSkillValidation, setShowCanonicalSkillValidation] = React.useState(false);
+  const [showCanonicalItemValidation, setShowCanonicalItemValidation] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [chapterValidity, setChapterValidity] = React.useState({
     first_mentioned_chapter_id: true,
@@ -534,6 +567,7 @@ export default function WikiDataEditorPage({ novel }) {
   });
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isEntityBrowserOpen, setIsEntityBrowserOpen] = React.useState(false);
   const [error, setError] = React.useState("");
 
   const selectedCharacter = React.useMemo(
@@ -544,9 +578,14 @@ export default function WikiDataEditorPage({ novel }) {
     () => availableSkills.find((skill) => skill.id === selectedSkillId) || null,
     [availableSkills, selectedSkillId]
   );
+  const selectedCanonicalItem = React.useMemo(
+    () => availableItems.find((item) => item.id === selectedItemId) || null,
+    [availableItems, selectedItemId]
+  );
 
   React.useEffect(() => {
     setSearch("");
+    setIsEntityBrowserOpen(false);
   }, [activeEntity]);
 
   React.useEffect(() => {
@@ -557,7 +596,9 @@ export default function WikiDataEditorPage({ novel }) {
     ));
   }, [activeEntity, activeSection]);
 
-  const publicWikiPath = activeEntity === "skills" && selectedCanonicalSkill
+  const publicWikiPath = activeEntity === "items" && selectedCanonicalItem
+    ? `/wiki/novels/${novel?.id}/items/${selectedCanonicalItem.id}`
+    : activeEntity === "skills" && selectedCanonicalSkill
     ? `/wiki/novels/${novel?.id}/skills/${selectedCanonicalSkill.id}`
     : selectedCharacter
       ? `/wiki/novels/${novel?.id}/characters/${selectedCharacter.id}`
@@ -570,8 +611,6 @@ export default function WikiDataEditorPage({ novel }) {
       const aliasText = (character.aliases || []).map((alias) => alias.alias).join(" ");
       const matchesSearch = !query || [
         character.name,
-        character.faction_or_affiliation,
-        character.current_cultivation_level,
         aliasText,
       ].some((value) => String(value || "").toLowerCase().includes(query));
 
@@ -583,11 +622,20 @@ export default function WikiDataEditorPage({ novel }) {
 
     return availableSkills.filter((skill) => {
       const aliasText = (skill.aliases || []).map((alias) => alias.alias).join(" ");
-      return !query || [skill.name, skill.category, aliasText].some(
+      return !query || [skill.name, aliasText].some(
         (value) => String(value || "").toLowerCase().includes(query)
       );
     });
   }, [availableSkills, search]);
+  const filteredCanonicalItems = React.useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return availableItems.filter((item) => (
+      !query || [item.name].some(
+        (value) => String(value || "").toLowerCase().includes(query)
+      )
+    ));
+  }, [availableItems, search]);
 
   const characterSaveChanges = React.useMemo(() => {
     if (!selectedCharacter) {
@@ -626,8 +674,19 @@ export default function WikiDataEditorPage({ novel }) {
           parentName: selectedCharacter.name,
         }
       ),
+      ...summarizeRelationshipChanges(
+        itemDrafts,
+        itemRelationshipsToDrafts(selectedCharacter),
+        "item",
+        (relationship) => relationship?.item_name,
+        "items",
+        {
+          parentLabel: "character",
+          parentName: selectedCharacter.name,
+        }
+      ),
     ];
-  }, [aliasDrafts, cultivationDrafts, draft, selectedCharacter, skillDrafts]);
+  }, [aliasDrafts, cultivationDrafts, draft, itemDrafts, selectedCharacter, skillDrafts]);
 
   const skillSaveChanges = React.useMemo(() => {
     if (!selectedCanonicalSkill) {
@@ -658,12 +717,48 @@ export default function WikiDataEditorPage({ novel }) {
     ];
   }, [canonicalSkillDraft, selectedCanonicalSkill, skillAliasDrafts, skillCharacterDrafts]);
 
-  const activeSaveChanges = activeEntity === "skills" ? skillSaveChanges : characterSaveChanges;
-  const activeRecordLabel = activeEntity === "skills"
+  const itemSaveChanges = React.useMemo(() => {
+    if (!selectedCanonicalItem) {
+      return [];
+    }
+
+    return [
+      ...summarizeFieldChanges(ITEM_FIELDS, canonicalItemDraft, selectedCanonicalItem, ITEM_FIELD_LABELS, {
+        entityLabel: "item",
+        entityName: selectedCanonicalItem.name,
+        entityType: "item",
+      }),
+      ...summarizeRelationshipChanges(
+        itemCharacterDrafts,
+        itemCharacterRelationshipsToDrafts(selectedCanonicalItem),
+        "character",
+        (relationship) => relationship?.character_name,
+        "characters",
+        {
+          parentLabel: "item",
+          parentName: selectedCanonicalItem.name,
+        }
+      ),
+    ];
+  }, [canonicalItemDraft, itemCharacterDrafts, selectedCanonicalItem]);
+
+  const activeSaveChanges = activeEntity === "items"
+    ? itemSaveChanges
+    : activeEntity === "skills"
+      ? skillSaveChanges
+      : characterSaveChanges;
+  const activeRecordLabel = activeEntity === "items"
+    ? `Item ${selectedCanonicalItem?.name || "record"}`
+    : activeEntity === "skills"
     ? `Skill ${selectedCanonicalSkill?.name || "record"}`
     : `Character ${selectedCharacter?.name || "record"}`;
 
   function discardCurrentDrafts() {
+    if (activeEntity === "items") {
+      resetCanonicalItemDrafts();
+      return;
+    }
+
     if (activeEntity === "skills") {
       resetCanonicalSkillDrafts();
       return;
@@ -686,6 +781,10 @@ export default function WikiDataEditorPage({ novel }) {
     }
 
     if (target.entity === "skills" && target.skillId && Number(target.skillId) !== selectedSkillId) {
+      return true;
+    }
+
+    if (target.entity === "items" && target.itemId && Number(target.itemId) !== selectedItemId) {
       return true;
     }
 
@@ -713,15 +812,18 @@ export default function WikiDataEditorPage({ novel }) {
     setIsLoading(true);
     setError("");
     try {
-      const [data, skillData] = await Promise.all([
+      const [data, skillData, itemData] = await Promise.all([
         fetchJson(`${API_BASE_URL}/admin/review/wiki-data/novels/${novel.id}/characters`),
         fetchJson(`${API_BASE_URL}/admin/review/wiki-data/novels/${novel.id}/skills`),
+        fetchJson(`${API_BASE_URL}/admin/review/wiki-data/novels/${novel.id}/items`),
       ]);
       const rows = data.characters || [];
       const requestedCharacterId = Number(searchParams.get("character"));
       setCharacters(rows);
       setAvailableSkills(skillData.skills || []);
+      setAvailableItems(itemData.items || []);
       const requestedSkillId = Number(searchParams.get("skill"));
+      const requestedItemId = Number(searchParams.get("item"));
       setSelectedCharacterId((currentId) => (
         rows.some((character) => character.id === requestedCharacterId)
           ? requestedCharacterId
@@ -734,7 +836,14 @@ export default function WikiDataEditorPage({ novel }) {
           ? requestedSkillId
           : (skillData.skills || []).some((skill) => skill.id === currentId)
             ? currentId
-            : skillData.skills?.[0]?.id || null
+          : skillData.skills?.[0]?.id || null
+      ));
+      setSelectedItemId((currentId) => (
+        (itemData.items || []).some((item) => item.id === requestedItemId)
+          ? requestedItemId
+          : (itemData.items || []).some((item) => item.id === currentId)
+            ? currentId
+            : itemData.items?.[0]?.id || null
       ));
     } catch (loadError) {
       setError(loadError.message);
@@ -749,13 +858,13 @@ export default function WikiDataEditorPage({ novel }) {
       return;
     }
 
-    if (characters.length || availableSkills.length) {
+    if (characters.length || availableSkills.length || availableItems.length) {
       setIsLoading(false);
       return;
     }
 
     loadCharacters();
-  }, [activeEntity, availableSkills.length, characters.length, novel?.id]);
+  }, [activeEntity, availableItems.length, availableSkills.length, characters.length, novel?.id]);
 
   React.useEffect(() => {
     const requestedEntity = searchParams.get("entity");
@@ -783,6 +892,11 @@ export default function WikiDataEditorPage({ novel }) {
       return;
     }
 
+    if (skipNextUrlSelectionSyncRef.current) {
+      skipNextUrlSelectionSyncRef.current = false;
+      return;
+    }
+
     const requestedCharacterId = Number(searchParams.get("character"));
 
     if (requestedCharacterId && characters.some((character) => character.id === requestedCharacterId)) {
@@ -795,12 +909,34 @@ export default function WikiDataEditorPage({ novel }) {
       return;
     }
 
+    if (skipNextUrlSelectionSyncRef.current) {
+      skipNextUrlSelectionSyncRef.current = false;
+      return;
+    }
+
     const requestedSkillId = Number(searchParams.get("skill"));
 
     if (requestedSkillId && availableSkills.some((skill) => skill.id === requestedSkillId)) {
       setSelectedSkillId(requestedSkillId);
     }
   }, [activeEntity, availableSkills, queryString]);
+
+  React.useEffect(() => {
+    if (activeEntity !== "items") {
+      return;
+    }
+
+    if (skipNextUrlSelectionSyncRef.current) {
+      skipNextUrlSelectionSyncRef.current = false;
+      return;
+    }
+
+    const requestedItemId = Number(searchParams.get("item"));
+
+    if (requestedItemId && availableItems.some((item) => item.id === requestedItemId)) {
+      setSelectedItemId(requestedItemId);
+    }
+  }, [activeEntity, availableItems, queryString]);
 
   React.useEffect(() => {
     const nextParams = new URLSearchParams(queryString);
@@ -826,6 +962,11 @@ export default function WikiDataEditorPage({ novel }) {
         nextParams.delete("skill");
         changed = true;
       }
+
+      if (nextParams.has("item")) {
+        nextParams.delete("item");
+        changed = true;
+      }
     } else if (activeEntity === "skills") {
       if (selectedSkillId && nextParams.get("skill") !== String(selectedSkillId)) {
         nextParams.set("skill", String(selectedSkillId));
@@ -834,6 +975,26 @@ export default function WikiDataEditorPage({ novel }) {
 
       if (nextParams.has("character")) {
         nextParams.delete("character");
+        changed = true;
+      }
+
+      if (nextParams.has("item")) {
+        nextParams.delete("item");
+        changed = true;
+      }
+    } else if (activeEntity === "items") {
+      if (selectedItemId && nextParams.get("item") !== String(selectedItemId)) {
+        nextParams.set("item", String(selectedItemId));
+        changed = true;
+      }
+
+      if (nextParams.has("character")) {
+        nextParams.delete("character");
+        changed = true;
+      }
+
+      if (nextParams.has("skill")) {
+        nextParams.delete("skill");
         changed = true;
       }
     } else {
@@ -846,15 +1007,20 @@ export default function WikiDataEditorPage({ novel }) {
         nextParams.delete("skill");
         changed = true;
       }
+
+      if (nextParams.has("item")) {
+        nextParams.delete("item");
+        changed = true;
+      }
     }
 
     if (changed) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [activeEntity, activeSection, selectedCharacterId, selectedSkillId, queryString, setSearchParams]);
+  }, [activeEntity, activeSection, selectedCharacterId, selectedItemId, selectedSkillId, queryString, setSearchParams]);
 
-  function navigateEditorTarget({ characterId = null, entity, section = null, skillId = null }) {
-    const target = { characterId, entity, skillId };
+  function navigateEditorTarget({ characterId = null, entity, itemId = null, section = null, skillId = null }) {
+    const target = { characterId, entity, itemId, skillId };
     requestNavigation(target, () => {
       const nextParams = new URLSearchParams(searchParams);
       const nextSection = section || sectionByEntity[entity] || "basic";
@@ -869,6 +1035,7 @@ export default function WikiDataEditorPage({ novel }) {
           nextParams.delete("character");
         }
         nextParams.delete("skill");
+        nextParams.delete("item");
       } else if (entity === "skills") {
         if (skillId) {
           nextParams.set("skill", String(skillId));
@@ -876,13 +1043,24 @@ export default function WikiDataEditorPage({ novel }) {
           nextParams.delete("skill");
         }
         nextParams.delete("character");
+        nextParams.delete("item");
+      } else if (entity === "items") {
+        if (itemId) {
+          nextParams.set("item", String(itemId));
+        } else {
+          nextParams.delete("item");
+        }
+        nextParams.delete("character");
+        nextParams.delete("skill");
       } else {
         nextParams.delete("character");
         nextParams.delete("skill");
+        nextParams.delete("item");
       }
 
       setActiveEntity(entity);
       setActiveSection(nextSection);
+      setIsEntityBrowserOpen(false);
 
       if (characterId) {
         setSelectedCharacterId(Number(characterId));
@@ -892,30 +1070,77 @@ export default function WikiDataEditorPage({ novel }) {
         setSelectedSkillId(Number(skillId));
       }
 
+      if (itemId) {
+        setSelectedItemId(Number(itemId));
+      }
+
+      skipNextUrlSelectionSyncRef.current = true;
       setSearchParams(nextParams, { replace: true });
     });
   }
 
   function selectEditorRecord(record) {
+    if (activeEntity === "items") {
+      requestNavigation({ entity: "items", itemId: record.id }, () => {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set("entity", "items");
+        nextParams.set("section", "basic");
+        nextParams.set("item", String(record.id));
+        nextParams.delete("character");
+        nextParams.delete("skill");
+
+        if (selectedItemId !== record.id) {
+          setSectionByEntity((current) => ({ ...current, items: "basic" }));
+          setActiveSection("basic");
+        }
+
+        setSelectedItemId(record.id);
+        setIsEntityBrowserOpen(false);
+        skipNextUrlSelectionSyncRef.current = true;
+        setSearchParams(nextParams, { replace: true });
+      });
+      return;
+    }
+
     if (activeEntity === "skills") {
       requestNavigation({ entity: "skills", skillId: record.id }, () => {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set("entity", "skills");
+        nextParams.set("section", "basic");
+        nextParams.set("skill", String(record.id));
+        nextParams.delete("character");
+        nextParams.delete("item");
+
         if (selectedSkillId !== record.id) {
           setSectionByEntity((current) => ({ ...current, skills: "basic" }));
           setActiveSection("basic");
         }
 
         setSelectedSkillId(record.id);
+        setIsEntityBrowserOpen(false);
+        skipNextUrlSelectionSyncRef.current = true;
+        setSearchParams(nextParams, { replace: true });
       });
       return;
     }
 
     requestNavigation({ entity: "characters", characterId: record.id }, () => {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set("entity", "characters");
+      nextParams.set("section", "basic");
+      nextParams.set("character", String(record.id));
+      nextParams.delete("skill");
+      nextParams.delete("item");
+
       if (selectedCharacterId !== record.id) {
         setSectionByEntity((current) => ({ ...current, characters: "basic" }));
         setActiveSection("basic");
       }
 
       setSelectedCharacterId(record.id);
+      setIsEntityBrowserOpen(false);
+      skipNextUrlSelectionSyncRef.current = true;
+      setSearchParams(nextParams, { replace: true });
     });
   }
 
@@ -942,13 +1167,21 @@ export default function WikiDataEditorPage({ novel }) {
       return;
     }
 
-    const isValid = activeEntity === "skills" ? validateCanonicalSkillDrafts() : validateCharacterDrafts();
+    const isValid = activeEntity === "items"
+      ? validateCanonicalItemDrafts()
+      : activeEntity === "skills"
+        ? validateCanonicalSkillDrafts()
+        : validateCharacterDrafts();
 
     if (!isValid) {
       return;
     }
 
-    const didSave = activeEntity === "skills" ? await saveCanonicalSkill() : await saveCharacter();
+    const didSave = activeEntity === "items"
+      ? await saveCanonicalItem({ skipDraftSync: true })
+      : activeEntity === "skills"
+        ? await saveCanonicalSkill({ skipDraftSync: true })
+        : await saveCharacter({ skipDraftSync: true });
 
     if (!didSave) {
       return;
@@ -1014,6 +1247,13 @@ export default function WikiDataEditorPage({ novel }) {
         )));
         setEditingSkillCharacterKey(change.editTarget?.clientKey || null);
       }
+    } else if (activeEntity === "items") {
+      if (section === "characters") {
+        setItemCharacterDrafts((current) => current.map((relationship) => (
+          relationship.client_key === change.editTarget?.clientKey ? { ...relationship, _deleted: false } : relationship
+        )));
+        setEditingItemCharacterKey(change.editTarget?.clientKey || null);
+      }
     }
 
     focusEditorTarget(change);
@@ -1027,6 +1267,8 @@ export default function WikiDataEditorPage({ novel }) {
     setEditingCultivationKey(null);
     setSkillDrafts(skillRelationshipsToDrafts(selectedCharacter));
     setEditingSkillKey(null);
+    setItemDrafts(itemRelationshipsToDrafts(selectedCharacter));
+    setEditingItemKey(null);
     setChapterValidity({
       first_mentioned_chapter_id: true,
       first_appeared_chapter_id: true,
@@ -1041,6 +1283,13 @@ export default function WikiDataEditorPage({ novel }) {
     setEditingSkillCharacterKey(null);
     setShowCanonicalSkillValidation(false);
   }, [selectedSkillId]);
+
+  React.useEffect(() => {
+    setCanonicalItemDraft(itemToDraft(selectedCanonicalItem));
+    setItemCharacterDrafts(itemCharacterRelationshipsToDrafts(selectedCanonicalItem));
+    setEditingItemCharacterKey(null);
+    setShowCanonicalItemValidation(false);
+  }, [selectedItemId]);
 
   function updateDraft(field, value) {
     if (field === "name") {
@@ -1058,6 +1307,8 @@ export default function WikiDataEditorPage({ novel }) {
     setEditingCultivationKey(null);
     setSkillDrafts(skillRelationshipsToDrafts(selectedCharacter));
     setEditingSkillKey(null);
+    setItemDrafts(itemRelationshipsToDrafts(selectedCharacter));
+    setEditingItemKey(null);
     setShowCharacterValidation(false);
   }
 
@@ -1190,6 +1441,10 @@ export default function WikiDataEditorPage({ novel }) {
       markSkillDeleted(confirmDelete.draft);
     } else if (confirmDelete.type === "skill_character") {
       markSkillCharacterDeleted(confirmDelete.draft);
+    } else if (confirmDelete.type === "item") {
+      markItemDeleted(confirmDelete.draft);
+    } else if (confirmDelete.type === "item_character") {
+      markItemCharacterDeleted(confirmDelete.draft);
     } else {
       markCultivationDeleted(confirmDelete.draft);
     }
@@ -1274,11 +1529,83 @@ export default function WikiDataEditorPage({ novel }) {
     setEditingSkillKey(null);
   }
 
-  function replaceCharacter(updatedCharacter) {
+  function updateItemDraft(clientKey, nextDraft) {
+    setItemDrafts((current) => current.map((relationship) => (
+      relationship.client_key === clientKey ? nextDraft : relationship
+    )));
+  }
+
+  function addItemDraft() {
+    const clientKey = `new-item-relationship-${Date.now()}`;
+    setItemDrafts((current) => [
+      {
+        client_key: clientKey,
+        item_id: "",
+        item_name: "",
+        chapter_id: "",
+        chapter: null,
+        _sort_chapter_number: Number.MAX_SAFE_INTEGER,
+        description: "",
+        evidence_text: "",
+        admin_notes: "",
+        _deleted: false,
+      },
+      ...current,
+    ]);
+    setEditingItemKey(clientKey);
+    setActiveSection("items");
+  }
+
+  function cancelItemEdit(itemDraft) {
+    if (!itemDraft.id) {
+      setItemDrafts((current) => current.filter((relationship) => relationship.client_key !== itemDraft.client_key));
+    } else {
+      const original = selectedCharacter.items.find((relationship) => relationship.id === itemDraft.id);
+      setItemDrafts((current) => current.map((relationship) => (
+        relationship.client_key === itemDraft.client_key
+          ? itemRelationshipsToDrafts({ items: [original] })[0]
+          : relationship
+      )));
+    }
+    setEditingItemKey(null);
+  }
+
+  function markItemDeleted(itemDraft) {
+    if (!itemDraft.id) {
+      setItemDrafts((current) => current.filter((relationship) => relationship.client_key !== itemDraft.client_key));
+      return;
+    }
+
+    setItemDrafts((current) => current.map((relationship) => (
+      relationship.client_key === itemDraft.client_key
+        ? { ...relationship, _deleted: true }
+        : relationship
+    )));
+    setEditingItemKey(null);
+  }
+
+  function requestItemDelete(itemDraft) {
+    setConfirmDelete({ type: "item", draft: itemDraft });
+  }
+
+  function finishItemEdit(itemDraft) {
+    setItemDrafts((current) => current.map((relationship) => (
+      relationship.client_key === itemDraft.client_key
+        ? { ...relationship, _sort_chapter_number: Number(relationship.chapter?.chapter_number || 0) }
+        : relationship
+    )));
+    setEditingItemKey(null);
+  }
+
+  function replaceCharacter(updatedCharacter, { skipDraftSync = false } = {}) {
     setCharacters((current) => current.map((character) => (
       character.id === updatedCharacter.id ? updatedCharacter : character
     )));
     setSelectedCharacterId(updatedCharacter.id);
+    if (skipDraftSync) {
+      return;
+    }
+
     setDraft(characterToDraft(updatedCharacter));
     setAliasDrafts(aliasesToDrafts(updatedCharacter));
     setEditingAliasKey(null);
@@ -1286,6 +1613,8 @@ export default function WikiDataEditorPage({ novel }) {
     setEditingCultivationKey(null);
     setSkillDrafts(skillRelationshipsToDrafts(updatedCharacter));
     setEditingSkillKey(null);
+    setItemDrafts(itemRelationshipsToDrafts(updatedCharacter));
+    setEditingItemKey(null);
     setShowCharacterValidation(false);
   }
 
@@ -1372,16 +1701,53 @@ export default function WikiDataEditorPage({ novel }) {
       return false;
     }
 
+    if (itemDrafts.some((relationship) => (
+      !relationship._deleted
+      && (
+        !relationship.item_id
+        || !relationship.chapter_id
+      )
+    ))) {
+      setError("Attached items require an item and first known chapter.");
+      return false;
+    }
+
+    const attachedItemIds = new Set();
+    const hasDuplicateItemRelationship = itemDrafts.some((relationship) => {
+      if (relationship._deleted) {
+        return false;
+      }
+
+      const itemId = String(relationship.item_id);
+
+      if (attachedItemIds.has(itemId)) {
+        return true;
+      }
+
+      attachedItemIds.add(itemId);
+      return false;
+    });
+
+    if (hasDuplicateItemRelationship) {
+      setError("An item can only be attached to a character once.");
+      return false;
+    }
+
     return true;
   }
 
   function requestSaveCharacter() {
+    if (!characterSaveChanges.length) {
+      setError("No changes to save.");
+      return;
+    }
+
     if (validateCharacterDrafts()) {
       setIsConfirmingSave(true);
     }
   }
 
-  async function saveCharacter() {
+  async function saveCharacter({ skipDraftSync = false } = {}) {
     if (!selectedCharacter) {
       return false;
     }
@@ -1397,9 +1763,10 @@ export default function WikiDataEditorPage({ novel }) {
           aliases: aliasDrafts.map(({ client_key, first_seen_chapter, ...alias }) => alias),
           cultivation_events: cultivationDrafts.map(({ client_key, chapter, _sort_chapter_number, ...event }) => event),
           skill_relationships: skillDrafts.map(({ client_key, chapter, skill_name, _sort_chapter_number, ...relationship }) => relationship),
+          item_relationships: itemDrafts.map(({ client_key, chapter, item_name, _sort_chapter_number, ...relationship }) => relationship),
         }),
       });
-      replaceCharacter(updatedCharacter);
+      replaceCharacter(updatedCharacter, { skipDraftSync });
       setIsConfirmingSave(false);
       return true;
     } catch (saveError) {
@@ -1599,7 +1966,18 @@ export default function WikiDataEditorPage({ novel }) {
     return true;
   }
 
-  async function saveCanonicalSkill() {
+  function requestSaveCanonicalSkill() {
+    if (!skillSaveChanges.length) {
+      setError("No changes to save.");
+      return;
+    }
+
+    if (validateCanonicalSkillDrafts()) {
+      setIsConfirmingSave(true);
+    }
+  }
+
+  async function saveCanonicalSkill({ skipDraftSync = false } = {}) {
     if (!selectedCanonicalSkill) return false;
 
     setIsSaving(true);
@@ -1639,7 +2017,8 @@ export default function WikiDataEditorPage({ novel }) {
           skills: updatedRelationship ? [...nextSkills, updatedRelationship] : nextSkills,
         };
       }));
-      setSkillDrafts((current) => {
+      if (!skipDraftSync) {
+        setSkillDrafts((current) => {
         const selectedCharacterRelationship = updatedRelationshipByCharacterId.get(String(selectedCharacterId));
         const nextDrafts = current.map((relationship) => (
           String(relationship.skill_id) === String(updatedSkill.id)
@@ -1665,11 +2044,228 @@ export default function WikiDataEditorPage({ novel }) {
 
         return nextDrafts;
       });
-      setCanonicalSkillDraft(skillToDraft(updatedSkill));
-      setSkillAliasDrafts(aliasesToDrafts(updatedSkill));
-      setEditingSkillAliasKey(null);
-      setSkillCharacterDrafts(skillCharacterRelationshipsToDrafts(updatedSkill));
-      setEditingSkillCharacterKey(null);
+        setCanonicalSkillDraft(skillToDraft(updatedSkill));
+        setSkillAliasDrafts(aliasesToDrafts(updatedSkill));
+        setEditingSkillAliasKey(null);
+        setSkillCharacterDrafts(skillCharacterRelationshipsToDrafts(updatedSkill));
+        setEditingSkillCharacterKey(null);
+      }
+      setIsConfirmingSave(false);
+      return true;
+    } catch (saveError) {
+      setIsConfirmingSave(false);
+      setError(saveError.message);
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function resetCanonicalItemDrafts() {
+    setCanonicalItemDraft(itemToDraft(selectedCanonicalItem));
+    setItemCharacterDrafts(itemCharacterRelationshipsToDrafts(selectedCanonicalItem));
+    setEditingItemCharacterKey(null);
+    setShowCanonicalItemValidation(false);
+  }
+
+  function updateItemCharacterDraft(clientKey, nextDraft) {
+    setItemCharacterDrafts((current) => current.map((relationship) => (
+      relationship.client_key === clientKey ? nextDraft : relationship
+    )));
+  }
+
+  function addItemCharacterDraft() {
+    const clientKey = `new-item-character-${Date.now()}`;
+    setItemCharacterDrafts((current) => [
+      {
+        client_key: clientKey,
+        character_id: "",
+        character_name: "",
+        chapter_id: "",
+        chapter: null,
+        _sort_chapter_number: Number.MAX_SAFE_INTEGER,
+        description: "",
+        evidence_text: "",
+        admin_notes: "",
+        _deleted: false,
+      },
+      ...current,
+    ]);
+    setEditingItemCharacterKey(clientKey);
+    setActiveSection("characters");
+  }
+
+  function cancelItemCharacterEdit(characterDraft) {
+    if (!characterDraft.id) {
+      setItemCharacterDrafts((current) => current.filter((relationship) => (
+        relationship.client_key !== characterDraft.client_key
+      )));
+    } else {
+      const original = selectedCanonicalItem.characters.find((relationship) => relationship.id === characterDraft.id);
+      setItemCharacterDrafts((current) => current.map((relationship) => (
+        relationship.client_key === characterDraft.client_key
+          ? itemCharacterRelationshipsToDrafts({ characters: [original] })[0]
+          : relationship
+      )));
+    }
+    setEditingItemCharacterKey(null);
+  }
+
+  function markItemCharacterDeleted(characterDraft) {
+    if (!characterDraft.id) {
+      setItemCharacterDrafts((current) => current.filter((relationship) => (
+        relationship.client_key !== characterDraft.client_key
+      )));
+      return;
+    }
+
+    setItemCharacterDrafts((current) => current.map((relationship) => (
+      relationship.client_key === characterDraft.client_key
+        ? { ...relationship, _deleted: true }
+        : relationship
+    )));
+    setEditingItemCharacterKey(null);
+  }
+
+  function requestItemCharacterDelete(characterDraft) {
+    setConfirmDelete({ type: "item_character", draft: characterDraft });
+  }
+
+  function finishItemCharacterEdit(characterDraft) {
+    setItemCharacterDrafts((current) => current.map((relationship) => (
+      relationship.client_key === characterDraft.client_key
+        ? { ...relationship, _sort_chapter_number: Number(relationship.chapter?.chapter_number || 0) }
+        : relationship
+    )));
+    setEditingItemCharacterKey(null);
+  }
+
+  function validateCanonicalItemDrafts() {
+    if (!selectedCanonicalItem) {
+      return false;
+    }
+
+    if (!canonicalItemDraft.name.trim()) {
+      setShowCanonicalItemValidation(true);
+      return false;
+    }
+
+    if (itemCharacterDrafts.some((relationship) => (
+      !relationship._deleted
+      && (
+        !relationship.character_id
+        || !relationship.chapter_id
+      )
+    ))) {
+      setError("Attached characters require a character and first known chapter.");
+      return false;
+    }
+
+    const attachedCharacterIds = new Set();
+    const hasDuplicateCharacterRelationship = itemCharacterDrafts.some((relationship) => {
+      if (relationship._deleted) {
+        return false;
+      }
+
+      const characterId = String(relationship.character_id);
+
+      if (attachedCharacterIds.has(characterId)) {
+        return true;
+      }
+
+      attachedCharacterIds.add(characterId);
+      return false;
+    });
+
+    if (hasDuplicateCharacterRelationship) {
+      setError("A character can only be attached to an item once.");
+      return false;
+    }
+
+    return true;
+  }
+
+  function requestSaveCanonicalItem() {
+    if (!itemSaveChanges.length) {
+      setError("No changes to save.");
+      return;
+    }
+
+    if (validateCanonicalItemDrafts()) {
+      setIsConfirmingSave(true);
+    }
+  }
+
+  async function saveCanonicalItem({ skipDraftSync = false } = {}) {
+    if (!selectedCanonicalItem) return false;
+
+    setIsSaving(true);
+    setError("");
+    try {
+      const updatedItem = await fetchJson(`${API_BASE_URL}/admin/review/wiki-data/items/${selectedCanonicalItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...ITEM_FIELDS.reduce((payload, field) => ({
+            ...payload,
+            [field]: canonicalItemDraft[field] === "" ? null : canonicalItemDraft[field],
+          }), {}),
+          character_relationships: itemCharacterDrafts.map(({ client_key, chapter, character_name, _sort_chapter_number, ...relationship }) => relationship),
+        }),
+      });
+      setAvailableItems((current) => current.map((item) => item.id === updatedItem.id ? updatedItem : item));
+      const updatedRelationshipByCharacterId = new Map(
+        (updatedItem.characters || []).map((relationship) => [
+          String(relationship.character_id),
+          {
+            ...relationship,
+            item_id: updatedItem.id,
+            item_name: updatedItem.name,
+          },
+        ])
+      );
+      setCharacters((current) => current.map((character) => {
+        const nextItems = (character.items || []).filter((relationship) => (
+          String(relationship.item_id) !== String(updatedItem.id)
+        ));
+        const updatedRelationship = updatedRelationshipByCharacterId.get(String(character.id));
+
+        return {
+          ...character,
+          items: updatedRelationship ? [...nextItems, updatedRelationship] : nextItems,
+        };
+      }));
+      if (!skipDraftSync) {
+        setItemDrafts((current) => {
+        const selectedCharacterRelationship = updatedRelationshipByCharacterId.get(String(selectedCharacterId));
+        const nextDrafts = current.map((relationship) => (
+          String(relationship.item_id) === String(updatedItem.id)
+            ? { ...relationship, item_name: updatedItem.name }
+            : relationship
+        )).filter((relationship) => {
+          if (String(relationship.item_id) !== String(updatedItem.id)) {
+            return true;
+          }
+
+          return Boolean(selectedCharacterRelationship);
+        });
+
+        if (
+          selectedCharacterRelationship
+          && !nextDrafts.some((relationship) => String(relationship.item_id) === String(updatedItem.id))
+        ) {
+          return [
+            ...nextDrafts,
+            itemRelationshipsToDrafts({ items: [selectedCharacterRelationship] })[0],
+          ];
+        }
+
+        return nextDrafts;
+      });
+        setCanonicalItemDraft(itemToDraft(updatedItem));
+        setItemCharacterDrafts(itemCharacterRelationshipsToDrafts(updatedItem));
+        setEditingItemCharacterKey(null);
+      }
       setIsConfirmingSave(false);
       return true;
     } catch (saveError) {
@@ -1715,6 +2311,15 @@ export default function WikiDataEditorPage({ novel }) {
 
         return Number(a._sort_chapter_number || 0) - Number(b._sort_chapter_number || 0);
       });
+    const visibleItemDrafts = itemDrafts
+      .filter((relationship) => !relationship._deleted)
+      .sort((a, b) => {
+        if (Boolean(a.id) !== Boolean(b.id)) {
+          return a.id ? 1 : -1;
+        }
+
+        return Number(a._sort_chapter_number || 0) - Number(b._sort_chapter_number || 0);
+      });
 
     return (
       <>
@@ -1724,7 +2329,6 @@ export default function WikiDataEditorPage({ novel }) {
               <div className="editor-title-row">
                 <h2>{selectedCharacter.name}</h2>
               </div>
-              <p>ID: CHAR_{String(selectedCharacter.id).padStart(4, "0")}</p>
             </div>
             <div className="editor-save-actions">
               <button type="button" className="admin-secondary-button" onClick={resetCharacterDrafts}>
@@ -2038,13 +2642,74 @@ export default function WikiDataEditorPage({ novel }) {
 
           {activeSection === "items" ? (
             <div className="editor-section-body">
-              <h3>Attached Items</h3>
-              <RelationList
-                rows={selectedCharacter.items}
-                emptyMessage="No items attached to this character."
-                renderTitle={(row) => row.item_name || "Item"}
-                renderMeta={(row) => row.description || row.relationship_type || "Canonical item link"}
-              />
+              <div className="editor-cultivation-toolbar">
+                <div>
+                  <h3>Items ({visibleItemDrafts.length})</h3>
+                  <p>Items attached to this character.</p>
+                </div>
+                <button type="button" className="admin-primary-button" onClick={addItemDraft}>
+                  <Plus aria-hidden="true" size={16} />
+                  Attach Item
+                </button>
+              </div>
+              <div className="editor-cultivation-list">
+                {visibleItemDrafts.length ? visibleItemDrafts.map((itemDraft) => (
+                  <article
+                    className={`editor-cultivation-row ${editingItemKey === itemDraft.client_key ? "editing" : ""}`}
+                    data-editor-row={itemDraft.client_key}
+                    key={itemDraft.client_key}
+                  >
+                    <div className="editor-cultivation-row-header">
+                      <div className="editor-cultivation-summary">
+                        <strong>{itemDraft.item_name || "Select an item"}</strong>
+                        <span className="editor-cultivation-chapter-line">
+                          <BookOpen aria-hidden="true" size={15} />
+                          {itemDraft.chapter ? formatChapter(itemDraft.chapter) : "No chapter linked"}
+                        </span>
+                      </div>
+                      <div className="editor-cultivation-actions">
+                        {itemDraft.item_id ? (
+                          <button
+                            type="button"
+                            className="admin-icon-button"
+                            onClick={() => navigateEditorTarget({
+                              entity: "items",
+                              section: "basic",
+                              itemId: itemDraft.item_id,
+                            })}
+                            aria-label={`Open ${itemDraft.item_name || "item"} in item editor`}
+                          >
+                            <ExternalLink aria-hidden="true" size={15} />
+                          </button>
+                        ) : null}
+                        {editingItemKey === itemDraft.client_key ? (
+                          <button type="button" className="admin-icon-button" onClick={() => setEditingItemKey(null)} aria-label="Collapse item editor">
+                            <ChevronUp aria-hidden="true" size={15} />
+                          </button>
+                        ) : (
+                          <button type="button" className="admin-icon-button" onClick={() => setEditingItemKey(itemDraft.client_key)} aria-label="Edit attached item">
+                            <Pencil aria-hidden="true" size={15} />
+                          </button>
+                        )}
+                        <button type="button" className="admin-danger-button ghost" onClick={() => requestItemDelete(itemDraft)} aria-label="Remove attached item">
+                          <Trash2 aria-hidden="true" size={15} />
+                        </button>
+                      </div>
+                    </div>
+                    {editingItemKey === itemDraft.client_key ? (
+                      <ItemRelationshipEditor
+                        availableItems={availableItems}
+                        draft={itemDraft}
+                        novelId={novel?.id}
+                        relationships={itemDrafts}
+                        onCancel={() => cancelItemEdit(itemDraft)}
+                        onChange={(nextDraft) => updateItemDraft(itemDraft.client_key, nextDraft)}
+                        onDone={() => finishItemEdit(itemDraft)}
+                      />
+                    ) : null}
+                  </article>
+                )) : <div className="editor-empty-inline">No items attached to this character yet.</div>}
+              </div>
             </div>
           ) : null}
 
@@ -2103,7 +2768,6 @@ export default function WikiDataEditorPage({ novel }) {
         <div className="editor-detail-header">
           <div>
             <div className="editor-title-row"><h2>{selectedCanonicalSkill.name}</h2></div>
-            <p>ID: SKILL_{String(selectedCanonicalSkill.id).padStart(4, "0")}</p>
           </div>
           <div className="editor-save-actions">
             <button type="button" className="admin-secondary-button" onClick={resetCanonicalSkillDrafts}>Cancel</button>
@@ -2111,9 +2775,7 @@ export default function WikiDataEditorPage({ novel }) {
               type="button"
               className="admin-primary-button"
               disabled={isSaving}
-              onClick={() => {
-                if (validateCanonicalSkillDrafts()) setIsConfirmingSave(true);
-              }}
+              onClick={requestSaveCanonicalSkill}
             >
               <Save aria-hidden="true" size={16} />
               {isSaving ? "Saving..." : "Save Changes"}
@@ -2145,7 +2807,17 @@ export default function WikiDataEditorPage({ novel }) {
                 />
               </EditorField>
               <EditorField label="Category">
-                <input data-editor-field="category" className="admin-input" value={canonicalSkillDraft.category} onChange={(event) => setCanonicalSkillDraft((current) => ({ ...current, category: event.target.value }))} />
+                <select
+                  data-editor-field="category"
+                  className="admin-select"
+                  value={canonicalSkillDraft.category}
+                  onChange={(event) => setCanonicalSkillDraft((current) => ({ ...current, category: event.target.value }))}
+                >
+                  <option value="">No category</option>
+                  {SKILL_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
               </EditorField>
             </div>
             <div className="editor-form-grid single">
@@ -2297,7 +2969,259 @@ export default function WikiDataEditorPage({ novel }) {
     );
   }
 
+  function renderCanonicalItemEditor() {
+    if (isLoading) return <div className="editor-empty-state">Loading items...</div>;
+    if (!availableItems.length) return <div className="editor-empty-state">No canonical items yet. Approve records in Review Queue first.</div>;
+    if (!selectedCanonicalItem) return <div className="editor-empty-state">Select an item to edit canonical wiki data.</div>;
+
+    const visibleItemCharacterDrafts = itemCharacterDrafts
+      .filter((relationship) => !relationship._deleted)
+      .sort((a, b) => {
+        if (Boolean(a.id) !== Boolean(b.id)) {
+          return a.id ? 1 : -1;
+        }
+
+        return Number(a._sort_chapter_number || 0) - Number(b._sort_chapter_number || 0);
+      });
+
+    return (
+      <section className="editor-main-panel admin-panel">
+        <div className="editor-detail-header">
+          <div>
+            <div className="editor-title-row"><h2>{selectedCanonicalItem.name}</h2></div>
+          </div>
+          <div className="editor-save-actions">
+            <button type="button" className="admin-secondary-button" onClick={resetCanonicalItemDrafts}>Cancel</button>
+            <button
+              type="button"
+              className="admin-primary-button"
+              disabled={isSaving}
+              onClick={requestSaveCanonicalItem}
+            >
+              <Save aria-hidden="true" size={16} />
+              {isSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
+
+        <div className="editor-section-tabs" role="tablist" aria-label="Item editor sections">
+          {ITEM_SECTIONS.map((section) => (
+            <button type="button" key={section.id} className={activeSection === section.id ? "active" : ""} onClick={() => setActiveSection(section.id)}>
+              {section.label}
+            </button>
+          ))}
+        </div>
+
+        {activeSection === "basic" ? (
+          <div className="editor-section-body">
+            <h3>Basic Information</h3>
+            <div className="editor-form-grid">
+              <EditorField label="Canonical Name" required>
+                <input
+                  data-editor-field="name"
+                  className={`admin-input ${showCanonicalItemValidation && !canonicalItemDraft.name.trim() ? "editor-invalid-control" : ""}`}
+                  value={canonicalItemDraft.name}
+                  onChange={(event) => {
+                    setShowCanonicalItemValidation(false);
+                    setCanonicalItemDraft((current) => ({ ...current, name: event.target.value }));
+                  }}
+                />
+              </EditorField>
+              <EditorField label="Category">
+                <select
+                  data-editor-field="category"
+                  className="admin-select"
+                  value={canonicalItemDraft.category}
+                  onChange={(event) => setCanonicalItemDraft((current) => ({ ...current, category: event.target.value }))}
+                >
+                  <option value="">No category</option>
+                  {ITEM_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </EditorField>
+            </div>
+            <div className="editor-form-grid single">
+              <EditorField label="Description">
+                <textarea data-editor-field="description" className="admin-textarea" rows={6} value={canonicalItemDraft.description} onChange={(event) => setCanonicalItemDraft((current) => ({ ...current, description: event.target.value }))} />
+              </EditorField>
+            </div>
+          </div>
+        ) : null}
+
+        {activeSection === "characters" ? (
+          <div className="editor-section-body">
+            <div className="editor-cultivation-toolbar">
+              <div>
+                <h3>Characters ({visibleItemCharacterDrafts.length})</h3>
+                <p>Characters currently attached to this item.</p>
+              </div>
+              <button type="button" className="admin-primary-button" onClick={addItemCharacterDraft}>
+                <Plus aria-hidden="true" size={16} />
+                Attach Character
+              </button>
+            </div>
+            <div className="editor-cultivation-list">
+              {visibleItemCharacterDrafts.length ? visibleItemCharacterDrafts.map((row) => (
+                <article
+                  className={`editor-cultivation-row ${editingItemCharacterKey === row.client_key ? "editing" : ""}`}
+                  data-editor-row={row.client_key}
+                  key={row.client_key}
+                >
+                  <div className="editor-cultivation-row-header">
+                    <div className="editor-cultivation-summary">
+                      <strong>{row.character_name || "Character"}</strong>
+                      <span className="editor-cultivation-chapter-line">
+                        <BookOpen aria-hidden="true" size={15} />
+                        {row.chapter ? formatChapter(row.chapter) : "No chapter linked"}
+                      </span>
+                      {row.description ? <span className="editor-relationship-note">{row.description}</span> : null}
+                    </div>
+                    <div className="editor-cultivation-actions">
+                      {row.character_id ? (
+                        <button
+                          type="button"
+                          className="admin-icon-button"
+                          onClick={() => navigateEditorTarget({
+                            characterId: row.character_id,
+                            entity: "characters",
+                            section: "items",
+                          })}
+                          aria-label={`Open ${row.character_name || "character"} in character editor`}
+                        >
+                          <ExternalLink aria-hidden="true" size={15} />
+                        </button>
+                      ) : null}
+                      {editingItemCharacterKey === row.client_key ? (
+                        <button type="button" className="admin-icon-button" onClick={() => setEditingItemCharacterKey(null)} aria-label="Collapse character item editor">
+                          <ChevronUp aria-hidden="true" size={15} />
+                        </button>
+                      ) : (
+                        <button type="button" className="admin-icon-button" onClick={() => setEditingItemCharacterKey(row.client_key)} aria-label="Edit attached character">
+                          <Pencil aria-hidden="true" size={15} />
+                        </button>
+                      )}
+                      <button type="button" className="admin-danger-button ghost" onClick={() => requestItemCharacterDelete(row)} aria-label="Remove attached character">
+                        <Trash2 aria-hidden="true" size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  {editingItemCharacterKey === row.client_key ? (
+                    <ItemCharacterRelationshipEditor
+                      availableCharacters={characters}
+                      draft={row}
+                      novelId={novel?.id}
+                      relationships={itemCharacterDrafts}
+                      onCancel={() => cancelItemCharacterEdit(row)}
+                      onChange={(nextDraft) => updateItemCharacterDraft(row.client_key, nextDraft)}
+                      onDone={() => finishItemCharacterEdit(row)}
+                    />
+                  ) : null}
+                </article>
+              )) : <div className="editor-empty-inline">No characters are attached to this item.</div>}
+            </div>
+          </div>
+        ) : null}
+
+        {activeSection === "evidence" ? (
+          <div className="editor-section-body">
+            <h3>Item Evidence</h3>
+            {selectedCanonicalItem.evidence?.length ? (
+              <div className="editor-evidence-list">
+                {selectedCanonicalItem.evidence.map((evidence) => (
+                  <article className="editor-evidence-row" key={evidence.id}>
+                    <blockquote>{evidence.evidence_text}</blockquote>
+                    <small>{formatChapter(evidence.chapter)}</small>
+                  </article>
+                ))}
+              </div>
+            ) : <div className="editor-empty-inline">No direct evidence attached to this item.</div>}
+          </div>
+        ) : null}
+
+        {activeSection === "notes" ? (
+          <div className="editor-section-body">
+            <h3>Admin Notes</h3>
+            <textarea data-editor-field="admin_notes" className="admin-textarea" rows={7} value={canonicalItemDraft.admin_notes} onChange={(event) => setCanonicalItemDraft((current) => ({ ...current, admin_notes: event.target.value }))} />
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
   const activeTab = ENTITY_TABS.find((tab) => tab.id === activeEntity);
+  const activeRecords = activeEntity === "items"
+    ? filteredCanonicalItems
+    : activeEntity === "skills"
+      ? filteredCanonicalSkills
+      : filteredCharacters;
+  const activeRecordCountLabel = activeEntity === "items"
+    ? `${filteredCanonicalItems.length} items`
+    : activeEntity === "skills"
+      ? `${filteredCanonicalSkills.length} skills`
+      : `${filteredCharacters.length} characters`;
+  const activeBrowseLabel = activeEntity === "items"
+    ? "Browse Items"
+    : activeEntity === "skills"
+      ? "Browse Skills"
+      : "Browse Characters";
+  const activeSearchPlaceholder = activeEntity === "items"
+    ? "Search items..."
+    : activeEntity === "skills"
+      ? "Search skills..."
+      : "Search characters...";
+
+  function renderEntityBrowser(className = "") {
+    return (
+      <aside className={`editor-list-panel admin-panel ${className}`}>
+        <div className="editor-browser-header">
+          <div>
+            <h2>{activeBrowseLabel}</h2>
+            <p>{activeRecordCountLabel}</p>
+          </div>
+          {className.includes("drawer") ? (
+            <button
+              type="button"
+              className="admin-icon-button"
+              onClick={() => setIsEntityBrowserOpen(false)}
+              aria-label="Close entity browser"
+            >
+              <X aria-hidden="true" size={16} />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="editor-search-field">
+          <Search aria-hidden="true" size={17} />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={activeSearchPlaceholder} />
+          {search ? (
+            <button type="button" onClick={() => setSearch("")} aria-label="Clear search">
+              <X aria-hidden="true" size={15} />
+            </button>
+          ) : null}
+        </div>
+        {!className.includes("drawer") ? <p className="editor-list-count">{activeRecordCountLabel}</p> : null}
+
+        <div className="editor-record-list">
+          {activeRecords.map((record) => (
+            <button
+              type="button"
+              key={record.id}
+              className={`editor-record-card ${(activeEntity === "items" ? selectedItemId : activeEntity === "skills" ? selectedSkillId : selectedCharacterId) === record.id ? "active" : ""}`}
+              onClick={() => selectEditorRecord(record)}
+            >
+              <span className="editor-record-avatar">
+                {activeEntity === "items" ? <Package aria-hidden="true" size={18} /> : activeEntity === "skills" ? <Sparkles aria-hidden="true" size={18} /> : <BookOpen aria-hidden="true" size={18} />}
+              </span>
+              <span>
+                <strong>{record.name}</strong>
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <div className="workspace-page editor-page">
@@ -2324,6 +3248,7 @@ export default function WikiDataEditorPage({ novel }) {
               onClick={() => navigateEditorTarget({
                 characterId: id === "characters" ? selectedCharacterId : null,
                 entity: id,
+                itemId: id === "items" ? selectedItemId : null,
                 skillId: id === "skills" ? selectedSkillId : null,
               })}
             >
@@ -2333,7 +3258,7 @@ export default function WikiDataEditorPage({ novel }) {
           ))}
         </nav>
 
-        {!["characters", "skills"].includes(activeEntity) ? (
+        {!["characters", "skills", "items"].includes(activeEntity) ? (
           <section className="editor-coming-soon admin-panel">
             <div className="editor-coming-icon">
               {activeTab?.icon ? React.createElement(activeTab.icon, { "aria-hidden": true, size: 24 }) : <FileText aria-hidden="true" size={24} />}
@@ -2342,41 +3267,28 @@ export default function WikiDataEditorPage({ novel }) {
             <p>This page is structured for canonical wiki editing. Characters are implemented first; this section will use the same pattern when the backend editor surface is added.</p>
           </section>
         ) : (
-          <div className="editor-layout">
-            <aside className="editor-list-panel admin-panel">
-              <div className="editor-search-field">
-                <Search aria-hidden="true" size={17} />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={activeEntity === "skills" ? "Search skills..." : "Search characters..."} />
-                {search ? (
-                  <button type="button" onClick={() => setSearch("")} aria-label="Clear search">
-                    <X aria-hidden="true" size={15} />
-                  </button>
-                ) : null}
-              </div>
-              <p className="editor-list-count">{activeEntity === "skills" ? `${filteredCanonicalSkills.length} skills` : `${filteredCharacters.length} characters`}</p>
+          <>
+            <div className="editor-browser-trigger-row">
+              <button type="button" className="admin-secondary-button" onClick={() => setIsEntityBrowserOpen(true)}>
+                <Search aria-hidden="true" size={16} />
+                {activeBrowseLabel}
+              </button>
+            </div>
 
-              <div className="editor-record-list">
-                {(activeEntity === "skills" ? filteredCanonicalSkills : filteredCharacters).map((record) => (
-                  <button
-                    type="button"
-                    key={record.id}
-                    className={`editor-record-card ${(activeEntity === "skills" ? selectedSkillId : selectedCharacterId) === record.id ? "active" : ""}`}
-                    onClick={() => selectEditorRecord(record)}
-                  >
-                    <span className="editor-record-avatar">
-                      {activeEntity === "skills" ? <Sparkles aria-hidden="true" size={18} /> : <BookOpen aria-hidden="true" size={18} />}
-                    </span>
-                    <span>
-                      <strong>{record.name}</strong>
-                      <small>{activeEntity === "skills" ? record.category || "Canonical skill" : getCharacterSubtitle(record)}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </aside>
+            <div className="editor-layout">
+              {renderEntityBrowser("desktop")}
 
-            {activeEntity === "skills" ? renderCanonicalSkillEditor() : renderCharacterEditor()}
-          </div>
+              {activeEntity === "items" ? renderCanonicalItemEditor() : activeEntity === "skills" ? renderCanonicalSkillEditor() : renderCharacterEditor()}
+            </div>
+
+            {isEntityBrowserOpen ? (
+              <div className="editor-browser-backdrop" role="presentation" onMouseDown={() => setIsEntityBrowserOpen(false)}>
+                <div className="editor-browser-drawer" role="dialog" aria-modal="true" aria-label={activeBrowseLabel} onMouseDown={(event) => event.stopPropagation()}>
+                  {renderEntityBrowser("drawer")}
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
 
@@ -2393,12 +3305,12 @@ export default function WikiDataEditorPage({ novel }) {
       <EditorConfirmModal
         action={isConfirmingSave ? {
           type: "save",
-          changes: activeEntity === "skills" ? skillSaveChanges : characterSaveChanges,
-          draft: activeEntity === "skills" ? selectedCanonicalSkill : selectedCharacter,
+          changes: activeEntity === "items" ? itemSaveChanges : activeEntity === "skills" ? skillSaveChanges : characterSaveChanges,
+          draft: activeEntity === "items" ? selectedCanonicalItem : activeEntity === "skills" ? selectedCanonicalSkill : selectedCharacter,
         } : null}
         onCancel={() => setIsConfirmingSave(false)}
         onEditChange={handleEditPendingChange}
-        onConfirm={activeEntity === "skills" ? saveCanonicalSkill : saveCharacter}
+        onConfirm={activeEntity === "items" ? saveCanonicalItem : activeEntity === "skills" ? saveCanonicalSkill : saveCharacter}
       />
       <EditorUnsavedChangesModal
         action={pendingNavigation}

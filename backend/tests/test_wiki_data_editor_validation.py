@@ -10,6 +10,7 @@ from app.models import (
     CharacterProgressionEvent,
     CharacterSkill,
     Chapter,
+    Item,
     Novel,
     Skill,
     SkillAlias,
@@ -66,12 +67,24 @@ class WikiDataEditorValidationTest(unittest.TestCase):
             name="Violet Qi Art",
             review_status="approved",
         )
+        self.item = Item(
+            novel_id=self.novel.id,
+            name="Copper Mirror",
+            review_status="approved",
+        )
+        self.other_item = Item(
+            novel_id=self.novel.id,
+            name="Blood Mask",
+            review_status="approved",
+        )
         db.session.add_all([
             self.chapter,
             self.other_chapter,
             self.character,
             self.skill,
             self.other_skill,
+            self.item,
+            self.other_item,
         ])
         db.session.commit()
 
@@ -89,6 +102,12 @@ class WikiDataEditorValidationTest(unittest.TestCase):
     def patch_skill(self, payload):
         return self.client.patch(
             f"/api/admin/review/wiki-data/skills/{self.skill.id}",
+            json=payload,
+        )
+
+    def patch_item(self, payload):
+        return self.client.patch(
+            f"/api/admin/review/wiki-data/items/{self.item.id}",
             json=payload,
         )
 
@@ -302,6 +321,17 @@ class WikiDataEditorValidationTest(unittest.TestCase):
         response = self.patch_skill({"name": self.other_skill.name.lower()})
         self.assert_validation_error(response, "A canonical skill with this name already exists.")
 
+    def test_skill_category_is_normalized_and_restricted(self):
+        response = self.patch_skill({"category": " technique "})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(db.session.get(Skill, self.skill.id).category, "Technique")
+
+        response = self.patch_skill({"category": "secret custom category"})
+        self.assert_validation_error(
+            response,
+            "Skill category must be one of the supported categories.",
+        )
+
     def test_skill_alias_requires_chapter_and_rejects_duplicates(self):
         response = self.patch_skill({"aliases": [{"alias": "Flame Art"}]})
         self.assert_validation_error(response, "Skill alias first mentioned chapter is required.")
@@ -327,7 +357,7 @@ class WikiDataEditorValidationTest(unittest.TestCase):
     def test_skill_editor_updates_basic_info_aliases_and_notes(self):
         response = self.patch_skill({
             "name": "Flame Serpent Technique",
-            "category": "offensive technique",
+            "category": "Combat Move",
             "description": "Creates a serpent of flame.",
             "admin_notes": "Canonicalized by editor.",
             "aliases": [{
@@ -344,6 +374,51 @@ class WikiDataEditorValidationTest(unittest.TestCase):
         alias = SkillAlias.query.one()
         self.assertEqual(alias.alias, "Flame Snake Art")
         self.assertEqual(alias.first_seen_chapter_id, self.chapter.id)
+
+    def test_item_category_is_normalized_and_restricted(self):
+        response = self.patch_item({"category": " quest_item "})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(db.session.get(Item, self.item.id).category, "Quest Item")
+
+        response = self.patch_item({"category": "secret custom category"})
+        self.assert_validation_error(
+            response,
+            "Item category must be one of the supported categories.",
+        )
+
+    def test_item_character_relationship_rejects_duplicates(self):
+        response = self.patch_item({
+            "character_relationships": [
+                {
+                    "character_id": self.character.id,
+                    "chapter_id": self.chapter.id,
+                },
+                {
+                    "character_id": self.character.id,
+                    "chapter_id": self.chapter.id,
+                },
+            ],
+        })
+        self.assert_validation_error(
+            response,
+            "This character is already attached to this item.",
+        )
+
+    def test_character_item_relationship_requires_item_and_chapter(self):
+        response = self.patch_character({
+            "item_relationships": [{
+                "item_id": self.item.id,
+            }],
+        })
+        self.assert_validation_error(response, "Item chapter is required.")
+
+        response = self.patch_character({
+            "item_relationships": [{
+                "item_id": self.item.id,
+                "chapter_id": self.other_chapter.id,
+            }],
+        })
+        self.assert_validation_error(response, "Item chapter reference must belong to this novel.")
 
 
 if __name__ == "__main__":

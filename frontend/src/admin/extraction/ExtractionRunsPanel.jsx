@@ -47,7 +47,7 @@ function ExtractionRunDetailsModal({ run, onClose }) {
             <h3 id="extraction-run-details-title">Extraction Run Details</h3>
             <p>{runTitle(run)}</p>
           </div>
-          <button className="admin-icon-button" type="button" aria-label="Close details" onClick={onClose}>
+          <button className="admin-icon-button modal-close-button" type="button" aria-label="Close details" onClick={onClose}>
             <X aria-hidden="true" size={18} strokeWidth={1.9} />
           </button>
         </header>
