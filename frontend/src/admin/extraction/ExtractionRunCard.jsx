@@ -7,6 +7,7 @@ import {
   StepForward,
   Trash2,
 } from "lucide-react";
+import { chapterLabel as formatChapterLabel } from "../../utils/wikiFormat.js";
 import { runProgress, runTitle } from "./extractionUtils.js";
 
 export function relativeRunTime(value) {
@@ -73,12 +74,7 @@ export function chapterLabel(runChapter) {
 
   if (!chapter) return "Unknown chapter";
 
-  const title = (chapter.title || "").replace(
-    new RegExp(`^\\s*Chapter\\s+${chapter.chapter_number}\\s*:?\\s*`, "i"),
-    "",
-  ) || chapter.title;
-
-  return `Chapter ${chapter.chapter_number}${title ? ` - ${title}` : ""}`;
+  return formatChapterLabel(chapter);
 }
 
 export function chapterRangeLabel(runChapters, emptyLabel = "None") {

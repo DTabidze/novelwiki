@@ -157,7 +157,6 @@ def public_character_skill(relationship):
         "skill_id": relationship.skill_id,
         "skill": public_skill(relationship.skill) if relationship.skill else None,
         "chapter": chapter_reference(relationship.chapter_id),
-        "relationship_type": relationship.relationship_type,
         "description": relationship.description,
         "evidence": evidence_for("character_skill", relationship.id),
     }
@@ -395,7 +394,6 @@ def get_public_skill(skill_id):
             if relationship.character
             else None,
             "chapter": chapter_reference(relationship.chapter_id),
-            "relationship_type": relationship.relationship_type,
             "description": relationship.description,
             "evidence": evidence_for("character_skill", relationship.id),
         }

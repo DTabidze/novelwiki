@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 
 export default function ReparseBookModal({ book, onClose, onConfirm }) {
   const [isReparsing, setIsReparsing] = React.useState(false);
@@ -25,8 +26,8 @@ export default function ReparseBookModal({ book, onClose, onConfirm }) {
             <h2>Reparse Book</h2>
             <p>This is destructive and should only be used before review data exists.</p>
           </div>
-          <button className="admin-icon-button" disabled={isReparsing} type="button" onClick={onClose}>
-            X
+          <button className="admin-icon-button modal-close-button" disabled={isReparsing} type="button" onClick={onClose} aria-label="Close">
+            <X aria-hidden="true" size={16} />
           </button>
         </div>
 

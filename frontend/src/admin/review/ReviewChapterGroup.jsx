@@ -1,16 +1,8 @@
 import React from "react";
 import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
+import { chapterLabel, cleanChapterTitle } from "../../utils/wikiFormat.js";
 import ReviewItemCard from "./ReviewItemCard.jsx";
 import { recordKey, reviewWarnings } from "./reviewUtils.js";
-
-function cleanChapterTitle(chapter) {
-  const title = chapter?.title || "Unlinked source";
-  const number = chapter?.chapter_number;
-
-  if (!number) return title;
-
-  return title.replace(new RegExp(`^chapter\\s+${number}\\s*[:\\-–—.]?\\s*`, "i"), "") || title;
-}
 
 export default function ReviewChapterGroup({
   group,
@@ -35,7 +27,7 @@ export default function ReviewChapterGroup({
         </span>
         <div className="review-chapter-heading">
           <strong title={cleanChapterTitle(group.chapter)}>
-            Chapter {group.chapter?.chapter_number || "-"} - {cleanChapterTitle(group.chapter)}
+            {chapterLabel(group.chapter)}
           </strong>
           <span>{group.bookTitle}</span>
         </div>

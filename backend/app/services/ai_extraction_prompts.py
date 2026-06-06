@@ -289,7 +289,7 @@ Do not put manuals, pills, artifacts, medicines, treasures, resources, scrolls, 
 A manual or scroll is an item. Only a named technique inside it is a skill.
 
 CHARACTER_SKILLS:
-Output a character_skills entry when a character clearly:
+Output one character_skills entry when a character clearly has a named skill because they:
 - learns
 - uses
 - knows
@@ -299,7 +299,8 @@ Output a character_skills entry when a character clearly:
 a named skill.
 
 If a character_skills entry references a skill not already listed in memory, also output that skill in skills.
-Do not repeat a known character-skill relationship from memory unless the relationship type is new.
+Set relationship_type to "has".
+Do not repeat a known character-skill relationship from memory. Different action verbs do not create different relationships.
 
 ITEMS:
 Items must be wiki-significant.

@@ -62,7 +62,10 @@ class ExtractedLifeEvent(BaseModel):
 class ExtractedCharacterSkill(BaseModel):
     character_name: str = Field(description="Canonical character name")
     skill_name: str = Field(description="Canonical skill name")
-    relationship_type: str = Field(description="learns, knows, uses, creates, teaches, or masters")
+    relationship_type: str = Field(
+        default="has",
+        description="Internal extraction action. Canonical character-skill relationships are always stored as has.",
+    )
     description: str = Field(description="Brief description of the character-skill relationship")
     evidence: str = Field(description="Short supporting snippet proving the relationship")
 

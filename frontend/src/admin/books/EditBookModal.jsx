@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 
 export default function EditBookModal({ book, books, onClose, onSave }) {
   const [number, setNumber] = React.useState(String(book.number || ""));
@@ -40,8 +41,8 @@ export default function EditBookModal({ book, books, onClose, onSave }) {
             <h2>Edit Book</h2>
             <p>Safely update book metadata. Source files and chapters are not changed.</p>
           </div>
-          <button className="admin-icon-button" disabled={isSaving} type="button" onClick={onClose}>
-            X
+          <button className="admin-icon-button modal-close-button" disabled={isSaving} type="button" onClick={onClose} aria-label="Close">
+            <X aria-hidden="true" size={16} />
           </button>
         </div>
 

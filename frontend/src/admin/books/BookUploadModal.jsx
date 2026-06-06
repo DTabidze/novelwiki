@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 
 export default function BookUploadModal({ nextNumber, onClose, onUpload }) {
   const [file, setFile] = React.useState(null);
@@ -43,8 +44,8 @@ export default function BookUploadModal({ nextNumber, onClose, onUpload }) {
             <h2>Upload Book</h2>
             <p>Add a source text file to this novel workspace.</p>
           </div>
-          <button className="admin-icon-button" disabled={isUploading} type="button" onClick={onClose}>
-            X
+          <button className="admin-icon-button modal-close-button" disabled={isUploading} type="button" onClick={onClose} aria-label="Close">
+            <X aria-hidden="true" size={16} />
           </button>
         </div>
 

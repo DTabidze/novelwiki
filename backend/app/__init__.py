@@ -158,6 +158,102 @@ def ensure_development_schema(app):
                     text(f"ALTER TABLE characters ADD COLUMN {column_name} {column_type}")
                 )
 
+        alias_columns = connection.execute(text("PRAGMA table_info(character_aliases)")).fetchall()
+        alias_column_names = {column[1] for column in alias_columns}
+
+        if alias_columns and "is_primary" not in alias_column_names:
+            connection.execute(
+                text("ALTER TABLE character_aliases ADD COLUMN is_primary BOOLEAN NOT NULL DEFAULT 0")
+            )
+
+        character_skill_columns = connection.execute(
+            text("PRAGMA table_info(character_skills)")
+        ).fetchall()
+
+        if character_skill_columns:
+            duplicate_skill_pairs = connection.execute(
+                text(
+                    "SELECT character_id, skill_id "
+                    "FROM character_skills "
+                    "GROUP BY character_id, skill_id "
+                    "HAVING COUNT(*) > 1"
+                )
+            ).fetchall()
+
+            for character_id, skill_id in duplicate_skill_pairs:
+                skill_rows = connection.execute(
+                    text(
+                        "SELECT cs.id, cs.description, cs.admin_notes, cs.review_status, "
+                        "cs.chapter_id, COALESCE(ch.chapter_number, 2147483647) AS chapter_number "
+                        "FROM character_skills cs "
+                        "LEFT JOIN chapters ch ON ch.id = cs.chapter_id "
+                        "WHERE cs.character_id = :character_id AND cs.skill_id = :skill_id "
+                        "ORDER BY chapter_number, cs.id"
+                    ),
+                    {"character_id": character_id, "skill_id": skill_id},
+                ).fetchall()
+                keeper = skill_rows[0]
+                keeper_id = keeper[0]
+                duplicate_ids = [row[0] for row in skill_rows[1:]]
+
+                def merge_unique_text(values):
+                    merged_values = []
+
+                    for value in values:
+                        normalized_value = (value or "").strip()
+
+                        if normalized_value and normalized_value not in merged_values:
+                            merged_values.append(normalized_value)
+
+                    return "\n\n".join(merged_values) or None
+
+                merged_description = merge_unique_text(row[1] for row in skill_rows)
+                merged_admin_notes = merge_unique_text(row[2] for row in skill_rows)
+                statuses = {row[3] for row in skill_rows}
+                merged_status = (
+                    "approved"
+                    if "approved" in statuses
+                    else "pending"
+                    if "pending" in statuses
+                    else "rejected"
+                )
+
+                for duplicate_id in duplicate_ids:
+                    connection.execute(
+                        text(
+                            "UPDATE wiki_evidence SET entity_id = :keeper_id "
+                            "WHERE entity_type = 'character_skill' AND entity_id = :duplicate_id"
+                        ),
+                        {"keeper_id": keeper_id, "duplicate_id": duplicate_id},
+                    )
+                    connection.execute(
+                        text("DELETE FROM character_skills WHERE id = :duplicate_id"),
+                        {"duplicate_id": duplicate_id},
+                    )
+
+                connection.execute(
+                    text(
+                        "UPDATE character_skills "
+                        "SET relationship_type = 'has', description = :description, "
+                        "admin_notes = :admin_notes, review_status = :review_status "
+                        "WHERE id = :keeper_id"
+                    ),
+                    {
+                        "description": merged_description,
+                        "admin_notes": merged_admin_notes,
+                        "review_status": merged_status,
+                        "keeper_id": keeper_id,
+                    },
+                )
+
+            connection.execute(text("UPDATE character_skills SET relationship_type = 'has'"))
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_character_skill_pair "
+                    "ON character_skills (character_id, skill_id)"
+                )
+            )
+
         if "current_sect_rank" in character_column_names:
             connection.execute(
                 text(

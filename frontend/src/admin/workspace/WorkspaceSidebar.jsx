@@ -5,15 +5,12 @@ import {
   BookMarked,
   BookOpen,
   ClipboardCheck,
+  DatabaseZap,
   Files,
   LayoutDashboard,
-  Package,
   ScanSearch,
   Settings,
-  Sparkles,
-  TrendingUp,
   TriangleAlert,
-  Users,
 } from "lucide-react";
 
 const workspaceGroups = [
@@ -30,10 +27,7 @@ const workspaceGroups = [
   [
     "Wiki Data",
     [
-      { label: "Characters", path: "characters", icon: Users },
-      { label: "Skills", path: "skills", icon: Sparkles },
-      { label: "Items", path: "items", icon: Package },
-      { label: "Progression", path: "progression", icon: TrendingUp },
+      { label: "Editor", path: "editor", icon: DatabaseZap },
     ],
   ],
   [

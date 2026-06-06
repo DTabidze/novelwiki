@@ -50,6 +50,8 @@ from app.services.extraction.identity import (
     select_canonical_character_name,
     should_promote_canonical_name,
 )
+from app.services.item_categories import normalize_item_category
+from app.services.skill_categories import normalize_skill_category
 
 ALLOWED_EVENT_TYPES = {
     "item_acquired",
@@ -552,18 +554,6 @@ def find_existing_life_event(character, chapter, event_type):
     ).first()
 
 
-def normalize_relationship_type(relationship_type):
-    return relationship_type.strip().lower().replace(" ", "_")
-
-
-def find_existing_character_skill(character, skill, relationship_type):
-    return CharacterSkill.query.filter_by(
-        character_id=character.id,
-        skill_id=skill.id,
-        relationship_type=relationship_type,
-    ).first()
-
-
 def find_existing_character_skill_pair(character, skill):
     return CharacterSkill.query.filter_by(
         character_id=character.id,
@@ -719,17 +709,18 @@ def save_chapter_extraction(novel, chapter, extraction):
         ):
             continue
 
+        skill_category = normalize_skill_category(extracted_skill.category) or "Other"
         skill = find_existing_skill(novel, extracted_skill.name)
 
         if skill:
-            skill.category = skill.category or extracted_skill.category
+            skill.category = skill.category or skill_category
             skill.description = merge_description(skill.description, extracted_skill.description)
             summary["skills_updated"] += 1
         else:
             skill = Skill(
                 novel_id=novel.id,
                 name=extracted_skill.name,
-                category=extracted_skill.category,
+                category=skill_category,
                 description=extracted_skill.description,
                 review_status="pending",
             )
@@ -757,17 +748,18 @@ def save_chapter_extraction(novel, chapter, extraction):
         ):
             continue
 
+        item_category = normalize_item_category(extracted_item.category) or "Other"
         item = find_existing_by_name(Item, novel, extracted_item.name)
 
         if item:
-            item.category = item.category or extracted_item.category
+            item.category = item.category or item_category
             item.description = merge_description(item.description, extracted_item.description)
             summary["items_updated"] += 1
         else:
             item = Item(
                 novel_id=novel.id,
                 name=extracted_item.name,
-                category=extracted_item.category,
+                category=item_category,
                 description=extracted_item.description,
                 review_status="pending",
             )
@@ -816,23 +808,30 @@ def save_chapter_extraction(novel, chapter, extraction):
             ):
                 summary["evidence_created"] += 1
 
-        relationship_type = normalize_relationship_type(extracted_relationship.relationship_type)
         existing_skill_pair = find_existing_character_skill_pair(character, skill)
 
         if existing_skill_pair:
-            continue
-
-        existing_relationship = find_existing_character_skill(
-            character,
-            skill,
-            relationship_type,
-        )
-
-        if existing_relationship:
-            existing_relationship.description = merge_description(
-                existing_relationship.description,
+            existing_skill_pair.relationship_type = "has"
+            existing_skill_pair.description = merge_description(
+                existing_skill_pair.description,
                 extracted_relationship.description,
             )
+            existing_chapter = db.session.get(Chapter, existing_skill_pair.chapter_id)
+
+            if (
+                not existing_chapter
+                or chapter.chapter_number < existing_chapter.chapter_number
+            ):
+                existing_skill_pair.chapter_id = chapter.id
+
+            if add_evidence(
+                novel,
+                chapter,
+                "character_skill",
+                existing_skill_pair.id,
+                extracted_relationship.evidence,
+            ):
+                summary["evidence_created"] += 1
             continue
 
         relationship = CharacterSkill(
@@ -840,7 +839,7 @@ def save_chapter_extraction(novel, chapter, extraction):
             character_id=character.id,
             skill_id=skill.id,
             chapter_id=chapter.id,
-            relationship_type=relationship_type,
+            relationship_type="has",
             description=extracted_relationship.description,
             review_status="pending",
         )

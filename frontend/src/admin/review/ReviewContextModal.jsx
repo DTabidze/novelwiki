@@ -1,6 +1,7 @@
 import React from "react";
 import { Eye, X } from "lucide-react";
 import { API_BASE_URL, fetchJson } from "../../api.js";
+import { chapterLabel } from "../../utils/wikiFormat.js";
 
 function highlightEvidence(text, evidenceText) {
   if (!evidenceText) return text;
@@ -91,11 +92,9 @@ export default function ReviewContextModal({ evidence, fallbackChapter, onClose 
         <header className="review-context-header">
           <div>
             <span>Source Context</span>
-            <h2 id="review-context-title">
-              Chapter {chapter?.chapter_number || "-"}{chapter?.title ? ` - ${chapter.title}` : ""}
-            </h2>
+            <h2 id="review-context-title">{chapterLabel(chapter)}</h2>
           </div>
-          <button type="button" className="admin-icon-button" onClick={onClose} aria-label="Close context modal">
+          <button type="button" className="admin-icon-button modal-close-button" onClick={onClose} aria-label="Close context modal">
             <X size={17} />
           </button>
         </header>

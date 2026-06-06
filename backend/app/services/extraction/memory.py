@@ -119,9 +119,7 @@ def build_extraction_memory(novel):
         for relationship in character_skill_rows:
             character_name = relationship.character.name if relationship.character else "Unknown"
             skill_name = relationship.skill.name if relationship.skill else "Unknown"
-            lines.append(
-                f"- {character_name}: {relationship.relationship_type} {skill_name}"
-            )
+            lines.append(f"- {character_name} has {skill_name}")
     else:
         lines.append("- None yet")
 

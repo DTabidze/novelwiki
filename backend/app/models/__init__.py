@@ -344,6 +344,7 @@ class CharacterAlias(db.Model):
     alias = db.Column(db.String(255), nullable=False)
     first_seen_chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
     evidence = db.Column(db.Text, nullable=True)
+    is_primary = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     character = db.relationship("Character", back_populates="aliases")
@@ -359,6 +360,7 @@ class CharacterAlias(db.Model):
             "alias": self.alias,
             "first_seen_chapter_id": self.first_seen_chapter_id,
             "evidence": self.evidence,
+            "is_primary": self.is_primary,
         }
 
 
@@ -587,8 +589,7 @@ class CharacterSkill(ReviewMixin, db.Model):
         db.UniqueConstraint(
             "character_id",
             "skill_id",
-            "relationship_type",
-            name="uq_character_skill_relationship",
+            name="uq_character_skill_pair",
         ),
     )
 
@@ -602,7 +603,6 @@ class CharacterSkill(ReviewMixin, db.Model):
             "skill_name": self.skill.name if self.skill else None,
             "chapter_id": self.chapter_id,
             "source_chapter_id": self.chapter_id,
-            "relationship_type": self.relationship_type,
             "description": self.description,
             **self.review_dict(),
         }

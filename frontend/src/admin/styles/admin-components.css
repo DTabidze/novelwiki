@@ -203,6 +203,24 @@
   background: rgba(8, 24, 39, 0.9);
 }
 
+.modal-close-button,
+.admin-shell button.modal-close-button {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-button svg,
+.admin-shell button.modal-close-button svg {
+  display: block;
+  flex: 0 0 auto;
+  transform: translateY(1px);
+}
+
 .admin-message {
   margin-bottom: 18px;
   border: 1px solid rgba(96, 165, 250, 0.35);
@@ -382,6 +400,38 @@
 
 .admin-modal-actions {
   justify-content: flex-end;
+}
+
+.admin-notice-modal {
+  max-width: 520px;
+}
+
+.admin-notice-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.admin-notice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+}
+
+.admin-notice-icon.danger {
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.26);
+}
+
+.admin-notice-icon.info {
+  color: #bfdbfe;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: rgba(37, 99, 235, 0.18);
 }
 
 .admin-danger-zone {
