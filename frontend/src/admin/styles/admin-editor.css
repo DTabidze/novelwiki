@@ -949,7 +949,14 @@
 .editor-confirm-modal.compact {
   grid-template-rows: auto auto;
   width: min(520px, calc(100vw - 40px));
+  height: auto;
   max-height: min(76vh, 520px);
+}
+
+.editor-confirm-modal.editor-unsaved-modal {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(760px, calc(100vw - 40px));
+  max-height: min(82vh, 680px);
 }
 
 .editor-confirm-modal.compact .editor-save-confirm-header {
@@ -971,11 +978,11 @@
 }
 
 .editor-save-confirm-body {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, auto) auto;
   gap: 12px;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 0 24px 14px;
 }
 
@@ -1008,11 +1015,20 @@
   color: #8fa3bb;
 }
 
+.editor-change-scroll {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  max-height: min(52vh, 540px);
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0;
+}
+
 .editor-change-group {
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 10px;
   background: rgba(7, 21, 36, 0.52);
-  overflow: hidden;
 }
 
 .editor-change-group h3 {
@@ -1054,6 +1070,10 @@
   gap: 13px;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
   padding: 12px 10px;
+}
+
+.editor-change-row.no-action {
+  grid-template-columns: 42px minmax(0, 1fr);
 }
 
 .editor-change-row:first-child {
