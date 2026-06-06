@@ -77,6 +77,8 @@ Current backend service boundaries:
 - `ai_extraction_service.py`: Main extraction orchestrator. It calls the AI, saves records, attaches evidence, and coordinates helper modules.
 - `ai_extraction_prompts.py`: AI system prompts for extraction and progression audit passes.
 - `ai_extraction_schemas.py`: JSON schema definitions for AI responses.
+- `skill_categories.py` / `item_categories.py`: Supported canonical category values for editor/API validation.
+- `wiki_editor_payloads.py`: Canonical Wiki Data Editor payload validation and relationship/alias update helpers.
 - `metadata_normalization.py`: Field-specific normalization for metadata values.
 - `extraction/ai_client.py`: AI client setup and response parsing.
 - `extraction/memory.py`: Existing approved/pending wiki memory passed into extraction.
@@ -98,7 +100,37 @@ Routes should stay thin. Extraction rules and persistence behavior should live i
 7. Backend stores pending characters, skills, items, character-skill links, character-item links, progression events, life events, aliases, metadata proposals, and evidence.
 8. Admin reviews records in a chapter-collapsible Review Queue.
 9. Admin opens evidence context, edits proposals before approval, approves, rejects, or merges records.
-10. Public wiki routes read approved records through `/api/wiki/*`.
+10. Admin corrects already-approved canonical data in the Wiki Data Editor when needed.
+11. Public wiki routes read approved records through `/api/wiki/*`.
+
+## Wiki Data Editor Architecture
+
+The Wiki Data Editor is the canonical-data editing surface for approved wiki records. It is intentionally separate from the Review Queue:
+
+- Review Queue edits AI-generated pending proposals before approval.
+- Wiki Data Editor edits approved records already used by public wiki pages.
+
+Backend routes live in `admin_review.py` under `/api/admin/review/wiki-data/*`. Route handlers should stay thin and delegate validation/payload application to `wiki_editor_payloads.py`.
+
+Frontend code lives under `frontend/src/admin/editor/`:
+
+- `WikiDataEditorPage.jsx`: coordinator for URL state, fetching, record selection, save/discard flow, and modal orchestration.
+- `components/CharacterEditor.jsx`: character canonical editor panel.
+- `components/SkillEditor.jsx`: skill canonical editor panel.
+- `components/ItemEditor.jsx`: item canonical editor panel.
+- `components/RelationshipEditors.jsx`: inline editors for aliases, cultivation breakthroughs, and character/skill/item relationships.
+- `components/ReferencePickers.jsx`: searchable pickers for skills, characters, and items.
+- `components/ChapterReferencePicker.jsx`: scalable chapter number/search picker.
+- `components/EditorModals.jsx`: save-confirmation, delete-confirmation, and unsaved-change review modals.
+- `editorDrafts.js`: API-to-draft conversion helpers and category lists.
+- `editorChangeSummary.js`: pending-change summary generation for confirmation modals.
+- `editorConfig.js`: entity tabs, section config, URL initialization, and field labels.
+
+The editor keeps changes in local draft state until the admin confirms Save Changes. Confirmation modals group changes as updated, added, or removed. Navigation away from a dirty record is guarded and shows the pending changes before save/discard.
+
+Large canonical lists use a drawer/browser pattern. The entity list is secondary to the active editor panel, especially on laptop-width screens.
+
+Chapter references must save chapter IDs, not chapter numbers. The chapter picker resolves by chapter ID, chapter number, or search query through the backend chapter-search endpoint.
 
 ## Extraction Run Behavior
 

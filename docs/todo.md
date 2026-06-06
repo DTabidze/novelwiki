@@ -4,6 +4,10 @@ Living list for product and data-quality ideas discovered during testing.
 
 ## Near Term
 
+- Smoke-test Wiki Data Editor saves against public wiki pages for characters, skills, and items.
+- Add audit/edit history for canonical Wiki Data Editor changes.
+- Consider reducing prop-heavy editor component calls after the current component split settles.
+- Clean up backend wiki editor route/service boundaries if `admin_review.py` grows further.
 - Add admin cleanup tools for repeated testing, such as clearing extraction runs/review data for a novel or chapter range.
 - Improve duplicate review flow for names, aliases, progression values, metadata proposals, and relationship records.
 - Add safeguards around book source replacement/reparse when approved wiki data or pending review data exists.

@@ -84,6 +84,36 @@ Supported review entity types:
 
 Approving a `character_metadata_proposals` record applies only that proposed field to the character. Editing a review item changes the proposal being reviewed and does not automatically approve it.
 
+## Admin Wiki Data Editor
+
+These endpoints edit canonical approved wiki data, not pending Review Queue proposals.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/admin/review/wiki-data/novels/:novel_id/characters` | List approved characters with aliases, cultivation, skills, items, evidence, and metadata history for the editor |
+| GET | `/api/admin/review/wiki-data/novels/:novel_id/skills?q=` | List approved skills with aliases, character links, and evidence |
+| GET | `/api/admin/review/wiki-data/novels/:novel_id/items?q=` | List approved items with character links and evidence |
+| GET | `/api/admin/review/wiki-data/novels/:novel_id/chapters/search?chapter_id=&number=&q=&limit=` | Resolve/search chapters for chapter reference pickers |
+| PATCH | `/api/admin/review/wiki-data/characters/:character_id` | Update an approved character and its aliases, cultivation events, skill links, and item links |
+| PATCH | `/api/admin/review/wiki-data/skills/:skill_id` | Update an approved skill and its aliases/character links |
+| PATCH | `/api/admin/review/wiki-data/items/:item_id` | Update an approved item and its character links |
+| POST | `/api/admin/review/wiki-data/characters/:character_id/aliases` | Legacy/direct create character alias |
+| PATCH | `/api/admin/review/wiki-data/character-aliases/:alias_id` | Legacy/direct update character alias |
+| DELETE | `/api/admin/review/wiki-data/character-aliases/:alias_id` | Legacy/direct delete character alias |
+
+Editor PATCH behavior:
+
+- Request bodies must be JSON objects.
+- Canonical names are required for characters, skills, and items.
+- Chapter references must be valid chapter IDs from the same novel.
+- Alias, relationship, and cultivation payloads must be arrays of objects.
+- Duplicate aliases and duplicate character-skill links are rejected before database commit where possible.
+- Skill and item categories are normalized and restricted to supported category values.
+- Relationship removals are staged by sending rows marked with `_deleted`.
+- PATCH responses return the updated editor record shape.
+
+The chapter search endpoint exists so the admin UI does not render huge chapter dropdowns for novels with hundreds or thousands of chapters.
+
 ## Public Wiki API
 
 Public endpoints return approved records only and never expose full chapter text.

@@ -9,6 +9,7 @@ Novel workspace
   -> Extraction runs
   -> Review Queue
   -> Approved public wiki data
+  -> Wiki Data Editor corrections
 ```
 
 ## Novel Library
@@ -105,6 +106,70 @@ The inspector shows:
 The "View Full Context" action opens nearby paragraphs around the evidence snippet. It does not show the full chapter by default.
 
 The "Edit" action modifies only the proposal being reviewed. It does not edit the canonical entity and does not automatically approve the item.
+
+## Wiki Data Editor
+
+The Wiki Data Editor edits canonical approved wiki data that is already eligible for public wiki pages. It is separate from the Review Queue.
+
+Use the Review Queue when:
+
+- AI created a pending proposal
+- the fact has not been approved yet
+- the reviewer is deciding whether to approve, reject, or adjust a proposal
+
+Use the Wiki Data Editor when:
+
+- an approved/public fact needs correction
+- a canonical character, skill, item, alias, cultivation breakthrough, or relationship needs to be added manually
+- an approved relationship needs better chapter/evidence/notes metadata
+
+Current editor surfaces:
+
+- Characters
+- Skills
+- Items
+
+Character editing includes:
+
+- basic profile fields
+- first mentioned/first appeared chapter references
+- aliases, including one primary alias
+- cultivation breakthrough history
+- character-skill links
+- character-item links
+- evidence read-only view
+- admin notes and metadata history
+
+Skill editing includes:
+
+- name, category, description, and admin notes
+- skill aliases
+- characters attached to the skill
+- evidence read-only view
+
+Item editing includes:
+
+- name, category, description, and admin notes
+- characters attached to the item
+- evidence read-only view
+
+The editor uses a search/drawer browser for large entity lists so the active editor panel keeps most of the workspace width. URLs preserve the selected entity, record, and editor section, for example:
+
+```text
+/admin/novels/1/editor?entity=characters&character=1&section=aliases
+```
+
+Chapter references use a reusable chapter reference picker. Admins type a chapter number or search chapter title/number; the backend resolves and saves the actual chapter ID. This avoids rendering thousands of chapter options in a dropdown.
+
+Save behavior:
+
+- Edits stay local until Save Changes is confirmed.
+- Save confirmation summarizes updated, added, and removed records.
+- Switching records with unsaved changes opens a warning modal with the same change summary.
+- Deleting aliases, cultivation rows, skills, items, or character relationships is staged locally and only persisted on Save Changes.
+- Cancel resets the current record draft to the last loaded canonical data.
+
+The editor should not expose `approved` as a normal editable status because every record loaded here is already canonical approved wiki data.
 
 ## Review Status Rules
 

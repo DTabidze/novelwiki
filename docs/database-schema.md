@@ -156,6 +156,7 @@ Stores alternate names for a character.
 | alias | text | Alternate name or title |
 | first_seen_chapter_id | integer nullable | First chapter where alias is seen |
 | evidence | text nullable | Short supporting note |
+| is_primary | boolean | One alias can be marked as the primary/display alias |
 | created_at | datetime | Created time |
 
 ### character_metadata_proposals
@@ -238,11 +239,52 @@ Shared shape:
 | admin_notes | text nullable | Admin-only notes |
 | created_at | datetime | Created time |
 
-Related tables:
+Skill aliases:
 
-- `skill_aliases`
-- `character_skills`
-- `character_items`
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer primary key | Internal ID |
+| skill_id | integer foreign key | Links to skills |
+| alias | text | Alternate skill name |
+| first_seen_chapter_id | integer nullable | First chapter where alias is seen |
+| evidence | text nullable | Short supporting note |
+| created_at | datetime | Created time |
+
+`skill_id + alias` is unique.
+
+Character-skill relationships:
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer primary key | Internal ID |
+| novel_id | integer foreign key | Links to novels |
+| character_id | integer foreign key | Links to characters |
+| skill_id | integer foreign key | Links to skills |
+| chapter_id | integer foreign key | First known chapter/evidence chapter |
+| relationship_type | text | Internal legacy field normalized to `has` |
+| description | text nullable | Short context/description |
+| review_status | text | pending, approved, rejected |
+| admin_notes | text nullable | Admin-only notes |
+| created_at | datetime | Created time |
+
+The canonical wiki model treats this as "character has skill." Extraction verbs such as learned, acquired, studied, used, knows, or teaches should not create separate public/editor relationships. `character_id + skill_id` is unique.
+
+Character-item relationships:
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | integer primary key | Internal ID |
+| novel_id | integer foreign key | Links to novels |
+| character_id | integer foreign key | Links to characters |
+| item_id | integer foreign key | Links to items |
+| chapter_id | integer foreign key | First known chapter/evidence chapter |
+| relationship_type | text | Relationship label such as ownership/possession/status if used |
+| description | text nullable | Short context/description |
+| review_status | text | pending, approved, rejected |
+| admin_notes | text nullable | Admin-only notes |
+| created_at | datetime | Created time |
+
+There is currently no item alias table.
 
 ### wiki_events
 
@@ -268,4 +310,5 @@ Keeps evidence separate so generated facts are traceable.
 - Keep evidence for every generated fact.
 - Avoid over-normalizing cultivation systems until real data patterns justify it.
 - Treat canceling extraction separately from deleting generated review data.
+- Use the Wiki Data Editor for approved canonical corrections, not for pending proposal review.
 - Add full-text search later after the review pipeline stabilizes.
