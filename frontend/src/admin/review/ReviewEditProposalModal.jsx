@@ -1,5 +1,16 @@
 import React from "react";
-import { Eye, Info, Pencil, Save, X } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ChevronDown,
+  Eye,
+  Info,
+  Package,
+  Pencil,
+  Save,
+  Sparkles,
+  UserRound,
+  X,
+} from "lucide-react";
 import { chapterLabel } from "../../utils/wikiFormat.js";
 import {
   confidenceText,
@@ -9,6 +20,30 @@ import {
   recordSummary,
   sourceChapter,
 } from "./reviewUtils.js";
+
+const CONVERT_TYPE_OPTIONS = [
+  {
+    targetType: "items",
+    label: "Item",
+    description: "Change to an Item proposal",
+    tone: "item",
+    Icon: Package,
+  },
+  {
+    targetType: "characters",
+    label: "Character",
+    description: "Change to a Character proposal",
+    tone: "character",
+    Icon: UserRound,
+  },
+  {
+    targetType: "progression_events",
+    label: "Cultivation Breakthrough",
+    description: "Change to a Cultivation proposal",
+    tone: "cultivation",
+    Icon: Sparkles,
+  },
+];
 
 const PROGRESSION_TYPES = [
   "cultivation_level",
@@ -117,6 +152,20 @@ function validate(fields, values) {
   return "";
 }
 
+function displayTypeLabel(entityType) {
+  const convertedOption = CONVERT_TYPE_OPTIONS.find((option) => option.targetType === entityType);
+  return convertedOption?.label || formatReviewType(entityType);
+}
+
+function displayTypeGroup(entityType, fallbackGroup) {
+  if (entityType === "character_metadata_proposals") return "metadata";
+  if (entityType === "progression_events") return "progression";
+  if (entityType === "skills" || entityType === "items" || entityType === "character_skills" || entityType === "character_items") {
+    return "skills_items";
+  }
+  return fallbackGroup || entityType || "";
+}
+
 function FieldControl({ config, value, onChange }) {
   const id = `review-edit-${config.name}`;
 
@@ -171,13 +220,19 @@ export default function ReviewEditProposalModal({
   const fields = React.useMemo(() => editableFieldsFor(item), [item]);
   const [values, setValues] = React.useState(() => initialValues(item, fields));
   const [validationError, setValidationError] = React.useState("");
+  const [displayEntityType, setDisplayEntityType] = React.useState(item?.entityType);
+  const [isConvertOpen, setIsConvertOpen] = React.useState(false);
+  const convertTypeRef = React.useRef(null);
   const chapter = sourceChapter(item);
   const evidence = evidenceRows(item);
-  const typeLabel = formatReviewType(item.entityType);
+  const typeLabel = displayTypeLabel(displayEntityType || item.entityType);
+  const typeGroup = displayTypeGroup(displayEntityType || item.entityType, item.typeGroup);
 
   React.useEffect(() => {
     setValues(initialValues(item, fields));
     setValidationError("");
+    setDisplayEntityType(item?.entityType);
+    setIsConvertOpen(false);
   }, [fields, item]);
 
   React.useEffect(() => {
@@ -188,8 +243,38 @@ export default function ReviewEditProposalModal({
     };
   }, []);
 
+  React.useEffect(() => {
+    if (!isConvertOpen) return undefined;
+
+    function closeOnOutsideClick(event) {
+      if (convertTypeRef.current && !convertTypeRef.current.contains(event.target)) {
+        setIsConvertOpen(false);
+      }
+    }
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") {
+        setIsConvertOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isConvertOpen]);
+
   function updateValue(name, value) {
     setValues((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleConvertType(targetType) {
+    setDisplayEntityType(targetType);
+    setIsConvertOpen(false);
+    console.info("Convert review proposal type selected:", targetType);
   }
 
   async function submit(event) {
@@ -232,7 +317,7 @@ export default function ReviewEditProposalModal({
           <section className="review-edit-summary" aria-label="Review item context">
             <div>
               <span>Review Item</span>
-              <strong className={`review-type-chip ${item.typeGroup}`}>{typeLabel}</strong>
+              <strong className={`review-type-chip ${typeGroup}`}>{typeLabel}</strong>
             </div>
             <div>
               <span>Status</span>
@@ -245,6 +330,47 @@ export default function ReviewEditProposalModal({
             <div>
               <span>Confidence</span>
               <strong>{confidenceText(item)}</strong>
+            </div>
+            <div className="review-convert-type" ref={convertTypeRef}>
+              <button
+                type="button"
+                className="review-convert-type-button"
+                aria-haspopup="menu"
+                aria-expanded={isConvertOpen}
+                onClick={() => setIsConvertOpen((isOpen) => !isOpen)}
+              >
+                <ArrowLeftRight size={16} aria-hidden="true" />
+                <span>Convert Type</span>
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
+              {isConvertOpen ? (
+                <div className="review-convert-popover" role="menu" aria-label="Convert proposal type">
+                  <h4>Convert this proposal to</h4>
+                  <div className="review-convert-options">
+                    {CONVERT_TYPE_OPTIONS.map(({ targetType, label, description, tone, Icon }) => (
+                      <button
+                        type="button"
+                        className="review-convert-option"
+                        role="menuitem"
+                        key={targetType}
+                        onClick={() => handleConvertType(targetType)}
+                      >
+                        <span className={`review-convert-option-icon ${tone}`}>
+                          <Icon size={18} aria-hidden="true" />
+                        </span>
+                        <span>
+                          <strong>{label}</strong>
+                          <small>{description}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="review-convert-note">
+                    <Info size={15} aria-hidden="true" />
+                    Evidence, chapter and AI notes will be preserved.
+                  </p>
+                </div>
+              ) : null}
             </div>
           </section>
 
