@@ -177,6 +177,15 @@ def public_character_item(relationship):
 
 
 def public_skill(skill):
+    character_rows = (
+        CharacterSkill.query.filter_by(
+            skill_id=skill.id,
+            review_status=APPROVED,
+        )
+        .order_by(CharacterSkill.id)
+        .all()
+    )
+
     return {
         "id": skill.id,
         "novel_id": skill.novel_id,
@@ -192,10 +201,29 @@ def public_skill(skill):
             for alias in skill.aliases
         ],
         "evidence": evidence_for("skill", skill.id),
+        "characters": [
+            {
+                "id": relationship.id,
+                "character_id": relationship.character_id,
+                "character_name": relationship.character.name if relationship.character else None,
+                "chapter": chapter_reference(relationship.chapter_id),
+                "description": relationship.description,
+            }
+            for relationship in character_rows
+        ],
     }
 
 
 def public_item(item):
+    character_rows = (
+        CharacterItem.query.filter_by(
+            item_id=item.id,
+            review_status=APPROVED,
+        )
+        .order_by(CharacterItem.id)
+        .all()
+    )
+
     return {
         "id": item.id,
         "novel_id": item.novel_id,
@@ -203,6 +231,17 @@ def public_item(item):
         "category": item.category,
         "description": item.description,
         "evidence": evidence_for("item", item.id),
+        "characters": [
+            {
+                "id": relationship.id,
+                "character_id": relationship.character_id,
+                "character_name": relationship.character.name if relationship.character else None,
+                "chapter": chapter_reference(relationship.chapter_id),
+                "relationship_type": relationship.relationship_type,
+                "description": relationship.description,
+            }
+            for relationship in character_rows
+        ],
     }
 
 

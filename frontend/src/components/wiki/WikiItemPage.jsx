@@ -1,6 +1,8 @@
 import React from "react";
+import { BookOpen, Users } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { WikiEvidence } from "./WikiDetailPages.jsx";
+import { ItemTypeIcon, itemTypeFor } from "./WikiItemsIndex.jsx";
 import { chapterLabel, relationshipLabel } from "../../utils/wikiFormat.js";
 
 export default function WikiItemPage({ item, onSelectCharacter, relatedItems = [] }) {
@@ -14,6 +16,7 @@ export default function WikiItemPage({ item, onSelectCharacter, relatedItems = [
   }
 
   const relatedCharacters = (item.characters || []).filter((relationship) => relationship.character);
+  const itemType = itemTypeFor(item);
 
   return (
     <article className="wiki-entity-page">
@@ -24,36 +27,34 @@ export default function WikiItemPage({ item, onSelectCharacter, relatedItems = [
         <div className="wiki-entity-main">
           <div className="wiki-title-row">
             <h1>{item.name}</h1>
-            <span className="wiki-title-mark">Item</span>
           </div>
 
           <div className="wiki-fact-grid">
             <div className="wiki-fact">
-              <span className="wiki-fact-icon">T</span>
+              <span className="wiki-fact-icon">
+                <ItemTypeIcon type={itemType} />
+              </span>
               <div>
                 <small>Item Type</small>
                 <strong>{item.category || "Item"}</strong>
               </div>
             </div>
             <div className="wiki-fact">
-              <span className="wiki-fact-icon">C</span>
+              <span className="wiki-fact-icon">
+                <Users aria-hidden="true" size={16} strokeWidth={2} />
+              </span>
               <div>
                 <small>Related Characters</small>
                 <strong>{relatedCharacters.length}</strong>
               </div>
             </div>
             <div className="wiki-fact">
-              <span className="wiki-fact-icon">B</span>
+              <span className="wiki-fact-icon">
+                <BookOpen aria-hidden="true" size={16} strokeWidth={2} />
+              </span>
               <div>
                 <small>First Evidence</small>
                 <strong>{chapterLabel(item.evidence?.[0]?.chapter)}</strong>
-              </div>
-            </div>
-            <div className="wiki-fact">
-              <span className="wiki-fact-icon">S</span>
-              <div>
-                <small>Status</small>
-                <strong>Approved</strong>
               </div>
             </div>
           </div>
