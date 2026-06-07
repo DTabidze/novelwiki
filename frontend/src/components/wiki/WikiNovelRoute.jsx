@@ -30,6 +30,14 @@ export default function WikiNovelRoute({
           : numericItemId
             ? "Item"
             : props.page;
+  const routeNovelLoaded = novel?.id === numericNovelId;
+  const displayNovel = routeNovelLoaded
+    ? novel
+    : {
+        id: numericNovelId,
+        title: "Loading...",
+        approved_character_count: 0,
+      };
 
   React.useEffect(() => {
     if (numericNovelId && (!novel || novel.id !== numericNovelId)) {
@@ -73,15 +81,20 @@ export default function WikiNovelRoute({
   return (
     <WikiPanel
       {...props}
-      items={items}
-      loading={loading}
-      novel={novel}
+      characters={routeNovelLoaded ? props.characters : []}
+      items={routeNovelLoaded ? items : []}
+      loading={loading || !routeNovelLoaded}
+      novel={displayNovel}
       novels={novels}
       onLoadNovel={loadNovel}
       onOpenAdmin={onOpenAdmin}
       onSelectCharacter={loadCharacter}
       page={page}
-      progressionEvents={props.progressionEvents}
+      progressionEvents={routeNovelLoaded ? props.progressionEvents : []}
+      selectedCharacter={routeNovelLoaded ? props.selectedCharacter : null}
+      selectedItem={routeNovelLoaded ? props.selectedItem : null}
+      selectedSkill={routeNovelLoaded ? props.selectedSkill : null}
+      skills={routeNovelLoaded ? props.skills : []}
     />
   );
 }

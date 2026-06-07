@@ -1,5 +1,24 @@
 import React from "react";
-import { formatNumber, splitCultivationValue } from "../../utils/wikiFormat.js";
+import {
+  cleanChapterTitle,
+  formatCultivationValue,
+  formatNumber,
+  initialsForName,
+} from "../../utils/wikiFormat.js";
+
+const PAGE_SIZE = 20;
+
+function pageWindow(currentPage, totalPages) {
+  const pages = [];
+  const start = Math.max(1, Math.min(currentPage - 1, totalPages - 2));
+  const end = Math.min(totalPages, start + 2);
+
+  for (let page = start; page <= end; page += 1) {
+    pages.push(page);
+  }
+
+  return pages;
+}
 
 export default function WikiCultivationPage({
   characters,
@@ -8,64 +27,94 @@ export default function WikiCultivationPage({
   progressionEvents,
 }) {
   const [activeLetter, setActiveLetter] = React.useState("All");
+  const [currentPage, setCurrentPage] = React.useState(1);
   const [realmFilter, setRealmFilter] = React.useState("All");
   const [searchTerm, setSearchTerm] = React.useState("");
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-  function latestCultivationFor(character) {
-    const currentLevel = character.current_cultivation_level;
-    const characterEvents = progressionEvents
-      .filter((event) => event.character_id === character.id)
-      .filter((event) => event.progression_type === "cultivation_level");
+  function latestCultivationEventFor(character) {
+    return progressionEvents
+      .filter((event) => event.character_id === character.id && event.progression_type === "cultivation_level")
+      .filter((event) => event.new_value)
+      .sort((first, second) => {
+        const firstChapter = first.chapter?.chapter_number || 0;
+        const secondChapter = second.chapter?.chapter_number || 0;
 
-    if (currentLevel) {
-      return currentLevel;
-    }
+        if (firstChapter !== secondChapter) {
+          return secondChapter - firstChapter;
+        }
 
-    if (characterEvents.length === 0) {
-      return "";
-    }
+        return (second.id || 0) - (first.id || 0);
+      })[0];
+  }
 
-    return characterEvents[0].new_value || "";
+  function characterMatchesSearch(character) {
+    const query = searchTerm.trim().toLowerCase();
+
+    if (!query) return true;
+
+    const aliasText = (character.aliases || []).map((alias) => alias.alias).join(" ");
+
+    return [character.name, aliasText].some((value) =>
+      String(value || "").toLowerCase().includes(query)
+    );
   }
 
   const characterRows = characters
-    .filter((character) => progressionEvents.some((event) => event.character_id === character.id))
     .map((character) => {
-      const cultivation = splitCultivationValue(latestCultivationFor(character));
+      const cultivationEvents = progressionEvents.filter(
+        (event) =>
+          event.character_id === character.id &&
+          event.progression_type === "cultivation_level" &&
+          event.new_value
+      );
+      const latestEvent = latestCultivationEventFor(character);
+      const cultivationValue = formatCultivationValue(latestEvent?.new_value || character.current_cultivation_level);
 
       return {
         character,
+        breakthroughCount: cultivationEvents.length,
+        chapter: latestEvent?.chapter || null,
+        cultivationValue,
         firstLetter: (character.name || "?").trim().slice(0, 1).toUpperCase(),
-        realm: cultivation.realm,
-        realmKey: cultivation.realm.toLowerCase(),
-        stage: cultivation.stage,
+        realmKey: cultivationValue.toLowerCase(),
       };
     })
+    .filter((row) => row.cultivationValue)
     .sort((first, second) => first.character.name.localeCompare(second.character.name));
 
-  const realmOptions = [...new Set(characterRows.map((row) => row.realm))].sort((first, second) =>
+  const realmOptions = [...new Set(characterRows.map((row) => row.cultivationValue))].sort((first, second) =>
     first.localeCompare(second)
   );
   const filteredRows = characterRows.filter((row) => {
     const matchesLetter = activeLetter === "All" || row.firstLetter === activeLetter;
     const matchesRealm = realmFilter === "All" || row.realmKey === realmFilter;
-    const matchesSearch = row.character.name.toLowerCase().includes(searchTerm.trim().toLowerCase());
+    const matchesSearch = characterMatchesSearch(row.character);
 
     return matchesLetter && matchesRealm && matchesSearch;
   });
-  const groupedRows = alphabet
-    .map((letter) => ({
-      letter,
-      rows: filteredRows.filter((row) => row.firstLetter === letter),
-    }))
-    .filter((group) => group.rows.length > 0);
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = filteredRows.length ? (safeCurrentPage - 1) * PAGE_SIZE : 0;
+  const visibleRows = filteredRows.slice(startIndex, startIndex + PAGE_SIZE);
+  const endIndex = Math.min(startIndex + visibleRows.length, filteredRows.length);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [activeLetter, realmFilter, searchTerm]);
+
+  React.useEffect(() => {
+    if (safeCurrentPage !== currentPage) {
+      setCurrentPage(safeCurrentPage);
+    }
+  }, [currentPage, safeCurrentPage]);
 
   return (
     <article className="wiki-cultivation-page">
       <section className="wiki-cultivation-header">
         <div>
           <h1>Cultivation</h1>
+          <p>Current cultivation status of characters and their latest known realm.</p>
           <p>{formatNumber(characterRows.length)} characters</p>
         </div>
         <div className="wiki-cultivation-tools">
@@ -106,32 +155,64 @@ export default function WikiCultivationPage({
         ))}
       </nav>
 
-      <section className="wiki-cultivation-index">
-        {filteredRows.length === 0 ? <p>No matching characters found.</p> : null}
-        {groupedRows.map((group) => (
-          <section className="wiki-cultivation-letter-group" key={group.letter}>
-            <div className="wiki-cultivation-letter-heading">
-              <h2>{group.letter}</h2>
-              <span>{formatNumber(group.rows.length)} characters</span>
-            </div>
-            <div className="wiki-cultivation-rows">
-              {group.rows.map((row) => (
-                <button
-                  className="wiki-cultivation-row"
-                  key={row.character.id}
-                  type="button"
-                  onClick={() => onSelectCharacterProgression(row.character)}
-                >
-                  <strong>{row.character.name}</strong>
-                  <span className="wiki-realm-tag">{row.realm}</span>
-                  <span>{row.stage}</span>
-                  <span className="wiki-row-action">›</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ))}
+      <section className="wiki-skill-list-toolbar">
+        <strong>{formatNumber(filteredRows.length)} characters found</strong>
       </section>
+
+      <section className="wiki-cultivation-index">
+        <div className="wiki-cultivation-rows">
+          {visibleRows.length ? visibleRows.map((row) => {
+            const chapterTitle = cleanChapterTitle(row.chapter);
+
+            return (
+              <button
+                className="wiki-cultivation-row"
+                key={row.character.id}
+                type="button"
+                onClick={() => onSelectCharacterProgression(row.character)}
+              >
+                <span className={`wiki-character-initials tone-${row.character.id % 6}`}>
+                  {initialsForName(row.character.name)}
+                </span>
+                <strong>{row.character.name}</strong>
+                <span className="wiki-realm-tag">{row.cultivationValue}</span>
+                <span className="wiki-cultivation-confirmed" title="Last confirmed chapter">
+                  <strong>{row.chapter ? `Chapter ${row.chapter.chapter_number}` : "Unknown chapter"}</strong>
+                  {chapterTitle ? <small>{chapterTitle}</small> : null}
+                </span>
+                <span className="wiki-breakthrough-count">
+                  <strong>{formatNumber(row.breakthroughCount)}</strong>
+                  <small>{row.breakthroughCount === 1 ? "breakthrough" : "breakthroughs"}</small>
+                </span>
+                <span className="wiki-row-action">›</span>
+              </button>
+            );
+          }) : (
+            <p className="wiki-muted-copy">No matching characters found.</p>
+          )}
+        </div>
+      </section>
+
+      <footer className="wiki-skill-pagination">
+        <div>
+          {pageWindow(safeCurrentPage, totalPages).map((page) => (
+            <button
+              className={page === safeCurrentPage ? "active" : ""}
+              key={page}
+              type="button"
+              onClick={() => setCurrentPage(page)}
+            >
+              {page}
+            </button>
+          ))}
+          {safeCurrentPage < totalPages ? (
+            <button type="button" onClick={() => setCurrentPage(safeCurrentPage + 1)}>›</button>
+          ) : null}
+        </div>
+        <span>
+          Showing {filteredRows.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredRows.length)} characters
+        </span>
+      </footer>
     </article>
   );
 }

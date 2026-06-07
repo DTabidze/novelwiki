@@ -1,9 +1,23 @@
 import React from "react";
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { API_BASE_URL, fetchJson } from "./api.js";
 import AdminApp from "./admin/AdminApp.jsx";
 import WikiPanel from "./components/wiki/WikiPanel.jsx";
 import WikiNovelRoute from "./components/wiki/WikiNovelRoute.jsx";
+
+function PublicWikiScrollReset() {
+  const location = useLocation();
+
+  React.useEffect(() => {
+    if (!location.pathname.startsWith("/wiki")) {
+      return;
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [location.pathname]);
+
+  return null;
+}
 
 export default function App() {
   const navigate = useNavigate();
@@ -98,6 +112,7 @@ export default function App() {
 
   return (
     <>
+      <PublicWikiScrollReset />
       {message ? <p className="message">{message}</p> : null}
       <Routes>
         <Route path="/" element={<Navigate to="/wiki/novels" replace />} />

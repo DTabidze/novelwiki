@@ -1,15 +1,45 @@
 import React from "react";
+import {
+  Bookmark,
+  Building2,
+  CircleHelp,
+  Compass,
+  Home,
+  Library,
+  MapPin,
+  Package,
+  ScrollText,
+  Sparkles,
+  Timeline,
+  Users,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import WikiAvatar from "./WikiAvatar.jsx";
 import WikiCharacterBrowser from "./WikiCharacterBrowser.jsx";
 import WikiCharacterDetail from "./WikiCharacterDetail.jsx";
 import WikiCharacterProgressionPage from "./WikiCharacterProgressionPage.jsx";
 import WikiCultivationPage from "./WikiCultivationPage.jsx";
-import WikiEntityBrowser from "./WikiEntityBrowser.jsx";
+import WikiItemsIndex from "./WikiItemsIndex.jsx";
 import WikiItemPage from "./WikiItemPage.jsx";
 import WikiLandingPage from "./WikiLandingPage.jsx";
 import WikiNovelOverview from "./WikiNovelOverview.jsx";
 import WikiSkillPage from "./WikiSkillPage.jsx";
+import WikiSkillsIndex from "./WikiSkillsIndex.jsx";
+
+const WIKI_NAV_ICONS = {
+  About: CircleHelp,
+  Bookmarks: Bookmark,
+  Characters: Users,
+  Cultivation: Timeline,
+  Items: Package,
+  Novels: Library,
+  Organizations: Building2,
+  Overview: Home,
+  Places: MapPin,
+  "Recent Updates": ScrollText,
+  Skills: Sparkles,
+  Timeline,
+};
 
 export default function WikiPanel({
   characters,
@@ -68,6 +98,12 @@ export default function WikiPanel({
     }
   }
 
+  function openCharacterSkills(character) {
+    if (trackedNovel && character) {
+      navigate(`/wiki/novels/${trackedNovel.id}/skills?character_id=${character.id}`);
+    }
+  }
+
   function openSkill(skill) {
     if (trackedNovel) {
       navigate(`/wiki/novels/${trackedNovel.id}/skills/${skill.id}`);
@@ -77,6 +113,12 @@ export default function WikiPanel({
   function openItems() {
     if (trackedNovel) {
       navigate(`/wiki/novels/${trackedNovel.id}/items`);
+    }
+  }
+
+  function openCharacterItems(character) {
+    if (trackedNovel && character) {
+      navigate(`/wiki/novels/${trackedNovel.id}/items?character_id=${character.id}`);
     }
   }
 
@@ -130,24 +172,28 @@ export default function WikiPanel({
           <span>Explore the Dao</span>
         </div>
 
-        <input className="wiki-sidebar-search" type="search" placeholder="Search wiki..." />
-
         <nav className="wiki-nav">
-          {(trackedNovel ? novelNav : globalNav).map((label) => (
-            <button
-              className={label === activeSection ? "active" : ""}
-              disabled={
-                Boolean(trackedNovel) &&
-                !["Novels", "Overview", "Characters", "Cultivation", "Skills", "Items"].includes(label)
-              }
-              key={label}
-              type="button"
-              onClick={() => handleNav(label)}
-            >
-              <span>{label.slice(0, 1)}</span>
-              {label}
-            </button>
-          ))}
+          {(trackedNovel ? novelNav : globalNav).map((label) => {
+            const Icon = WIKI_NAV_ICONS[label] || Compass;
+
+            return (
+              <button
+                className={label === activeSection ? "active" : ""}
+                disabled={
+                  Boolean(trackedNovel) &&
+                  !["Novels", "Overview", "Characters", "Cultivation", "Skills", "Items"].includes(label)
+                }
+                key={label}
+                type="button"
+                onClick={() => handleNav(label)}
+              >
+                <span className="wiki-nav-icon">
+                  <Icon aria-hidden="true" size={14} strokeWidth={2} />
+                </span>
+                {label}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="wiki-sidebar-section">
@@ -264,6 +310,8 @@ export default function WikiPanel({
                 <WikiCharacterDetail
                   character={selectedCharacter}
                   onOpenCultivation={() => openCharacterProgression(selectedCharacter)}
+                  onOpenItems={() => openCharacterItems(selectedCharacter)}
+                  onOpenSkills={() => openCharacterSkills(selectedCharacter)}
                   onSelectItem={openItem}
                   relatedCharacters={characters}
                   onSelectRelated={openCharacter}
@@ -284,13 +332,12 @@ export default function WikiPanel({
               ) : null}
 
               {page === "Skills" ? (
-                <WikiEntityBrowser
-                  countLabel="approved"
-                  entities={skills}
-                  iconLabel="Skill"
+                <WikiSkillsIndex
+                  characters={characters}
                   novel={trackedNovel}
-                  pageTitle="Skills"
-                  onSelectEntity={openSkill}
+                  onSelectCharacter={openCharacter}
+                  onSelectSkill={openSkill}
+                  skills={skills}
                 />
               ) : null}
 
@@ -313,13 +360,12 @@ export default function WikiPanel({
               ) : null}
 
               {page === "Items" ? (
-                <WikiEntityBrowser
-                  countLabel="approved"
-                  entities={items}
-                  iconLabel="Item"
+                <WikiItemsIndex
+                  characters={characters}
+                  items={items}
                   novel={trackedNovel}
-                  pageTitle="Items"
-                  onSelectEntity={openItem}
+                  onSelectCharacter={openCharacter}
+                  onSelectItem={openItem}
                 />
               ) : null}
 

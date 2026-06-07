@@ -1,4 +1,16 @@
 import React from "react";
+import {
+  BadgeCheck,
+  BookOpen,
+  Building2,
+  Calendar,
+  Crown,
+  Dna,
+  MapPin,
+  Sparkles,
+  Timeline,
+  UserRound,
+} from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
 import {
   chapterLabel,
@@ -11,6 +23,8 @@ import {
 export default function WikiCharacterDetail({
   character,
   onOpenCultivation,
+  onOpenItems,
+  onOpenSkills,
   onSelectItem,
   onSelectRelated,
   onSelectSkill,
@@ -61,7 +75,7 @@ export default function WikiCharacterDetail({
   const latestTitle = titles[titles.length - 1] || "";
   const quickFacts = [
     {
-      icon: "C",
+      Icon: Timeline,
       label: "Current Cultivation",
       value: currentCultivation || "Unknown",
       action: (
@@ -70,16 +84,16 @@ export default function WikiCharacterDetail({
         </button>
       ),
     },
-    { icon: "P", label: "Current Position", value: formatMetadataValue(character.current_position, "current_position") },
-    { icon: "M", label: "First Mentioned", value: chapterLabel(character.first_mentioned_chapter) },
-    { icon: "A", label: "First Appeared", value: chapterLabel(character.first_appeared_chapter) },
-    { icon: "G", label: "Gender", value: formatMetadataValue(character.gender, "gender") },
-    { icon: "R", label: "Race / Species", value: formatMetadataValue(character.race_or_species, "race_or_species") },
-    { icon: "O", label: "Origin", value: formatMetadataValue(character.origin, "origin") },
-    { icon: "F", label: "Affiliation", value: formatMetadataValue(character.faction_or_affiliation, "faction_or_affiliation") },
-    { icon: "S", label: "Status", value: formatMetadataValue(character.status, "status") },
-    { icon: "T", label: "Latest Title", value: formatMetadataValue(latestTitle, "titles") },
-    { icon: "Y", label: "Age", value: formatMetadataValue(character.age_text, "age_text") },
+    { Icon: Sparkles, label: "Current Position", value: formatMetadataValue(character.current_position, "current_position") },
+    { Icon: BookOpen, label: "First Mentioned", value: chapterLabel(character.first_mentioned_chapter) },
+    { Icon: BookOpen, label: "First Appeared", value: chapterLabel(character.first_appeared_chapter) },
+    { Icon: UserRound, label: "Gender", value: formatMetadataValue(character.gender, "gender") },
+    { Icon: Dna, label: "Race / Species", value: formatMetadataValue(character.race_or_species, "race_or_species") },
+    { Icon: MapPin, label: "Origin", value: formatMetadataValue(character.origin, "origin") },
+    { Icon: Building2, label: "Affiliation", value: formatMetadataValue(character.faction_or_affiliation, "faction_or_affiliation") },
+    { Icon: BadgeCheck, label: "Status", value: formatMetadataValue(character.status, "status") },
+    { Icon: Crown, label: "Latest Title", value: formatMetadataValue(latestTitle, "titles") },
+    { Icon: Calendar, label: "Age", value: formatMetadataValue(character.age_text, "age_text") },
   ].filter((fact) => fact.value);
 
   function shortEvidence(text) {
@@ -126,9 +140,11 @@ export default function WikiCharacterDetail({
       </section>
 
       <section className="wiki-character-fact-strip">
-        {quickFacts.map((fact) => (
+        {quickFacts.map(({ Icon, ...fact }) => (
           <div className="wiki-character-fact-card" key={fact.label}>
-            <span className="wiki-fact-icon">{fact.icon}</span>
+            <span className="wiki-fact-icon">
+              <Icon aria-hidden="true" size={16} strokeWidth={2} />
+            </span>
             <div>
               <small>{fact.label}</small>
               <strong>{fact.value}</strong>
@@ -181,7 +197,11 @@ export default function WikiCharacterDetail({
           <section className="wiki-card">
             <div className="wiki-card-heading">
               <h2>Skills Summary</h2>
-              {skills.length > shownSkills.length ? <span>{skills.length - shownSkills.length} more</span> : null}
+              {skills.length > shownSkills.length ? (
+                <button className="wiki-text-link" type="button" onClick={onOpenSkills}>
+                  View all skills
+                </button>
+              ) : null}
             </div>
             {shownSkills.length > 0 ? (
               <div className="wiki-summary-list">
@@ -229,7 +249,14 @@ export default function WikiCharacterDetail({
 
         <aside className="wiki-character-side-stack">
           <section className="wiki-card">
-            <h2>Items Summary</h2>
+            <div className="wiki-card-heading">
+              <h2>Items Summary</h2>
+              {items.length > 0 ? (
+                <button className="wiki-text-link" type="button" onClick={onOpenItems}>
+                  View all items
+                </button>
+              ) : null}
+            </div>
             {shownItems.length > 0 ? (
               <div className="wiki-compact-list">
                 {shownItems.map((relationship) => (
