@@ -11,7 +11,13 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { chapterLabel } from "../../utils/wikiFormat.js";
+import {
+  ITEM_CATEGORIES,
+  normalizeItemCategory,
+  normalizeSkillCategory,
+  SKILL_CATEGORIES,
+} from "../editor/editorDrafts.js";
+import { chapterLabel, cleanChapterTitle } from "../../utils/wikiFormat.js";
 import {
   confidenceText,
   evidenceRows,
@@ -23,6 +29,13 @@ import {
 
 const CONVERT_TYPE_OPTIONS = [
   {
+    targetType: "skills",
+    label: "Skill",
+    description: "Change to a Skill proposal",
+    tone: "skill",
+    Icon: Sparkles,
+  },
+  {
     targetType: "items",
     label: "Item",
     description: "Change to an Item proposal",
@@ -32,16 +45,18 @@ const CONVERT_TYPE_OPTIONS = [
   {
     targetType: "characters",
     label: "Character",
-    description: "Change to a Character proposal",
+    description: "Character conversion coming later",
     tone: "character",
     Icon: UserRound,
+    disabled: true,
   },
   {
     targetType: "progression_events",
     label: "Cultivation Breakthrough",
-    description: "Change to a Cultivation proposal",
+    description: "Cultivation conversion coming later",
     tone: "cultivation",
     Icon: Sparkles,
+    disabled: true,
   },
 ];
 
@@ -86,12 +101,12 @@ const EDIT_FIELD_CONFIG = {
   ],
   skills: [
     field("Name", "name", { required: true }),
-    field("Category", "category"),
+    field("Category", "category", { options: SKILL_CATEGORIES, emptyLabel: "No category" }),
     field("Description", "description", { multiline: true }),
   ],
   items: [
     field("Name", "name", { required: true }),
-    field("Category", "category"),
+    field("Category", "category", { options: ITEM_CATEGORIES, emptyLabel: "No category" }),
     field("Description", "description", { multiline: true }),
   ],
   character_skills: [
@@ -134,7 +149,14 @@ function editablePayload(fields, formValues) {
 function initialValues(item, fields) {
   const values = {};
   fields.forEach((config) => {
-    values[config.name] = item?.[config.name] ?? "";
+    const value = item?.[config.name] ?? "";
+
+    if (config.name === "category") {
+      values[config.name] = normalizeCategoryForEntityType(item?.entityType, value);
+      return;
+    }
+
+    values[config.name] = value;
   });
   values.admin_notes = item?.admin_notes ?? "";
   return values;
@@ -152,6 +174,18 @@ function validate(fields, values) {
   return "";
 }
 
+function normalizeCategoryForEntityType(entityType, category) {
+  if (entityType === "skills") {
+    return normalizeSkillCategory(category) || "";
+  }
+
+  if (entityType === "items") {
+    return normalizeItemCategory(category) || "";
+  }
+
+  return category ?? "";
+}
+
 function displayTypeLabel(entityType) {
   const convertedOption = CONVERT_TYPE_OPTIONS.find((option) => option.targetType === entityType);
   return convertedOption?.label || formatReviewType(entityType);
@@ -166,6 +200,15 @@ function displayTypeGroup(entityType, fallbackGroup) {
   return fallbackGroup || entityType || "";
 }
 
+function summaryChapterLabel(chapter) {
+  if (!chapter) {
+    return "Unknown";
+  }
+
+  const title = cleanChapterTitle(chapter);
+  return title ? `${chapter.chapter_number} - ${title}` : String(chapter.chapter_number);
+}
+
 function FieldControl({ config, value, onChange }) {
   const id = `review-edit-${config.name}`;
 
@@ -178,6 +221,7 @@ function FieldControl({ config, value, onChange }) {
         disabled={config.readOnly}
         onChange={(event) => onChange(config.name, event.target.value)}
       >
+        {config.emptyLabel ? <option value="">{config.emptyLabel}</option> : null}
         {config.options.map((option) => (
           <option value={option} key={option}>{option}</option>
         ))}
@@ -217,23 +261,29 @@ export default function ReviewEditProposalModal({
   onSave,
   onViewContext,
 }) {
-  const fields = React.useMemo(() => editableFieldsFor(item), [item]);
+  const [displayEntityType, setDisplayEntityType] = React.useState(item?.entityType);
+  const fields = React.useMemo(
+    () => editableFieldsFor({ ...item, entityType: displayEntityType || item?.entityType }),
+    [displayEntityType, item]
+  );
   const [values, setValues] = React.useState(() => initialValues(item, fields));
   const [validationError, setValidationError] = React.useState("");
-  const [displayEntityType, setDisplayEntityType] = React.useState(item?.entityType);
   const [isConvertOpen, setIsConvertOpen] = React.useState(false);
   const convertTypeRef = React.useRef(null);
   const chapter = sourceChapter(item);
   const evidence = evidenceRows(item);
+  const chapterText = summaryChapterLabel(chapter);
+  const fullChapterText = chapterLabel(chapter);
   const typeLabel = displayTypeLabel(displayEntityType || item.entityType);
   const typeGroup = displayTypeGroup(displayEntityType || item.entityType, item.typeGroup);
 
   React.useEffect(() => {
-    setValues(initialValues(item, fields));
+    const originalFields = editableFieldsFor(item);
+    setValues(initialValues(item, originalFields));
     setValidationError("");
     setDisplayEntityType(item?.entityType);
     setIsConvertOpen(false);
-  }, [fields, item]);
+  }, [item]);
 
   React.useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -258,11 +308,11 @@ export default function ReviewEditProposalModal({
       }
     }
 
-    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("mousedown", closeOnOutsideClick, true);
     document.addEventListener("keydown", closeOnEscape);
 
     return () => {
-      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("mousedown", closeOnOutsideClick, true);
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [isConvertOpen]);
@@ -273,6 +323,10 @@ export default function ReviewEditProposalModal({
 
   function handleConvertType(targetType) {
     setDisplayEntityType(targetType);
+    setValues((current) => ({
+      ...current,
+      category: normalizeCategoryForEntityType(targetType, current.category),
+    }));
     setIsConvertOpen(false);
     console.info("Convert review proposal type selected:", targetType);
   }
@@ -287,6 +341,8 @@ export default function ReviewEditProposalModal({
     await onSave({
       ...editablePayload(fields, values),
       admin_notes: values.admin_notes || "",
+    }, {
+      targetEntityType: displayEntityType,
     });
   }
 
@@ -315,19 +371,19 @@ export default function ReviewEditProposalModal({
 
         <div className="review-edit-body">
           <section className="review-edit-summary" aria-label="Review item context">
-            <div>
+            <div className="review-summary-cell review-summary-type">
               <span>Review Item</span>
               <strong className={`review-type-chip ${typeGroup}`}>{typeLabel}</strong>
             </div>
-            <div>
+            <div className="review-summary-cell review-summary-status">
               <span>Status</span>
               <strong className={`review-status-badge ${item.review_status}`}>{item.review_status}</strong>
             </div>
-            <div>
+            <div className="review-summary-cell review-summary-chapter">
               <span>Chapter</span>
-              <strong className="review-chapter-chip">{chapterLabel(chapter)}</strong>
+              <strong className="review-chapter-chip" title={fullChapterText}>{chapterText}</strong>
             </div>
-            <div>
+            <div className="review-summary-cell review-summary-confidence">
               <span>Confidence</span>
               <strong>{confidenceText(item)}</strong>
             </div>
@@ -347,11 +403,15 @@ export default function ReviewEditProposalModal({
                 <div className="review-convert-popover" role="menu" aria-label="Convert proposal type">
                   <h4>Convert this proposal to</h4>
                   <div className="review-convert-options">
-                    {CONVERT_TYPE_OPTIONS.map(({ targetType, label, description, tone, Icon }) => (
+                    {CONVERT_TYPE_OPTIONS
+                      .filter((option) => option.targetType !== (displayEntityType || item.entityType))
+                      .map(({ targetType, label, description, tone, Icon, disabled }) => (
                       <button
                         type="button"
                         className="review-convert-option"
                         role="menuitem"
+                        disabled={disabled}
+                        aria-disabled={disabled}
                         key={targetType}
                         onClick={() => handleConvertType(targetType)}
                       >

@@ -663,19 +663,26 @@ export default function ReviewQueuePage({
     }
   }
 
-  async function saveReviewProposalEdits(payload) {
+  async function saveReviewProposalEdits(payload, options = {}) {
     if (!editingItem) return;
 
     setEditError("");
     setIsSaving(true);
     pendingSelectionKeyRef.current = recordKey(editingItem);
+    const targetEntityType = options.targetEntityType;
+    const isConversion = targetEntityType && targetEntityType !== editingItem.entityType;
 
     try {
-      await fetchJson(`${API_BASE_URL}/admin/review/${editingItem.entityType}/${editingItem.id}`, {
-        method: "PATCH",
+      const savedItem = await fetchJson(`${API_BASE_URL}/admin/review/${editingItem.entityType}/${editingItem.id}${isConversion ? "/convert" : ""}`, {
+        method: isConversion ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(isConversion ? { ...payload, target_entity_type: targetEntityType } : payload),
       });
+
+      if (isConversion && savedItem?.entity_type && savedItem?.review_item?.id) {
+        pendingSelectionKeyRef.current = `${savedItem.entity_type}:${savedItem.review_item.id}`;
+      }
+
       await onRefresh?.({ showLoading: false });
       setEditingItem(null);
     } catch (err) {

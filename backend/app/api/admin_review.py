@@ -304,6 +304,110 @@ def evidence_response(entity_type, entity_id):
     ]
 
 
+CONVERTIBLE_REVIEW_ENTITY_TYPES = {"skills", "items"}
+
+
+def move_wiki_evidence(source_type, source_id, target_type, target_id):
+    evidence_rows = WikiEvidence.query.filter_by(
+        entity_type=source_type,
+        entity_id=source_id,
+    ).all()
+
+    for evidence in evidence_rows:
+        db.session.add(WikiEvidence(
+            novel_id=evidence.novel_id,
+            chapter_id=evidence.chapter_id,
+            entity_type=target_type,
+            entity_id=target_id,
+            evidence_text=evidence.evidence_text,
+        ))
+        db.session.delete(evidence)
+
+
+def converted_review_payload(payload, source, target_entity_type):
+    allowed_fields = {"target_entity_type", "name", "category", "description", "admin_notes"}
+    unexpected_fields = set(payload) - allowed_fields
+
+    if unexpected_fields:
+        return None, f"Unsupported conversion field: {sorted(unexpected_fields)[0]}."
+
+    name = validate_optional_text(payload.get("name", source.name), "Name")
+    name = (name or "").strip()
+
+    if not name:
+        return None, "Name is required."
+
+    category_text = validate_optional_text(payload.get("category", source.category), "Category")
+
+    if target_entity_type == "skills":
+        category = normalize_skill_category(category_text)
+
+        if category_text not in (None, "") and not category:
+            return None, "Skill category must be one of the supported categories."
+    else:
+        category = normalize_item_category(category_text)
+
+        if category_text not in (None, "") and not category:
+            return None, "Item category must be one of the supported categories."
+
+    return {
+        "name": name,
+        "category": category,
+        "description": validate_optional_text(payload.get("description", source.description), "Description") or None,
+        "admin_notes": validate_optional_text(payload.get("admin_notes", source.admin_notes), "Admin notes") or None,
+    }, None
+
+
+def convert_skill_relationships_to_item(skill, item):
+    if CharacterSkill.query.filter_by(skill_id=skill.id, review_status=APPROVED_STATUS).first():
+        return "Cannot convert a skill with approved character relationships."
+
+    relationships = CharacterSkill.query.filter_by(skill_id=skill.id).all()
+
+    for relationship in relationships:
+        converted = CharacterItem(
+            novel_id=relationship.novel_id,
+            character_id=relationship.character_id,
+            item_id=item.id,
+            chapter_id=relationship.chapter_id,
+            relationship_type="associated",
+            description=relationship.description,
+            review_status=relationship.review_status,
+            admin_notes=relationship.admin_notes,
+        )
+        db.session.add(converted)
+        db.session.flush()
+        move_wiki_evidence("character_skill", relationship.id, "character_item", converted.id)
+        db.session.delete(relationship)
+
+    return None
+
+
+def convert_item_relationships_to_skill(item, skill):
+    if CharacterItem.query.filter_by(item_id=item.id, review_status=APPROVED_STATUS).first():
+        return "Cannot convert an item with approved character relationships."
+
+    relationships = CharacterItem.query.filter_by(item_id=item.id).all()
+
+    for relationship in relationships:
+        converted = CharacterSkill(
+            novel_id=relationship.novel_id,
+            character_id=relationship.character_id,
+            skill_id=skill.id,
+            chapter_id=relationship.chapter_id,
+            relationship_type="has",
+            description=relationship.description,
+            review_status=relationship.review_status,
+            admin_notes=relationship.admin_notes,
+        )
+        db.session.add(converted)
+        db.session.flush()
+        move_wiki_evidence("character_item", relationship.id, "character_skill", converted.id)
+        db.session.delete(relationship)
+
+    return None
+
+
 def approved_character_relation_rows(model, character_id):
     rows = (
         model.query.filter_by(
@@ -954,6 +1058,75 @@ def update_extracted_entity(entity_type, entity_id):
     db.session.commit()
 
     return success(admin_review_response(entity_type, record))
+
+
+@admin_review_bp.post("/<entity_type>/<int:entity_id>/convert")
+def convert_extracted_entity(entity_type, entity_id):
+    if entity_type not in CONVERTIBLE_REVIEW_ENTITY_TYPES:
+        return failure("Only skill and item review proposals can be converted for now.", status=400)
+
+    payload = request_json_object()
+    target_entity_type = payload.get("target_entity_type")
+
+    if target_entity_type not in CONVERTIBLE_REVIEW_ENTITY_TYPES:
+        return failure("target_entity_type must be skills or items.")
+
+    if target_entity_type == entity_type:
+        return failure("target_entity_type must be different from the current review item type.")
+
+    source_model = ENTITY_CONFIG[entity_type]["model"]
+    source = source_model.query.get_or_404(entity_id)
+
+    if source.review_status != "pending":
+        return failure("Only pending review items can be converted.")
+
+    converted_payload, payload_error = converted_review_payload(payload, source, target_entity_type)
+
+    if payload_error:
+        return failure(payload_error)
+
+    target_model = ENTITY_CONFIG[target_entity_type]["model"]
+    converted = target_model(
+        novel_id=source.novel_id,
+        review_status=source.review_status,
+        **converted_payload,
+    )
+
+    try:
+        db.session.add(converted)
+        db.session.flush()
+
+        move_wiki_evidence(
+            EVIDENCE_ENTITY_TYPES[entity_type],
+            source.id,
+            EVIDENCE_ENTITY_TYPES[target_entity_type],
+            converted.id,
+        )
+
+        if entity_type == "skills" and target_entity_type == "items":
+            relationship_error = convert_skill_relationships_to_item(source, converted)
+        elif entity_type == "items" and target_entity_type == "skills":
+            relationship_error = convert_item_relationships_to_skill(source, converted)
+        else:
+            relationship_error = None
+
+        if relationship_error:
+            db.session.rollback()
+            return failure(relationship_error)
+
+        db.session.delete(source)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return failure("Converted review item conflicts with existing data.")
+
+    return success(
+        {
+            "entity_type": target_entity_type,
+            "review_item": admin_review_response(target_entity_type, converted),
+        },
+        status=201,
+    )
 
 
 @admin_review_bp.post("/characters/<int:source_id>/merge")
