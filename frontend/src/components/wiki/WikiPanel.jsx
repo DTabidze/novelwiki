@@ -19,10 +19,12 @@ import WikiCharacterBrowser from "./WikiCharacterBrowser.jsx";
 import WikiCharacterDetail from "./WikiCharacterDetail.jsx";
 import WikiCharacterProgressionPage from "./WikiCharacterProgressionPage.jsx";
 import WikiCultivationPage from "./WikiCultivationPage.jsx";
+import WikiGlobalSearch from "./WikiGlobalSearch.jsx";
 import WikiItemsIndex from "./WikiItemsIndex.jsx";
 import WikiItemPage from "./WikiItemPage.jsx";
 import WikiLandingPage from "./WikiLandingPage.jsx";
 import WikiNovelOverview from "./WikiNovelOverview.jsx";
+import WikiSearchResultsPage from "./WikiSearchResultsPage.jsx";
 import WikiSkillPage from "./WikiSkillPage.jsx";
 import WikiSkillsIndex from "./WikiSkillsIndex.jsx";
 
@@ -251,6 +253,12 @@ export default function WikiPanel({
                 <strong>Cultivation</strong>
               </>
             ) : null}
+            {page === "Search" ? (
+              <>
+                <span>/</span>
+                <strong>Search</strong>
+              </>
+            ) : null}
             {page === "Skill" && selectedSkill ? (
               <>
                 <span>/</span>
@@ -294,7 +302,15 @@ export default function WikiPanel({
               </>
             ) : null}
           </div>
-          <input className="wiki-search" type="search" placeholder="Search characters, novels, skills..." />
+          <WikiGlobalSearch
+            characters={characters}
+            items={items}
+            novel={trackedNovel}
+            skills={skills}
+            onSelectCharacter={openCharacter}
+            onSelectItem={openItem}
+            onSelectSkill={openSkill}
+          />
         </header>
 
         <div className="wiki-content">
@@ -353,7 +369,6 @@ export default function WikiPanel({
 
               {page === "Skill" && selectedSkill ? (
                 <WikiSkillPage
-                  relatedSkills={skills}
                   skill={selectedSkill}
                   onSelectCharacter={openCharacter}
                 />
@@ -369,10 +384,21 @@ export default function WikiPanel({
                 />
               ) : null}
 
+              {page === "Search" ? (
+                <WikiSearchResultsPage
+                  characters={characters}
+                  items={items}
+                  novel={trackedNovel}
+                  skills={skills}
+                  onSelectCharacter={openCharacter}
+                  onSelectItem={openItem}
+                  onSelectSkill={openSkill}
+                />
+              ) : null}
+
               {page === "Item" && selectedItem ? (
                 <WikiItemPage
                   item={selectedItem}
-                  relatedItems={items}
                   onSelectCharacter={openCharacter}
                 />
               ) : null}

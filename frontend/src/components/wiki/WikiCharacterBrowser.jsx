@@ -1,4 +1,5 @@
 import React from "react";
+import { Search } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { chapterLabel, formatCultivationValue, formatNumber } from "../../utils/wikiFormat.js";
 
@@ -16,7 +17,7 @@ function characterMatchesSearch(character, query) {
   if (!normalizedQuery) return true;
 
   const aliasText = (character.aliases || []).map((alias) => alias.alias).join(" ");
-  return [character.name, aliasText, character.titles].some((value) =>
+  return [character.name, aliasText].some((value) =>
     String(value || "").toLowerCase().includes(normalizedQuery)
   );
 }
@@ -125,12 +126,15 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
           <p>{formatNumber(filteredCharacters.length)} characters</p>
         </div>
         <div className="wiki-cultivation-tools single">
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
-            placeholder="Search characters..."
-          />
+          <label className="wiki-local-search-field">
+            <Search aria-hidden="true" size={18} />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
+              placeholder="Search characters..."
+            />
+          </label>
         </div>
       </section>
 

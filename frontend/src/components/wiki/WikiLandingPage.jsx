@@ -1,4 +1,5 @@
 import React from "react";
+import { Search } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { formatDate, formatNumber } from "../../utils/wikiFormat.js";
 
@@ -11,7 +12,10 @@ export default function WikiLandingPage({ novels, onLoadNovel }) {
       </section>
 
       <section className="wiki-library-toolbar">
-        <input type="search" placeholder="Search novels..." />
+        <label className="wiki-local-search-field">
+          <Search aria-hidden="true" size={18} />
+          <input type="search" placeholder="Search novels..." />
+        </label>
         <select defaultValue="all">
           <option value="all">Status: All</option>
           <option value="tracking">Tracking</option>

@@ -5,7 +5,7 @@ import { WikiEvidence } from "./WikiDetailPages.jsx";
 import { ItemTypeIcon, itemTypeFor } from "./WikiItemsIndex.jsx";
 import { chapterLabel, relationshipLabel } from "../../utils/wikiFormat.js";
 
-export default function WikiItemPage({ item, onSelectCharacter, relatedItems = [] }) {
+export default function WikiItemPage({ item, onSelectCharacter }) {
   if (!item) {
     return (
       <section className="wiki-empty-panel">
@@ -101,19 +101,6 @@ export default function WikiItemPage({ item, onSelectCharacter, relatedItems = [
             ))}
           </section>
 
-          <section className="wiki-card">
-            <h2>Related Items</h2>
-            {relatedItems.length === 0 ? <p>No related items yet.</p> : null}
-            {relatedItems
-              .filter((related) => related.id !== item.id)
-              .slice(0, 3)
-              .map((related) => (
-                <div className="wiki-mini-link" key={related.id}>
-                  <strong>{related.name}</strong>
-                  <span>{related.category || "Item"}</span>
-                </div>
-              ))}
-          </section>
         </div>
       </section>
     </article>

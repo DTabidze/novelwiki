@@ -1,4 +1,5 @@
 import React from "react";
+import { Search } from "lucide-react";
 import {
   cleanChapterTitle,
   formatCultivationValue,
@@ -118,12 +119,15 @@ export default function WikiCultivationPage({
           <p>{formatNumber(characterRows.length)} characters</p>
         </div>
         <div className="wiki-cultivation-tools">
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search characters..."
-          />
+          <label className="wiki-local-search-field">
+            <Search aria-hidden="true" size={18} />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search characters..."
+            />
+          </label>
           <select value={realmFilter} onChange={(event) => setRealmFilter(event.target.value)}>
             <option value="All">Filter by realm</option>
             {realmOptions.map((realm) => (

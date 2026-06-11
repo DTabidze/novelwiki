@@ -1,9 +1,10 @@
 import React from "react";
+import { BookOpen, Sparkles, Tags, Users } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { WikiEvidence } from "./WikiDetailPages.jsx";
 import { chapterLabel, relationshipLabel } from "../../utils/wikiFormat.js";
 
-export default function WikiSkillPage({ onSelectCharacter, relatedSkills = [], skill }) {
+export default function WikiSkillPage({ onSelectCharacter, skill }) {
   if (!skill) {
     return (
       <section className="wiki-empty-panel">
@@ -24,33 +25,40 @@ export default function WikiSkillPage({ onSelectCharacter, relatedSkills = [], s
         <div className="wiki-entity-main">
           <div className="wiki-title-row">
             <h1>{skill.name}</h1>
-            <span className="wiki-title-mark">Art</span>
           </div>
 
           <div className="wiki-fact-grid">
             <div className="wiki-fact">
-              <span className="wiki-fact-icon">T</span>
+              <span className="wiki-fact-icon">
+                <Sparkles aria-hidden="true" size={16} strokeWidth={2} />
+              </span>
               <div>
                 <small>Skill Type</small>
                 <strong>{skill.category || "Technique"}</strong>
               </div>
             </div>
             <div className="wiki-fact">
-              <span className="wiki-fact-icon">U</span>
+              <span className="wiki-fact-icon">
+                <Users aria-hidden="true" size={16} strokeWidth={2} />
+              </span>
               <div>
                 <small>Known Users</small>
                 <strong>{knownUsers.length}</strong>
               </div>
             </div>
             <div className="wiki-fact">
-              <span className="wiki-fact-icon">B</span>
+              <span className="wiki-fact-icon">
+                <BookOpen aria-hidden="true" size={16} strokeWidth={2} />
+              </span>
               <div>
                 <small>First Evidence</small>
                 <strong>{chapterLabel(skill.evidence?.[0]?.chapter)}</strong>
               </div>
             </div>
             <div className="wiki-fact">
-              <span className="wiki-fact-icon">A</span>
+              <span className="wiki-fact-icon">
+                <Tags aria-hidden="true" size={16} strokeWidth={2} />
+              </span>
               <div>
                 <small>Aliases</small>
                 <strong>
@@ -90,32 +98,23 @@ export default function WikiSkillPage({ onSelectCharacter, relatedSkills = [], s
           <section className="wiki-card">
             <h2>Known Users</h2>
             {knownUsers.length === 0 ? <p>No approved known users yet.</p> : null}
-            {knownUsers.map((relationship) => (
-              <button
-                className="wiki-related-row"
-                key={relationship.id}
-                type="button"
-                onClick={() => onSelectCharacter(relationship.character)}
-              >
-                <WikiAvatar name={relationship.character.name} size="small" />
-                <span>{relationship.character.name}</span>
-                <small>{relationshipLabel(relationship)}</small>
-              </button>
-            ))}
-          </section>
+            {knownUsers.map((relationship) => {
+              const chapter = chapterLabel(relationship.chapter);
 
-          <section className="wiki-card">
-            <h2>Related Skills</h2>
-            {relatedSkills.length === 0 ? <p>No related skills yet.</p> : null}
-            {relatedSkills
-              .filter((related) => related.id !== skill.id)
-              .slice(0, 3)
-              .map((related) => (
-                <div className="wiki-mini-link" key={related.id}>
-                  <strong>{related.name}</strong>
-                  <span>{related.category || "Skill"}</span>
-                </div>
-              ))}
+              return (
+                <button
+                  className="wiki-related-row"
+                  key={relationship.id}
+                  type="button"
+                  onClick={() => onSelectCharacter(relationship.character)}
+                >
+                  <WikiAvatar name={relationship.character.name} size="small" />
+                  <span>{relationship.character.name}</span>
+                  <small title={chapter}>{chapter}</small>
+                  <span className="wiki-row-action">›</span>
+                </button>
+              );
+            })}
           </section>
         </div>
       </section>

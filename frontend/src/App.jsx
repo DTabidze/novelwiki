@@ -166,6 +166,31 @@ export default function App() {
           }
         />
         <Route
+          path="/wiki/novels/:novelId/search"
+          element={
+            <WikiNovelRoute
+              characters={wikiCharacters}
+              items={wikiItems}
+              loadCharacter={loadWikiCharacter}
+              loadItem={loadWikiItem}
+              loadSkill={loadWikiSkill}
+              loading={wikiLoading}
+              loadNovel={loadWikiNovel}
+              novel={wikiNovel}
+              novels={wikiNovels}
+              onOpenAdmin={() => navigate("/admin")}
+              page="Search"
+              progressionEvents={wikiProgressionEvents}
+              selectedCharacter={null}
+              selectedItem={null}
+              selectedNovelId={wikiSelectedNovelId}
+              selectedSkill={null}
+              setMessage={setMessage}
+              skills={wikiSkills}
+            />
+          }
+        />
+        <Route
           path="/wiki/novels/:novelId/characters"
           element={
             <WikiNovelRoute

@@ -1,4 +1,5 @@
 import React from "react";
+import { Search } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { formatNumber } from "../../utils/wikiFormat.js";
@@ -205,12 +206,15 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
           <p>{formatNumber(filteredItems.length)} items</p>
         </div>
         <div className="wiki-cultivation-tools single">
-          <input
-            type="search"
-            value={search}
-            placeholder="Search items..."
-            onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
-          />
+          <label className="wiki-local-search-field">
+            <Search aria-hidden="true" size={18} />
+            <input
+              type="search"
+              value={search}
+              placeholder="Search items..."
+              onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
+            />
+          </label>
         </div>
       </header>
 

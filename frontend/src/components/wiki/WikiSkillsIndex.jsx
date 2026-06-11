@@ -1,4 +1,5 @@
 import React from "react";
+import { Search } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { chapterLabel, formatNumber } from "../../utils/wikiFormat.js";
@@ -20,6 +21,14 @@ const SKILL_CATEGORIES = [
 ];
 
 const PAGE_SIZE = 20;
+
+export function skillCategoryClass(category) {
+  return String(category || "skill")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "skill";
+}
 
 function skillChapter(skill, characterId) {
   const characterRelationship = characterId
@@ -142,12 +151,15 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
           <p>{formatNumber(filteredSkills.length)} skills</p>
         </div>
         <div className="wiki-cultivation-tools">
-          <input
-            type="search"
-            value={search}
-            placeholder="Search skills..."
-            onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
-          />
+          <label className="wiki-local-search-field">
+            <Search aria-hidden="true" size={18} />
+            <input
+              type="search"
+              value={search}
+              placeholder="Search skills..."
+              onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
+            />
+          </label>
           <select
             aria-label="Skill category"
             value={category}
@@ -249,7 +261,9 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
               <span className="wiki-skill-icon small">S</span>
               <span className="wiki-skill-index-main">
                 <strong>{skill.name}</strong>
-                <small>{skill.category || "Skill"}</small>
+                <small className={`wiki-type-badge skill ${skillCategoryClass(skill.category)}`}>
+                  {skill.category || "Skill"}
+                </small>
               </span>
               <span className="wiki-skill-index-description">{description}</span>
               <span className="wiki-skill-index-chapter">

@@ -1,4 +1,5 @@
 import React from "react";
+import { Search } from "lucide-react";
 import { formatNumber } from "../../utils/wikiFormat.js";
 
 const ITEM_TYPES = [
@@ -138,12 +139,15 @@ export default function WikiEntityBrowser({ entities, iconLabel, onSelectEntity,
           </p>
         </div>
         <div className="wiki-cultivation-tools single">
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder={`Search ${entityLabel}...`}
-          />
+          <label className="wiki-local-search-field">
+            <Search aria-hidden="true" size={18} />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder={`Search ${entityLabel}...`}
+            />
+          </label>
         </div>
       </section>
 
