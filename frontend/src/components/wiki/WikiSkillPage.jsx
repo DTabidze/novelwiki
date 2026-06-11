@@ -1,10 +1,38 @@
 import React from "react";
-import { BookOpen, Sparkles, Tags, Users } from "lucide-react";
+import { BookOpen, FileText, Tags, Users } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
-import { WikiEvidence } from "./WikiDetailPages.jsx";
-import { chapterLabel, relationshipLabel } from "../../utils/wikiFormat.js";
+import { skillCategoryClass } from "./WikiSkillsIndex.jsx";
+import { chapterLabel, initialsForName, relationshipLabel } from "../../utils/wikiFormat.js";
+
+function compactEvidence(text, limit = 150) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, limit - 3).trim()}...`;
+}
+
+function chapterNumber(chapter) {
+  return Number(chapter?.chapter_number) || Number.MAX_SAFE_INTEGER;
+}
+
+function chapterBadge(chapter) {
+  return chapter?.chapter_number ? `Ch. ${chapter.chapter_number}` : "Ch. ?";
+}
+
+function firstChapter(...rows) {
+  return rows
+    .flat()
+    .map((row) => row?.chapter || row?.first_seen_chapter)
+    .filter(Boolean)
+    .sort((first, second) => chapterNumber(first) - chapterNumber(second))[0];
+}
 
 export default function WikiSkillPage({ onSelectCharacter, skill }) {
+  const [showAllTimeline, setShowAllTimeline] = React.useState(false);
+
   if (!skill) {
     return (
       <section className="wiki-empty-panel">
@@ -15,108 +43,201 @@ export default function WikiSkillPage({ onSelectCharacter, skill }) {
   }
 
   const knownUsers = (skill.characters || []).filter((relationship) => relationship.character);
+  const aliases = skill.aliases || [];
+  const evidence = skill.evidence || [];
+  const firstSeenChapter = firstChapter(knownUsers, aliases, evidence);
+  const timelineRows = [
+    ...knownUsers.map((relationship) => ({
+      id: `relationship-${relationship.id}`,
+      chapter: relationship.chapter,
+      summary: relationship.description || relationshipLabel(relationship),
+      evidence: relationship.evidence?.[0]?.evidence_text || "",
+    })),
+    ...evidence.map((row) => ({
+      id: `evidence-${row.id}`,
+      chapter: row.chapter,
+      summary: `${skill.name} is mentioned in the source text.`,
+      evidence: row.evidence_text,
+    })),
+  ]
+    .filter((row) => row.chapter || row.summary || row.evidence)
+    .sort((first, second) => chapterNumber(first.chapter) - chapterNumber(second.chapter));
+  const visibleTimelineRows = showAllTimeline ? timelineRows : timelineRows.slice(0, 4);
+  const skillBadgeClass = `wiki-type-badge skill ${skillCategoryClass(skill.category)}`;
 
   return (
-    <article className="wiki-entity-page">
-      <section className="wiki-entity-hero skill">
-        <div className="wiki-entity-art">
-          <WikiAvatar name={skill.name} />
+    <article className="wiki-skill-detail-page">
+      <section className="wiki-skill-hero-card">
+        <div className="wiki-skill-hero-art">
+          <div className="wiki-skill-hero-avatar">
+            <span>{initialsForName(skill.name)}</span>
+          </div>
         </div>
-        <div className="wiki-entity-main">
-          <div className="wiki-title-row">
-            <h1>{skill.name}</h1>
-          </div>
 
-          <div className="wiki-fact-grid">
-            <div className="wiki-fact">
-              <span className="wiki-fact-icon">
-                <Sparkles aria-hidden="true" size={16} strokeWidth={2} />
-              </span>
-              <div>
-                <small>Skill Type</small>
-                <strong>{skill.category || "Technique"}</strong>
-              </div>
-            </div>
-            <div className="wiki-fact">
-              <span className="wiki-fact-icon">
-                <Users aria-hidden="true" size={16} strokeWidth={2} />
-              </span>
-              <div>
-                <small>Known Users</small>
-                <strong>{knownUsers.length}</strong>
-              </div>
-            </div>
-            <div className="wiki-fact">
-              <span className="wiki-fact-icon">
-                <BookOpen aria-hidden="true" size={16} strokeWidth={2} />
-              </span>
-              <div>
-                <small>First Evidence</small>
-                <strong>{chapterLabel(skill.evidence?.[0]?.chapter)}</strong>
-              </div>
-            </div>
-            <div className="wiki-fact">
-              <span className="wiki-fact-icon">
-                <Tags aria-hidden="true" size={16} strokeWidth={2} />
-              </span>
-              <div>
+        <div className="wiki-skill-hero-main">
+          <h1>{skill.name}</h1>
+          {skill.category ? <span className={skillBadgeClass}>{skill.category}</span> : null}
+          {skill.description ? <p>{skill.description}</p> : null}
+
+          <div className="wiki-skill-stat-grid">
+            <span>
+              <Users aria-hidden="true" size={18} strokeWidth={2} />
+              <strong>{knownUsers.length}</strong>
+              <small>Known Users</small>
+            </span>
+            {aliases.length ? (
+              <span>
+                <Tags aria-hidden="true" size={18} strokeWidth={2} />
+                <strong>{aliases.length}</strong>
                 <small>Aliases</small>
-                <strong>
-                  {skill.aliases && skill.aliases.length > 0
-                    ? skill.aliases.map((alias) => alias.alias).join(", ")
-                    : "N/A"}
-                </strong>
-              </div>
-            </div>
+              </span>
+            ) : null}
+            {evidence.length ? (
+              <span>
+                <FileText aria-hidden="true" size={18} strokeWidth={2} />
+                <strong>{evidence.length}</strong>
+                <small>Evidence Records</small>
+              </span>
+            ) : null}
+            {firstSeenChapter ? (
+              <span>
+                <BookOpen aria-hidden="true" size={18} strokeWidth={2} />
+                <strong>Chapter {firstSeenChapter.chapter_number}</strong>
+                <small>First Seen</small>
+              </span>
+            ) : null}
           </div>
-
-          {skill.description ? <p className="wiki-description">{skill.description}</p> : null}
         </div>
       </section>
 
-      <section className="wiki-content-grid">
-        <div className="wiki-card wiki-progression-card">
-          <h2>Evidence & Usage</h2>
-          <WikiEvidence evidence={skill.evidence} />
-          {knownUsers.length > 0 ? (
-            <div className="wiki-usage-list">
-              {knownUsers.map((relationship) => (
-                <article className="wiki-usage-row" key={relationship.id}>
-                  <span className="wiki-timeline-dot" />
-                  <div>
-                    <small>{chapterLabel(relationship.chapter)}</small>
-                    <strong>{relationshipLabel(relationship)}</strong>
-                    {relationship.description ? <p>{relationship.description}</p> : null}
-                  </div>
-                </article>
-              ))}
-            </div>
+      <section className="wiki-card wiki-skill-section-card">
+        <div className="wiki-card-heading">
+          <h2>Known Users</h2>
+          {knownUsers.length ? (
+            <button className="wiki-text-link" type="button">
+              View all users <span aria-hidden="true">→</span>
+            </button>
           ) : null}
         </div>
 
-        <div className="wiki-side-stack">
-          <section className="wiki-card">
-            <h2>Known Users</h2>
-            {knownUsers.length === 0 ? <p>No approved known users yet.</p> : null}
+        {knownUsers.length ? (
+          <div className="wiki-skill-known-users">
             {knownUsers.map((relationship) => {
               const chapter = chapterLabel(relationship.chapter);
 
               return (
                 <button
-                  className="wiki-related-row"
+                  className="wiki-skill-known-user-row"
                   key={relationship.id}
                   type="button"
                   onClick={() => onSelectCharacter(relationship.character)}
                 >
                   <WikiAvatar name={relationship.character.name} size="small" />
-                  <span>{relationship.character.name}</span>
-                  <small title={chapter}>{chapter}</small>
+                  <span>
+                    <strong>{relationship.character.name}</strong>
+                    {relationship.description ? <small>{relationship.description}</small> : null}
+                  </span>
+                  <span className="wiki-skill-row-chapter" title={chapter}>{chapter}</span>
                   <span className="wiki-row-action">›</span>
                 </button>
               );
             })}
-          </section>
+          </div>
+        ) : (
+          <p className="wiki-muted-copy">No approved known users yet.</p>
+        )}
+      </section>
+
+      {aliases.length ? (
+        <section className="wiki-card wiki-skill-section-card">
+          <div className="wiki-card-heading">
+            <h2>Aliases ({aliases.length})</h2>
+            <button className="wiki-text-link" type="button">
+              View all aliases <span aria-hidden="true">→</span>
+            </button>
+          </div>
+
+          <div className="wiki-skill-alias-list">
+            {aliases.map((alias) => {
+              const firstSeen = alias.first_seen_chapter ? chapterLabel(alias.first_seen_chapter) : "";
+
+              return (
+                <article className="wiki-skill-alias-row" key={alias.id}>
+                  <span className="wiki-skill-alias-icon">
+                    <BookOpen aria-hidden="true" size={18} strokeWidth={2} />
+                  </span>
+                  <strong>{alias.alias}</strong>
+                  <span>{firstSeen ? `First seen in ${firstSeen}` : ""}</span>
+                  <span className="wiki-row-action">›</span>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="wiki-card wiki-skill-section-card">
+        <div className="wiki-card-heading">
+          <h2>Usage Timeline</h2>
+          {timelineRows.length ? (
+            <button className="wiki-text-link" type="button">
+              View full timeline <span aria-hidden="true">→</span>
+            </button>
+          ) : null}
         </div>
+
+        {visibleTimelineRows.length ? (
+          <div className="wiki-skill-timeline">
+            {visibleTimelineRows.map((row) => (
+              <article className="wiki-skill-timeline-row" key={row.id}>
+                <span className="wiki-skill-timeline-dot" />
+                <div>
+                  <small>{chapterLabel(row.chapter)}</small>
+                  {row.summary ? <strong>{row.summary}</strong> : null}
+                  {row.evidence ? <p>"{compactEvidence(row.evidence)}"</p> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="wiki-muted-copy">No usage timeline records yet.</p>
+        )}
+
+        {timelineRows.length > 4 ? (
+          <button
+            className="wiki-outline-link wiki-skill-timeline-toggle"
+            type="button"
+            onClick={() => setShowAllTimeline((visible) => !visible)}
+          >
+            {showAllTimeline ? "Show fewer timeline records" : `View all ${timelineRows.length} timeline records`}
+            <span aria-hidden="true">⌄</span>
+          </button>
+        ) : null}
+      </section>
+
+      <section className="wiki-card wiki-evidence-list-card">
+        <div className="wiki-card-heading">
+          <h2>Evidence Highlights</h2>
+          {evidence.length ? (
+            <button className="wiki-text-link" type="button">
+              View all evidence <span aria-hidden="true">→</span>
+            </button>
+          ) : null}
+        </div>
+
+        {evidence.length ? (
+          <div className="wiki-evidence-compact-list">
+            {evidence.slice(0, 5).map((row) => (
+              <article className="wiki-evidence-compact-row" key={row.id}>
+                <span>{chapterBadge(row.chapter)}</span>
+                <p>"{compactEvidence(row.evidence_text)}"</p>
+                <span className="wiki-row-action">›</span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="wiki-muted-copy">No evidence snippets recorded yet.</p>
+        )}
       </section>
     </article>
   );
