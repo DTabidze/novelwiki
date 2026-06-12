@@ -6,9 +6,9 @@ import {
   formatCultivationValue,
   formatNumber,
   initialsForName,
+  skillCategoryClass,
 } from "../../utils/wikiFormat.js";
-import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemsIndex.jsx";
-import { skillCategoryClass } from "./WikiSkillsIndex.jsx";
+import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
 
 const SEARCH_TABS = [
   { id: "all", label: "All", Icon: Layers3 },

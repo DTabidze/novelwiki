@@ -1,34 +1,16 @@
 import React from "react";
 import { BookOpen, FileText, Tags, Users } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
-import { skillCategoryClass } from "./WikiSkillsIndex.jsx";
-import { chapterLabel, initialsForName, relationshipLabel } from "../../utils/wikiFormat.js";
-
-function compactEvidence(text, limit = 150) {
-  const normalized = String(text || "").replace(/\s+/g, " ").trim();
-
-  if (normalized.length <= limit) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, limit - 3).trim()}...`;
-}
-
-function chapterNumber(chapter) {
-  return Number(chapter?.chapter_number) || Number.MAX_SAFE_INTEGER;
-}
-
-function chapterBadge(chapter) {
-  return chapter?.chapter_number ? `Ch. ${chapter.chapter_number}` : "Ch. ?";
-}
-
-function firstChapter(...rows) {
-  return rows
-    .flat()
-    .map((row) => row?.chapter || row?.first_seen_chapter)
-    .filter(Boolean)
-    .sort((first, second) => chapterNumber(first) - chapterNumber(second))[0];
-}
+import {
+  chapterBadge,
+  chapterLabel,
+  chapterNumberValue,
+  compactEvidence,
+  firstChapterFromRows,
+  initialsForName,
+  relationshipLabel,
+  skillCategoryClass,
+} from "../../utils/wikiFormat.js";
 
 export default function WikiSkillPage({ onSelectCharacter, skill }) {
   const [showAllTimeline, setShowAllTimeline] = React.useState(false);
@@ -45,7 +27,7 @@ export default function WikiSkillPage({ onSelectCharacter, skill }) {
   const knownUsers = (skill.characters || []).filter((relationship) => relationship.character);
   const aliases = skill.aliases || [];
   const evidence = skill.evidence || [];
-  const firstSeenChapter = firstChapter(knownUsers, aliases, evidence);
+  const firstSeenChapter = firstChapterFromRows(knownUsers, aliases, evidence);
   const timelineRows = [
     ...knownUsers.map((relationship) => ({
       id: `relationship-${relationship.id}`,
@@ -61,7 +43,7 @@ export default function WikiSkillPage({ onSelectCharacter, skill }) {
     })),
   ]
     .filter((row) => row.chapter || row.summary || row.evidence)
-    .sort((first, second) => chapterNumber(first.chapter) - chapterNumber(second.chapter));
+    .sort((first, second) => chapterNumberValue(first.chapter) - chapterNumberValue(second.chapter));
   const visibleTimelineRows = showAllTimeline ? timelineRows : timelineRows.slice(0, 4);
   const skillBadgeClass = `wiki-type-badge skill ${skillCategoryClass(skill.category)}`;
 
@@ -151,7 +133,7 @@ export default function WikiSkillPage({ onSelectCharacter, skill }) {
       {aliases.length ? (
         <section className="wiki-card wiki-skill-section-card">
           <div className="wiki-card-heading">
-            <h2>Aliases ({aliases.length})</h2>
+            <h2>Aliases</h2>
             <button className="wiki-text-link" type="button">
               View all aliases <span aria-hidden="true">→</span>
             </button>

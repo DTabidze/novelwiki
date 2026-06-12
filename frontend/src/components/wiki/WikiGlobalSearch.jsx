@@ -9,9 +9,8 @@ import {
   Users,
 } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { formatCultivationValue, initialsForName } from "../../utils/wikiFormat.js";
-import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemsIndex.jsx";
-import { skillCategoryClass } from "./WikiSkillsIndex.jsx";
+import { formatCultivationValue, initialsForName, skillCategoryClass } from "../../utils/wikiFormat.js";
+import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
 
 const TABS = [
   { id: "all", label: "All", Icon: Layers3 },

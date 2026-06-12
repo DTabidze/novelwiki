@@ -4042,8 +4042,18 @@ button:disabled {
 }
 
 .wiki-character-hero-badges .status {
+  background: #eef2f6;
+  color: #52637f;
+}
+
+.wiki-character-hero-badges .status.alive {
   background: #ecfdf5;
   color: #047857;
+}
+
+.wiki-character-hero-badges .status.dead {
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .wiki-character-hero-badges .species {
@@ -4211,6 +4221,75 @@ button:disabled {
 .wiki-quick-fact-row .wiki-fact-icon {
   width: 26px;
   height: 26px;
+  background: #eef2ff;
+}
+
+.wiki-quick-fact-row.status.alive .wiki-fact-icon,
+.wiki-quick-fact-row.status.alive strong {
+  color: #047857;
+}
+
+.wiki-quick-fact-row.status.alive .wiki-fact-icon {
+  background: #ecfdf5;
+}
+
+.wiki-quick-fact-row.status.dead .wiki-fact-icon,
+.wiki-quick-fact-row.status.dead strong {
+  color: #b91c1c;
+}
+
+.wiki-quick-fact-row.status.dead .wiki-fact-icon {
+  background: #fef2f2;
+}
+
+.wiki-quick-fact-row.gender .wiki-fact-icon,
+.wiki-quick-fact-row.gender strong,
+.wiki-quick-fact-row.species .wiki-fact-icon,
+.wiki-quick-fact-row.species strong {
+  color: #1554d1;
+}
+
+.wiki-quick-fact-row.gender .wiki-fact-icon,
+.wiki-quick-fact-row.species .wiki-fact-icon {
+  background: #eff6ff;
+}
+
+.wiki-quick-fact-row.affiliation .wiki-fact-icon,
+.wiki-quick-fact-row.affiliation strong,
+.wiki-quick-fact-row.title .wiki-fact-icon,
+.wiki-quick-fact-row.title strong {
+  color: #6d28d9;
+}
+
+.wiki-quick-fact-row.affiliation .wiki-fact-icon,
+.wiki-quick-fact-row.title .wiki-fact-icon {
+  background: #f5f3ff;
+}
+
+.wiki-quick-fact-row.origin .wiki-fact-icon,
+.wiki-quick-fact-row.origin strong {
+  color: #15803d;
+}
+
+.wiki-quick-fact-row.origin .wiki-fact-icon {
+  background: #f0fdf4;
+}
+
+.wiki-quick-fact-row.age .wiki-fact-icon,
+.wiki-quick-fact-row.age strong {
+  color: #c26a00;
+}
+
+.wiki-quick-fact-row.age .wiki-fact-icon {
+  background: #fff7ed;
+}
+
+.wiki-quick-fact-row.chapter .wiki-fact-icon,
+.wiki-quick-fact-row.chapter strong {
+  color: #4f46e5;
+}
+
+.wiki-quick-fact-row.chapter .wiki-fact-icon {
   background: #eef2ff;
 }
 

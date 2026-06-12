@@ -1,44 +1,16 @@
 import React from "react";
 import { BookOpen, FileText, Users } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
-import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemsIndex.jsx";
-import { chapterLabel, initialsForName } from "../../utils/wikiFormat.js";
-
-function compactEvidence(text, limit = 150) {
-  const normalized = String(text || "").replace(/\s+/g, " ").trim();
-
-  if (normalized.length <= limit) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, limit - 3).trim()}...`;
-}
-
-function chapterNumber(chapter) {
-  return Number(chapter?.chapter_number) || Number.MAX_SAFE_INTEGER;
-}
-
-function chapterBadge(chapter) {
-  return chapter?.chapter_number ? `Ch. ${chapter.chapter_number}` : "Ch. ?";
-}
-
-function firstChapter(...rows) {
-  return rows
-    .flat()
-    .map((row) => row?.chapter)
-    .filter(Boolean)
-    .sort((first, second) => chapterNumber(first) - chapterNumber(second))[0];
-}
-
-function relationshipTypeLabel(type) {
-  const normalized = String(type || "").replace(/_/g, " ").trim();
-
-  if (!normalized) {
-    return "";
-  }
-
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
+import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
+import {
+  chapterBadge,
+  chapterLabel,
+  chapterNumberValue,
+  compactEvidence,
+  firstChapterFromRows,
+  initialsForName,
+  relationshipTypeLabel,
+} from "../../utils/wikiFormat.js";
 
 export default function WikiItemPage({ item, onSelectCharacter }) {
   const [showAllTimeline, setShowAllTimeline] = React.useState(false);
@@ -57,7 +29,7 @@ export default function WikiItemPage({ item, onSelectCharacter }) {
   );
   const evidence = item.evidence || [];
   const itemType = itemTypeFor(item);
-  const firstSeenChapter = firstChapter(relatedCharacters, evidence);
+  const firstSeenChapter = firstChapterFromRows(relatedCharacters, evidence);
   const timelineRows = [
     ...relatedCharacters.map((relationship) => ({
       id: `relationship-${relationship.id}`,
@@ -73,7 +45,7 @@ export default function WikiItemPage({ item, onSelectCharacter }) {
     })),
   ]
     .filter((row) => row.chapter || row.summary || row.evidence)
-    .sort((first, second) => chapterNumber(first.chapter) - chapterNumber(second.chapter));
+    .sort((first, second) => chapterNumberValue(first.chapter) - chapterNumberValue(second.chapter));
   const visibleTimelineRows = showAllTimeline ? timelineRows : timelineRows.slice(0, 4);
 
   return (

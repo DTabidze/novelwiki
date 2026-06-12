@@ -14,14 +14,14 @@ import {
   Zap,
 } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
-import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemsIndex.jsx";
-import { skillCategoryClass } from "./WikiSkillsIndex.jsx";
+import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
 import {
   chapterLabel,
   cleanChapterTitle,
   firstDescriptionChunk,
   formatCultivationValue,
   formatMetadataValue,
+  skillCategoryClass,
 } from "../../utils/wikiFormat.js";
 
 export default function WikiCharacterDetail({
@@ -68,7 +68,7 @@ export default function WikiCharacterDetail({
     ? `${aboutText.slice(0, 400).trim()}...`
     : aboutText;
   const heroBadges = [
-    { className: "status", value: formatMetadataValue(character.status, "status") },
+    { className: statusBadgeClass(character.status), value: formatMetadataValue(character.status, "status") },
     { className: "species", value: formatMetadataValue(character.race_or_species, "race_or_species") },
     { className: "position", value: formatMetadataValue(character.current_position, "current_position") },
     { className: "cultivation", value: currentCultivation },
@@ -78,15 +78,15 @@ export default function WikiCharacterDetail({
     { Icon: MapPin, value: formatMetadataValue(character.origin, "origin") },
   ].filter((row) => row.value && !isUnknown(row.value));
   const quickFacts = [
-    { Icon: BadgeCheck, label: "Status", value: formatMetadataValue(character.status, "status") },
-    { Icon: UserRound, label: "Gender", value: formatMetadataValue(character.gender, "gender") },
-    { Icon: Dna, label: "Race / Species", value: formatMetadataValue(character.race_or_species, "race_or_species") },
-    { Icon: Building2, label: "Affiliation", value: formatMetadataValue(character.faction_or_affiliation, "faction_or_affiliation") },
-    { Icon: MapPin, label: "Origin", value: formatMetadataValue(character.origin, "origin") },
-    { Icon: Calendar, label: "Age", value: formatMetadataValue(character.age_text, "age_text") },
-    { Icon: BookOpen, label: "First Appeared", value: chapterLabel(character.first_appeared_chapter) },
-    { Icon: BookOpen, label: "First Mentioned", value: chapterLabel(character.first_mentioned_chapter) },
-    { Icon: Crown, label: "Latest Title", value: formatMetadataValue(latestTitle, "titles") },
+    { Icon: BadgeCheck, className: statusBadgeClass(character.status), label: "Status", value: formatMetadataValue(character.status, "status") },
+    { Icon: UserRound, className: "gender", label: "Gender", value: formatMetadataValue(character.gender, "gender") },
+    { Icon: Dna, className: "species", label: "Race / Species", value: formatMetadataValue(character.race_or_species, "race_or_species") },
+    { Icon: Building2, className: "affiliation", label: "Affiliation", value: formatMetadataValue(character.faction_or_affiliation, "faction_or_affiliation") },
+    { Icon: MapPin, className: "origin", label: "Origin", value: formatMetadataValue(character.origin, "origin") },
+    { Icon: Calendar, className: "age", label: "Age", value: formatMetadataValue(character.age_text, "age_text") },
+    { Icon: BookOpen, className: "chapter", label: "First Appeared", value: chapterLabel(character.first_appeared_chapter) },
+    { Icon: BookOpen, className: "chapter", label: "First Mentioned", value: chapterLabel(character.first_mentioned_chapter) },
+    { Icon: Crown, className: "title", label: "Latest Title", value: formatMetadataValue(latestTitle, "titles") },
   ].filter((fact) => fact.value && !isUnknown(fact.value));
 
   function shortEvidence(text) {
@@ -108,6 +108,20 @@ export default function WikiCharacterDetail({
 
   function isUnknown(value) {
     return !value || /^unknown/i.test(String(value).trim());
+  }
+
+  function statusBadgeClass(status) {
+    const normalized = String(status || "").trim().toLowerCase();
+
+    if (["dead", "deceased", "died"].includes(normalized)) {
+      return "status dead";
+    }
+
+    if (normalized === "alive") {
+      return "status alive";
+    }
+
+    return "status";
   }
 
   function relationshipChapter(relationship) {
@@ -218,7 +232,7 @@ export default function WikiCharacterDetail({
           <h2>Quick Facts</h2>
           <div className="wiki-quick-facts-list">
             {quickFacts.map(({ Icon, ...fact }) => (
-              <div className="wiki-quick-fact-row" key={fact.label}>
+              <div className={`wiki-quick-fact-row ${fact.className || ""}`} key={fact.label}>
                 <span className="wiki-fact-icon">
                   <Icon aria-hidden="true" size={16} strokeWidth={2} />
                 </span>

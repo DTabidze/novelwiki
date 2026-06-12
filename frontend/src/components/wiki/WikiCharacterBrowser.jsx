@@ -36,6 +36,28 @@ function isUnknown(value) {
   return !value || /^unknown/i.test(String(value).trim());
 }
 
+function normalizedStatus(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (["dead", "deceased", "died"].includes(normalized)) {
+    return "deceased";
+  }
+
+  return normalized;
+}
+
+function statusFilterLabel(value) {
+  if (normalizedStatus(value) === "deceased") {
+    return "Deceased";
+  }
+
+  if (normalizedStatus(value) === "alive") {
+    return "Alive";
+  }
+
+  return value;
+}
+
 function characterAffiliation(character) {
   const primary = character.faction_or_affiliation || character.origin;
   const parts = [character.current_position, primary]
@@ -89,7 +111,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
     const rows = characters
       .filter((character) => characterMatchesSearch(character, search))
       .filter((character) => gender === "all" || String(character.gender || "").toLowerCase() === gender)
-      .filter((character) => status === "all" || String(character.status || "").toLowerCase() === status)
+      .filter((character) => status === "all" || normalizedStatus(character.status) === normalizedStatus(status))
       .filter((character) => {
         const firstLetter = (character.name || "?").trim().slice(0, 1).toUpperCase();
         return letter === "All" || firstLetter === letter;
@@ -158,7 +180,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
           ) : null}
           {status !== "all" ? (
             <button type="button" onClick={() => updateFilters({ status: "all", page: 1 })}>
-              Status: {status} <span aria-hidden="true">x</span>
+              Status: {statusFilterLabel(status)} <span aria-hidden="true">x</span>
             </button>
           ) : null}
           <button className="clear" type="button" onClick={clearAllFilters}>Clear all</button>

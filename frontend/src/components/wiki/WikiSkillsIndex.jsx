@@ -2,7 +2,7 @@ import React from "react";
 import { Search } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import WikiAvatar from "./WikiAvatar.jsx";
-import { chapterLabel, formatNumber } from "../../utils/wikiFormat.js";
+import { chapterLabel, formatNumber, skillCategoryClass } from "../../utils/wikiFormat.js";
 
 const SKILL_CATEGORIES = [
   "Technique",
@@ -21,14 +21,6 @@ const SKILL_CATEGORIES = [
 ];
 
 const PAGE_SIZE = 20;
-
-export function skillCategoryClass(category) {
-  return String(category || "skill")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") || "skill";
-}
 
 function skillChapter(skill, characterId) {
   const characterRelationship = characterId
