@@ -27,6 +27,32 @@ export function chapterLabel(chapter) {
   return title ? `Chapter ${chapterNumber} - ${title}` : `Chapter ${chapterNumber}`;
 }
 
+export function chapterNumberValue(chapter) {
+  return Number(chapter?.chapter_number) || Number.MAX_SAFE_INTEGER;
+}
+
+export function chapterBadge(chapter) {
+  return chapter?.chapter_number ? `Ch. ${chapter.chapter_number}` : "Ch. ?";
+}
+
+export function firstChapterFromRows(...rows) {
+  return rows
+    .flat()
+    .map((row) => row?.chapter || row?.first_seen_chapter)
+    .filter(Boolean)
+    .sort((first, second) => chapterNumberValue(first) - chapterNumberValue(second))[0];
+}
+
+export function compactEvidence(text, limit = 150) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, limit - 3).trim()}...`;
+}
+
 export function cleanChapterTitle(chapter) {
   if (!chapter?.title) {
     return "";
@@ -44,6 +70,24 @@ export function relationshipLabel(relationship) {
     : "known";
   const chapter = relationship.chapter ? ` in Chapter ${relationship.chapter.chapter_number}` : "";
   return `${type.charAt(0).toUpperCase()}${type.slice(1)}${chapter}`;
+}
+
+export function relationshipTypeLabel(type) {
+  const normalized = String(type || "").replace(/_/g, " ").trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+export function skillCategoryClass(category) {
+  return String(category || "skill")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "skill";
 }
 
 export function formatNumber(value) {
