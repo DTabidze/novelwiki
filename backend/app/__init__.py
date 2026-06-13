@@ -166,6 +166,34 @@ def ensure_development_schema(app):
                 text("ALTER TABLE character_aliases ADD COLUMN is_primary BOOLEAN NOT NULL DEFAULT 0")
             )
 
+        connection.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS wiki_edit_logs ("
+                "id INTEGER PRIMARY KEY, "
+                "novel_id INTEGER NOT NULL, "
+                "entity_type VARCHAR(100) NOT NULL, "
+                "entity_id INTEGER, "
+                "entity_label VARCHAR(255) NOT NULL, "
+                "parent_entity_type VARCHAR(100), "
+                "parent_entity_id INTEGER, "
+                "change_type VARCHAR(50) NOT NULL, "
+                "field_name VARCHAR(100), "
+                "old_value_json TEXT, "
+                "new_value_json TEXT, "
+                "summary TEXT, "
+                "edited_by VARCHAR(255), "
+                "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                "FOREIGN KEY(novel_id) REFERENCES novels (id)"
+                ")"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_wiki_edit_logs_novel_created "
+                "ON wiki_edit_logs (novel_id, created_at)"
+            )
+        )
+
         character_skill_columns = connection.execute(
             text("PRAGMA table_info(character_skills)")
         ).fetchall()

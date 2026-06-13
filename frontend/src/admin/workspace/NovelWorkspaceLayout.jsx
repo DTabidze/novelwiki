@@ -4,6 +4,7 @@ import { API_BASE_URL, fetchJson } from "../../api.js";
 import BooksPage from "../books/BooksPage.jsx";
 import ChaptersPage from "../chapters/ChaptersPage.jsx";
 import EmptyState from "../components/EmptyState.jsx";
+import WikiEditLogPage from "../edit-log/WikiEditLogPage.jsx";
 import WikiDataEditorPage from "../editor/WikiDataEditorPage.jsx";
 import ExtractionPage from "../extraction/ExtractionPage.jsx";
 import EditNovelModal from "../novels/EditNovelModal.jsx";
@@ -367,6 +368,10 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
                 novel={novel}
               />
             }
+          />
+          <Route
+            path="edit-log"
+            element={<WikiEditLogPage novel={novel} />}
           />
           <Route path="*" element={<WorkspacePlaceholder title="Workspace Section" message="This section is not implemented yet." />} />
         </Routes>

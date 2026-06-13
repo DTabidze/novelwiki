@@ -1204,6 +1204,354 @@
   animation: editor-focus-flash 1.4s ease;
 }
 
+/* Wiki edit log */
+.edit-log-page {
+  min-height: 100%;
+}
+
+.edit-log-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 22px 32px 32px;
+}
+
+.edit-log-filter-panel {
+  padding: 16px;
+}
+
+.edit-log-filter-toggle {
+  display: none;
+}
+
+.edit-log-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+
+.edit-log-filter-bar label {
+  flex: 1 1 160px;
+  display: grid;
+  gap: 7px;
+  min-width: 150px;
+}
+
+.edit-log-filter-bar label > span {
+  color: #9fb0c5;
+  font-size: 0.79rem;
+  font-weight: 800;
+}
+
+.edit-log-search-field {
+  flex: 2 1 320px;
+  min-width: min(320px, 100%);
+}
+
+.edit-log-filter-bar > .admin-secondary-button {
+  flex: 0 1 160px;
+  min-width: 142px;
+  white-space: nowrap;
+}
+
+.edit-log-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 380px);
+  gap: 18px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.edit-log-main {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.edit-log-group {
+  display: grid;
+  gap: 12px;
+}
+
+.edit-log-group > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+.edit-log-group h2 {
+  margin: 0;
+  color: #dce8f7;
+  font-size: 0.98rem;
+}
+
+.edit-log-group > header span {
+  padding: 4px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 999px;
+  color: #9fb0c5;
+  background: rgba(148, 163, 184, 0.08);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.edit-log-row-list {
+  display: grid;
+  gap: 8px;
+}
+
+.edit-log-row {
+  display: grid;
+  grid-template-columns: 48px 86px minmax(150px, 0.95fr) minmax(240px, 1.65fr) 82px 24px;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  color: #d6e2f3;
+  background: rgba(8, 24, 39, 0.72);
+  text-align: left;
+  cursor: pointer;
+}
+
+.edit-log-row:hover,
+.edit-log-row.active {
+  border-color: rgba(124, 94, 255, 0.65);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(14, 47, 78, 0.72));
+}
+
+.edit-log-row-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  color: #c4b5fd;
+  background: rgba(109, 67, 255, 0.32);
+}
+
+.edit-log-row.added .edit-log-row-icon {
+  color: #9af5bd;
+  background: rgba(34, 197, 94, 0.24);
+}
+
+.edit-log-row.removed .edit-log-row-icon,
+.edit-log-row.deleted .edit-log-row-icon {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.24);
+}
+
+.edit-log-change-badge {
+  justify-self: start;
+  padding: 4px 10px;
+  border: 1px solid rgba(124, 94, 255, 0.35);
+  border-radius: 7px;
+  color: #c4b5fd;
+  background: rgba(109, 67, 255, 0.16);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.edit-log-change-badge.added,
+.edit-log-row.added .edit-log-change-badge {
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #86efac;
+  background: rgba(22, 163, 74, 0.16);
+}
+
+.edit-log-change-badge.removed,
+.edit-log-change-badge.deleted,
+.edit-log-row.removed .edit-log-change-badge,
+.edit-log-row.deleted .edit-log-change-badge {
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.16);
+}
+
+.edit-log-entity,
+.edit-log-admin {
+  display: grid;
+  gap: 4px;
+}
+
+.edit-log-entity strong,
+.edit-log-admin strong {
+  color: #f4f8ff;
+  font-size: 0.94rem;
+}
+
+.edit-log-entity small,
+.edit-log-admin small {
+  color: #9fb0c5;
+  font-size: 0.81rem;
+  font-weight: 750;
+}
+
+.edit-log-summary {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  color: #b8c7db;
+  font-weight: 750;
+}
+
+.edit-log-summary span,
+.edit-log-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.edit-log-summary strong {
+  color: #86efac;
+}
+
+.edit-log-row.removed .edit-log-summary strong,
+.edit-log-row.deleted .edit-log-summary strong {
+  color: #f87171;
+}
+
+.edit-log-row-chevron {
+  color: #8ea2bc;
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.edit-log-row:hover .edit-log-row-chevron,
+.edit-log-row.active .edit-log-row-chevron {
+  color: #c4b5fd;
+  transform: translateX(3px);
+}
+
+.edit-log-detail-panel {
+  position: sticky;
+  top: 22px;
+  display: grid;
+  gap: 18px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.edit-log-detail-panel header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.edit-log-detail-panel h2 {
+  margin: 0;
+  color: #f4f8ff;
+  font-size: 1.1rem;
+}
+
+.edit-log-detail-list {
+  display: grid;
+  gap: 0;
+}
+
+.edit-log-detail-row {
+  display: grid;
+  grid-template-columns: minmax(105px, 0.45fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.edit-log-detail-row > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #9fb0c5;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.edit-log-detail-row strong {
+  min-width: 0;
+  color: #eef5ff;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.edit-log-quick-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+}
+
+.edit-log-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0 0;
+  color: #9fb0c5;
+}
+
+.edit-log-pagination > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.edit-log-pagination button,
+.edit-log-pagination select {
+  min-height: 38px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  color: #dce8f7;
+  background: rgba(8, 24, 39, 0.72);
+  font-weight: 800;
+}
+
+.edit-log-pagination button {
+  min-width: 38px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.edit-log-pagination button.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #6d43ff, #3f5dd6);
+  border-color: rgba(124, 94, 255, 0.65);
+}
+
+.edit-log-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.edit-log-pagination p {
+  margin: 0 0 0 auto;
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
 @keyframes editor-focus-flash {
   0%,
   100% {
@@ -1473,9 +1821,189 @@
   }
 }
 
+@media (max-width: 1240px) {
+  .edit-log-page-body {
+    height: auto;
+    overflow-y: auto;
+  }
+
+  .edit-log-layout {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .edit-log-main {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .edit-log-detail-panel {
+    max-height: none;
+    overflow: visible;
+    position: static;
+  }
+}
+
 @media (max-width: 920px) {
-  .editor-page-body {
+  .editor-page-body,
+  .edit-log-page-body {
     padding: 18px;
+  }
+
+  .edit-log-filter-panel {
+    padding: 0;
+  }
+
+  .edit-log-filter-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    width: 100%;
+    min-height: 58px;
+    border: 0;
+    border-radius: 10px;
+    padding: 0 18px;
+    color: #f4f8ff;
+    background: transparent;
+    font-size: 1rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .edit-log-filter-toggle > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .edit-log-filter-toggle strong {
+    display: grid;
+    place-items: center;
+    min-width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #6d43ff, #3f5dd6);
+    font-size: 0.8rem;
+  }
+
+  .edit-log-filter-toggle > svg:last-child {
+    color: #9fb0c5;
+    transition: transform 160ms ease;
+  }
+
+  .edit-log-filter-panel.open .edit-log-filter-toggle > svg:last-child {
+    transform: rotate(180deg);
+  }
+
+  .edit-log-filter-bar {
+    align-items: stretch;
+    flex-direction: column;
+    display: none;
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
+    padding: 14px;
+  }
+
+  .edit-log-filter-panel.open .edit-log-filter-bar {
+    display: flex;
+  }
+
+  .edit-log-filter-bar label,
+  .edit-log-search-field,
+  .edit-log-filter-bar > .admin-secondary-button {
+    flex-basis: auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .edit-log-row {
+    grid-template-columns: 58px minmax(0, 1fr) 24px;
+    grid-template-areas:
+      "icon badge chevron"
+      ". entity chevron"
+      ". summary chevron"
+      ". admin chevron";
+    gap: 8px 14px;
+    align-items: start;
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .edit-log-row.active {
+    border-color: rgba(124, 94, 255, 0.56);
+    box-shadow: inset 3px 0 0 rgba(124, 94, 255, 0.9);
+  }
+
+  .edit-log-row-icon {
+    grid-area: icon;
+    width: 48px;
+    height: 48px;
+  }
+
+  .edit-log-change-badge {
+    grid-area: badge;
+    margin-top: 2px;
+  }
+
+  .edit-log-entity {
+    grid-area: entity;
+  }
+
+  .edit-log-entity strong {
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+  }
+
+  .edit-log-summary {
+    grid-area: summary;
+    align-items: flex-start;
+    line-height: 1.45;
+  }
+
+  .edit-log-summary span,
+  .edit-log-summary strong {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .edit-log-admin {
+    grid-area: admin;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 2px;
+  }
+
+  .edit-log-admin strong,
+  .edit-log-admin small {
+    font-size: 0.9rem;
+  }
+
+  .edit-log-admin strong::after {
+    content: "•";
+    margin-left: 8px;
+    color: #70839c;
+  }
+
+  .edit-log-row-chevron {
+    grid-area: chevron;
+    align-self: start;
+    margin-top: 13px;
+  }
+
+  .edit-log-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .edit-log-pagination > div {
+    flex-wrap: wrap;
+  }
+
+  .edit-log-pagination p {
+    margin: 0;
   }
 
   .editor-layout {
