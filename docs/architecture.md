@@ -35,7 +35,7 @@ Current API blueprints:
 
 - `health.py`: Health check endpoint.
 - `admin_novels.py`: Novel/book management, chapter listing, extraction run creation/cancel/resume, and admin data loading.
-- `admin_review.py`: Review updates, evidence context, metadata proposal approval, and character merge.
+- `admin_review.py`: Review updates, evidence context, metadata proposal approval, character merge, canonical Wiki Data Editor routes, and Wiki Edit Log routes. Route handlers should delegate domain behavior to services.
 - `wiki.py`: Approved public wiki data.
 
 ## Frontend Folders
@@ -79,6 +79,9 @@ Current backend service boundaries:
 - `ai_extraction_schemas.py`: JSON schema definitions for AI responses.
 - `skill_categories.py` / `item_categories.py`: Supported canonical category values for editor/API validation.
 - `wiki_editor_payloads.py`: Canonical Wiki Data Editor payload validation and relationship/alias update helpers.
+- `wiki_edit_logs.py`: Wiki Edit Log value normalization, snapshot diffing, edit-log row creation, parent-label enrichment, filtering, and pagination.
+- `wiki_admin_responses.py`: Admin/review/editor response serialization for canonical records, evidence, chapter references, aliases, and approved relationships.
+- `review_proposal_conversion.py`: Review proposal type conversion helpers for skill/item proposals, including evidence and relationship movement.
 - `metadata_normalization.py`: Field-specific normalization for metadata values.
 - `extraction/ai_client.py`: AI client setup and response parsing.
 - `extraction/memory.py`: Existing approved/pending wiki memory passed into extraction.
@@ -110,7 +113,11 @@ The Wiki Data Editor is the canonical-data editing surface for approved wiki rec
 - Review Queue edits AI-generated pending proposals before approval.
 - Wiki Data Editor edits approved records already used by public wiki pages.
 
-Backend routes live in `admin_review.py` under `/api/admin/review/wiki-data/*`. Route handlers should stay thin and delegate validation/payload application to `wiki_editor_payloads.py`.
+Backend routes live in `admin_review.py` under `/api/admin/review/wiki-data/*`. Route handlers should stay thin and delegate behavior to services:
+
+- `wiki_editor_payloads.py` validates and applies canonical editor payloads.
+- `wiki_admin_responses.py` builds the editor/review response shapes.
+- `wiki_edit_logs.py` records and queries canonical wiki-data changes.
 
 Frontend code lives under `frontend/src/admin/editor/`:
 
@@ -131,6 +138,32 @@ The editor keeps changes in local draft state until the admin confirms Save Chan
 Large canonical lists use a drawer/browser pattern. The entity list is secondary to the active editor panel, especially on laptop-width screens.
 
 Chapter references must save chapter IDs, not chapter numbers. The chapter picker resolves by chapter ID, chapter number, or search query through the backend chapter-search endpoint.
+
+## Wiki Edit Log Architecture
+
+The Wiki Edit Log is an admin audit surface for canonical wiki-data changes. It is separate from the editor so admins can review historical changes without opening an editable record.
+
+Backend route:
+
+- `GET /api/admin/review/wiki-data/novels/:novel_id/edit-log`
+
+The endpoint supports search, entity type, change type, date range, admin, page, and page-size filters. It returns grouped-ready log rows plus pagination metadata.
+
+Edit-log rows are written when canonical editor PATCH/direct alias endpoints commit approved-data changes. Logs capture:
+
+- operation: added, updated, or removed
+- edited context entity, such as character, skill, or item
+- changed record/value, such as alias text or linked character
+- field/type label
+- old and new values where applicable
+- parent entity IDs for contextual display and editor navigation
+- edited-by text, currently `Admin` until real user accounts exist
+
+Frontend route:
+
+- `/admin/novels/:novelId/edit-log`
+
+The desktop layout keeps filters and details visible while the log list scrolls. Medium and mobile layouts stack details below the list, and mobile rows render as compact activity-feed cards.
 
 ## Extraction Run Behavior
 
