@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   DatabaseZap,
   Files,
+  History,
   LayoutDashboard,
   ScanSearch,
   Settings,
@@ -28,6 +29,7 @@ const workspaceGroups = [
     "Wiki Data",
     [
       { label: "Editor", path: "editor", icon: DatabaseZap },
+      { label: "Edit Log", path: "edit-log", icon: History },
     ],
   ],
   [

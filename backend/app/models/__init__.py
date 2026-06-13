@@ -537,6 +537,51 @@ class WikiEvidence(db.Model):
         }
 
 
+class WikiEditLog(db.Model):
+    __tablename__ = "wiki_edit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    entity_type = db.Column(db.String(100), nullable=False)
+    entity_id = db.Column(db.Integer, nullable=True)
+    entity_label = db.Column(db.String(255), nullable=False)
+    parent_entity_type = db.Column(db.String(100), nullable=True)
+    parent_entity_id = db.Column(db.Integer, nullable=True)
+    change_type = db.Column(db.String(50), nullable=False)
+    field_name = db.Column(db.String(100), nullable=True)
+    old_value_json = db.Column(db.Text, nullable=True)
+    new_value_json = db.Column(db.Text, nullable=True)
+    summary = db.Column(db.Text, nullable=True)
+    edited_by = db.Column(db.String(255), nullable=True, default="Admin")
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    novel = db.relationship("Novel")
+
+    def old_value(self):
+        return json.loads(self.old_value_json) if self.old_value_json else None
+
+    def new_value(self):
+        return json.loads(self.new_value_json) if self.new_value_json else None
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "entity_label": self.entity_label,
+            "parent_entity_type": self.parent_entity_type,
+            "parent_entity_id": self.parent_entity_id,
+            "change_type": self.change_type,
+            "field_name": self.field_name,
+            "old_value": self.old_value(),
+            "new_value": self.new_value(),
+            "summary": self.summary,
+            "edited_by": self.edited_by,
+            "created_at": serialize_datetime(self.created_at),
+        }
+
+
 class CharacterProgressionEvent(ReviewMixin, db.Model):
     __tablename__ = "character_progression_events"
 

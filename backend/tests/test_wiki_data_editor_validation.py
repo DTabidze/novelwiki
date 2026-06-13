@@ -1,4 +1,5 @@
 import unittest
+from datetime import timedelta
 
 from flask import Flask
 from sqlalchemy.exc import IntegrityError
@@ -14,7 +15,9 @@ from app.models import (
     Novel,
     Skill,
     SkillAlias,
+    WikiEditLog,
     db,
+    utc_now,
 )
 
 
@@ -168,7 +171,125 @@ class WikiDataEditorValidationTest(unittest.TestCase):
         })
         self.assert_validation_error(response, "This character already has this alias.")
 
+    def test_patch_character_creates_wiki_edit_log(self):
+        response = self.patch_character({"status": "dead"})
+
+        self.assertEqual(response.status_code, 200)
+
+        logs = WikiEditLog.query.filter_by(novel_id=self.novel.id).all()
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0].entity_type, "character")
+        self.assertEqual(logs[0].change_type, "updated")
+        self.assertEqual(logs[0].field_name, "Status")
+        self.assertEqual(logs[0].old_value(), "unknown")
+        self.assertEqual(logs[0].new_value(), "dead")
+
+        response = self.client.get(
+            f"/api/admin/review/wiki-data/novels/{self.novel.id}/edit-log"
+        )
+        payload = response.get_json()["data"]
+        self.assertEqual(payload["pagination"]["total"], 1)
+        self.assertEqual(payload["logs"][0]["field_name"], "Status")
+
         self.assertEqual(CharacterAlias.query.count(), 0)
+
+    def test_patch_character_aliases_create_added_edit_log(self):
+        response = self.patch_character({
+            "aliases": [{
+                "alias": "Hao-ge",
+                "first_seen_chapter_id": self.chapter.id,
+            }],
+        })
+
+        self.assertEqual(response.status_code, 200)
+        log = WikiEditLog.query.filter_by(entity_type="alias").one()
+        self.assertEqual(log.change_type, "added")
+        self.assertEqual(log.entity_label, "Meng Hao")
+        self.assertEqual(log.field_name, "Alias")
+        self.assertEqual(log.new_value(), "Hao-ge")
+
+        response = self.client.get(
+            f"/api/admin/review/wiki-data/novels/{self.novel.id}/edit-log"
+        )
+        self.assertEqual(response.get_json()["data"]["logs"][0]["parent_entity_label"], "Meng Hao")
+
+    def test_patch_skill_aliases_create_added_edit_log(self):
+        response = self.patch_skill({
+            "aliases": [{
+                "alias": "Blood Art",
+                "first_seen_chapter_id": self.chapter.id,
+            }],
+        })
+
+        self.assertEqual(response.status_code, 200)
+        log = WikiEditLog.query.filter_by(entity_type="skill_alias").one()
+        self.assertEqual(log.change_type, "added")
+        self.assertEqual(log.entity_label, "Blood Mastiff Art")
+        self.assertEqual(log.field_name, "Alias")
+        self.assertEqual(log.new_value(), "Blood Art")
+
+    def test_cultivation_update_log_uses_character_label(self):
+        event = CharacterProgressionEvent(
+            novel_id=self.novel.id,
+            character_id=self.character.id,
+            chapter_id=self.chapter.id,
+            progression_type="cultivation_level",
+            new_value="2nd lvl",
+            review_status="approved",
+        )
+        db.session.add(event)
+        db.session.commit()
+
+        response = self.patch_character({
+            "cultivation_events": [{
+                "id": event.id,
+                "cultivation_level": "2nd level of Qi Condensation",
+                "chapter_id": self.chapter.id,
+            }],
+        })
+
+        self.assertEqual(response.status_code, 200)
+        log = WikiEditLog.query.filter_by(entity_type="cultivation").one()
+        self.assertEqual(log.change_type, "updated")
+        self.assertEqual(log.entity_label, "Meng Hao")
+        self.assertEqual(log.field_name, "Cultivation Level")
+        self.assertEqual(log.old_value(), "2nd lvl")
+        self.assertEqual(log.new_value(), "2nd level of Qi Condensation")
+
+    def test_edit_log_date_filter_matches_recent_rows(self):
+        old_log = WikiEditLog(
+            novel_id=self.novel.id,
+            entity_type="character",
+            entity_id=self.character.id,
+            entity_label=self.character.name,
+            change_type="updated",
+            field_name="Status",
+            old_value_json='"alive"',
+            new_value_json='"dead"',
+            created_at=utc_now() - timedelta(days=20),
+        )
+        recent_log = WikiEditLog(
+            novel_id=self.novel.id,
+            entity_type="character",
+            entity_id=self.character.id,
+            entity_label=self.character.name,
+            change_type="updated",
+            field_name="Gender",
+            old_value_json='"unknown"',
+            new_value_json='"Male"',
+            created_at=utc_now(),
+        )
+        db.session.add_all([old_log, recent_log])
+        db.session.commit()
+
+        today = utc_now().date().isoformat()
+        response = self.client.get(
+            f"/api/admin/review/wiki-data/novels/{self.novel.id}/edit-log"
+            f"?date_from={today}&date_to={today}"
+        )
+        payload = response.get_json()["data"]
+        self.assertEqual(payload["pagination"]["total"], 1)
+        self.assertEqual(payload["logs"][0]["field_name"], "Gender")
 
     def test_rejects_multiple_primary_aliases(self):
         response = self.patch_character({
