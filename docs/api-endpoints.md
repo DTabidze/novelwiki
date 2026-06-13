@@ -94,6 +94,7 @@ These endpoints edit canonical approved wiki data, not pending Review Queue prop
 | GET | `/api/admin/review/wiki-data/novels/:novel_id/skills?q=` | List approved skills with aliases, character links, and evidence |
 | GET | `/api/admin/review/wiki-data/novels/:novel_id/items?q=` | List approved items with character links and evidence |
 | GET | `/api/admin/review/wiki-data/novels/:novel_id/chapters/search?chapter_id=&number=&q=&limit=` | Resolve/search chapters for chapter reference pickers |
+| GET | `/api/admin/review/wiki-data/novels/:novel_id/edit-log` | List canonical wiki-data edit log rows with filters and pagination |
 | PATCH | `/api/admin/review/wiki-data/characters/:character_id` | Update an approved character and its aliases, cultivation events, skill links, and item links |
 | PATCH | `/api/admin/review/wiki-data/skills/:skill_id` | Update an approved skill and its aliases/character links |
 | PATCH | `/api/admin/review/wiki-data/items/:item_id` | Update an approved item and its character links |
@@ -113,6 +114,56 @@ Editor PATCH behavior:
 - PATCH responses return the updated editor record shape.
 
 The chapter search endpoint exists so the admin UI does not render huge chapter dropdowns for novels with hundreds or thousands of chapters.
+
+### Wiki Edit Log Query Parameters
+
+`GET /api/admin/review/wiki-data/novels/:novel_id/edit-log` supports:
+
+| Parameter | Purpose |
+| --- | --- |
+| `search` | Search entity labels, field names, summaries, and old/new values |
+| `entity_type` | Filter by entity/change context, for example `character`, `skill`, `item`, `alias`, `skill_alias`, `cultivation`, `character_skill`, or `character_item` |
+| `change_type` | Filter by `added`, `updated`, or `removed` |
+| `date_from` | Inclusive date lower bound, formatted as `YYYY-MM-DD` or ISO datetime |
+| `date_to` | Inclusive date upper bound, formatted as `YYYY-MM-DD` or ISO datetime |
+| `edited_by` | Filter by editor display name; currently usually `Admin` |
+| `page` | Page number |
+| `per_page` | Page size, capped by the backend |
+
+Response shape:
+
+```json
+{
+  "data": {
+    "logs": [
+      {
+        "id": 1,
+        "novel_id": 1,
+        "entity_type": "alias",
+        "entity_id": 10,
+        "entity_label": "Meng Hao",
+        "parent_entity_type": "character",
+        "parent_entity_id": 1,
+        "parent_entity_label": "Meng Hao",
+        "change_type": "added",
+        "field_name": "Alias",
+        "old_value": null,
+        "new_value": "Hao-ge",
+        "summary": "Added alias to Meng Hao.",
+        "edited_by": "Admin",
+        "created_at": "2026-06-12T09:03:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "per_page": 10,
+      "total": 172,
+      "total_pages": 18
+    }
+  },
+  "error": null
+}
+```
 
 ## Public Wiki API
 

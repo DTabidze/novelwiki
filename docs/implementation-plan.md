@@ -13,6 +13,7 @@ The project has completed the first operational admin/wiki slice:
 7. Public wiki endpoints expose approved data only.
 8. React has an Admin workspace and routed public Wiki pages for novels, characters, progression, skills, and items.
 9. Admin can edit approved canonical wiki data through the Wiki Data Editor for characters, skills, items, aliases, cultivation breakthroughs, and character relationships.
+10. Admin can review canonical wiki-data history through the Wiki Edit Log with filters, details, and editor/public-page navigation.
 
 ## Phase 1: Foundation
 
@@ -61,6 +62,15 @@ Start with `.txt`. Add robust `.epub` and `.pdf` parsing after the text flow rem
 5. Support item edits and item-character links.
 6. Use searchable pickers for large character/skill/item/chapter sets.
 7. Stage changes locally, show a grouped save confirmation, and persist only after Save Changes.
+8. Record canonical wiki-data edits in the Wiki Edit Log.
+9. Add a dedicated Edit Log page under Wiki Data with filtering, pagination, selected-change details, and responsive/mobile activity-feed rows.
+
+Backend services supporting this phase:
+
+- `wiki_editor_payloads.py`: editor payload validation and mutation helpers.
+- `wiki_admin_responses.py`: admin/editor response serialization.
+- `wiki_edit_logs.py`: edit-log diffing, creation, filtering, and pagination.
+- `review_proposal_conversion.py`: review proposal type conversion helpers.
 
 ## Phase 6: Public Wiki Read API
 
@@ -73,12 +83,13 @@ Start with `.txt`. Add robust `.epub` and `.pdf` parsing after the text flow rem
 
 ## Current Product Priorities
 
-1. Validate Wiki Data Editor changes against the public wiki pages during real editing.
-2. Improve Review Queue data quality and duplicate handling.
-3. Add safer admin cleanup tools for repeated extraction testing.
-4. Improve book source replacement/reparse safeguards when review data exists.
-5. Add robust `.epub` and `.pdf` parsing if those formats remain required.
-6. Add public organization/location/timeline pages after core character/progression quality stabilizes.
+1. Add user/admin accounts so Wiki Edit Log rows can record real editors instead of the placeholder `Admin`.
+2. Validate Wiki Data Editor and Edit Log workflows during real editing.
+3. Improve Review Queue data quality and duplicate handling.
+4. Add safer admin cleanup tools for repeated extraction testing.
+5. Improve book source replacement/reparse safeguards when review data exists.
+6. Add robust `.epub` and `.pdf` parsing if those formats remain required.
+7. Add public organization/location/timeline pages after core character/progression quality stabilizes.
 
 ## Later: Better File Support
 
