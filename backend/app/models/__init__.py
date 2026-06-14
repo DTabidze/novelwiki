@@ -27,11 +27,26 @@ def serialize_datetime(value):
 class ReviewMixin:
     review_status = db.Column(db.String(50), nullable=False, default="pending")
     admin_notes = db.Column(db.Text, nullable=True)
+    review_version = db.Column(db.Integer, nullable=False, default=0)
+    last_reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    last_review_action = db.Column(db.String(50), nullable=True)
+    last_reviewed_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     def review_dict(self):
+        last_reviewed_by = None
+
+        if self.last_reviewed_by_user_id:
+            user = db.session.get(User, self.last_reviewed_by_user_id)
+            last_reviewed_by = user.username if user else None
+
         return {
             "review_status": self.review_status,
             "admin_notes": self.admin_notes,
+            "review_version": self.review_version or 0,
+            "last_reviewed_by_user_id": self.last_reviewed_by_user_id,
+            "last_reviewed_by": last_reviewed_by,
+            "last_review_action": self.last_review_action,
+            "last_reviewed_at": serialize_datetime(self.last_reviewed_at),
         }
 
 

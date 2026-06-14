@@ -15,10 +15,13 @@ from app.models import (
     Item,
     Skill,
     SkillAlias,
+    User,
     WikiEvent,
     WikiEvidence,
     db,
+    utc_now,
 )
+from app.services.auth import current_user
 from app.services.wiki_admin_responses import (
     admin_review_response,
     character_editor_response,
@@ -149,6 +152,78 @@ def success(data, status=200):
 
 def failure(message, status=400):
     return jsonify({"data": None, "error": message}), status
+
+
+STALE_REVIEW_MESSAGE = "This review item was changed by another admin. Refresh to continue."
+
+
+def review_action_label(action):
+    labels = {
+        "approved": "approved",
+        "rejected": "rejected",
+        "edited": "edited",
+        "converted": "converted",
+    }
+    return labels.get(action or "", "changed")
+
+
+def stale_review_message(record):
+    action = review_action_label(getattr(record, "last_review_action", None))
+    actor = None
+
+    if getattr(record, "last_reviewed_by_user_id", None):
+        user = db.session.get(User, record.last_reviewed_by_user_id)
+        actor = user.username if user else None
+
+    if actor:
+        return f"This review item was {action} by {actor}. Refresh to continue."
+
+    return STALE_REVIEW_MESSAGE
+
+
+def review_conflict(entity_type, record):
+    return jsonify(
+        {
+            "data": {
+                "entity_type": entity_type,
+                "review_item": admin_review_response(entity_type, record),
+                "review_version": record.review_version or 0,
+            },
+            "error": stale_review_message(record),
+        }
+    ), 409
+
+
+def has_stale_review_version(record, payload):
+    expected_version = payload.get("expected_review_version")
+
+    if expected_version is None:
+        return True
+
+    try:
+        expected_version = int(expected_version)
+    except (TypeError, ValueError):
+        return True
+
+    return expected_version != (record.review_version or 0)
+
+
+def review_action_from_payload(payload):
+    review_status = payload.get("review_status")
+
+    if review_status in {"approved", "rejected"}:
+        return review_status
+
+    return "edited"
+
+
+def mark_review_change(record, action):
+    user = current_user()
+
+    record.review_version = (record.review_version or 0) + 1
+    record.last_review_action = action
+    record.last_reviewed_at = utc_now()
+    record.last_reviewed_by_user_id = user.id if user else None
 
 
 @admin_review_bp.errorhandler(PayloadValidationError)
@@ -774,6 +849,9 @@ def update_extracted_entity(entity_type, entity_id):
     payload = request.get_json(silent=True) or {}
     record = config["model"].query.get_or_404(entity_id)
 
+    if has_stale_review_version(record, payload):
+        return review_conflict(entity_type, record)
+
     if "review_status" in payload and payload["review_status"] not in REVIEW_STATUSES:
         return failure("review_status must be pending, approved, or rejected.")
 
@@ -792,6 +870,7 @@ def update_extracted_entity(entity_type, entity_id):
         initialize_alive_status_on_character_approval(record)
         initialize_default_species_on_character_approval(record)
 
+    mark_review_change(record, review_action_from_payload(payload))
     db.session.commit()
 
     return success(admin_review_response(entity_type, record))
@@ -814,10 +893,22 @@ def convert_extracted_entity(entity_type, entity_id):
     source_model = ENTITY_CONFIG[entity_type]["model"]
     source = source_model.query.get_or_404(entity_id)
 
+    if has_stale_review_version(source, payload):
+        return review_conflict(entity_type, source)
+
     if source.review_status != "pending":
         return failure("Only pending review items can be converted.")
 
-    converted_payload, payload_error = converted_review_payload(payload, source, target_entity_type)
+    conversion_payload = {
+        key: value
+        for key, value in payload.items()
+        if key != "expected_review_version"
+    }
+    converted_payload, payload_error = converted_review_payload(
+        conversion_payload,
+        source,
+        target_entity_type,
+    )
 
     if payload_error:
         return failure(payload_error)
@@ -851,6 +942,7 @@ def convert_extracted_entity(entity_type, entity_id):
             db.session.rollback()
             return failure(relationship_error)
 
+        mark_review_change(converted, "converted")
         db.session.delete(source)
         db.session.commit()
     except IntegrityError:

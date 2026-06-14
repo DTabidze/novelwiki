@@ -8,6 +8,8 @@ from app.models import (
     Character,
     CharacterAlias,
     CharacterItem,
+    CharacterLifeEvent,
+    CharacterMetadataProposal,
     CharacterProgressionEvent,
     CharacterSkill,
     Chapter,
@@ -16,6 +18,7 @@ from app.models import (
     Skill,
     SkillAlias,
     User,
+    WikiEvent,
     db,
 )
 
@@ -188,9 +191,12 @@ def review_record_novel_id(entity_type, entity_id):
         "characters": Character,
         "skills": Skill,
         "items": Item,
+        "events": WikiEvent,
         "progression_events": CharacterProgressionEvent,
+        "character_metadata_proposals": CharacterMetadataProposal,
         "character_skills": CharacterSkill,
         "character_items": CharacterItem,
+        "life_events": CharacterLifeEvent,
     }
     model = models.get(entity_type)
 

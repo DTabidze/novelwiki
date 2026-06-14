@@ -14,6 +14,7 @@ from app.models import (
     WikiEvidence,
     db,
 )
+from app.services.extraction_service import get_extracted_data
 
 
 class ReviewItemConversionTest(unittest.TestCase):
@@ -108,6 +109,7 @@ class ReviewItemConversionTest(unittest.TestCase):
                 "category": "Weapon",
                 "description": "A magical sword produced through Time refinement.",
                 "admin_notes": "Converted from skill.",
+                "expected_review_version": skill.review_version,
             },
         )
 
@@ -117,6 +119,8 @@ class ReviewItemConversionTest(unittest.TestCase):
         self.assertEqual(body["review_item"]["name"], "Time Sword")
         self.assertEqual(body["review_item"]["category"], "Weapon")
         self.assertEqual(body["review_item"]["review_status"], "pending")
+        self.assertEqual(body["review_item"]["review_version"], 1)
+        self.assertEqual(body["review_item"]["last_review_action"], "converted")
 
         self.assertIsNone(db.session.get(Skill, skill.id))
 
@@ -138,6 +142,7 @@ class ReviewItemConversionTest(unittest.TestCase):
                 "target_entity_type": "items",
                 "name": "Time Sword",
                 "category": "Technique",
+                "expected_review_version": skill.review_version,
             },
         )
 
@@ -180,6 +185,7 @@ class ReviewItemConversionTest(unittest.TestCase):
                 "name": "Time Sword",
                 "category": "Technique",
                 "description": "A technique produced through Time refinement.",
+                "expected_review_version": item.review_version,
             },
         )
 
@@ -198,6 +204,101 @@ class ReviewItemConversionTest(unittest.TestCase):
         relationship_evidence = WikiEvidence.query.filter_by(entity_type="character_skill").one()
         self.assertEqual(relationship_evidence.entity_id, converted_relationship.id)
         self.assertEqual(relationship_evidence.evidence_text, "Meng Hao drew the Time Sword.")
+
+    def test_rejects_stale_review_update(self):
+        skill = self.create_pending_skill()
+        stale_version = skill.review_version
+
+        skill.description = "Changed by another admin."
+        skill.review_version += 1
+        skill.last_review_action = "edited"
+        db.session.commit()
+
+        response = self.client.patch(
+            f"/api/admin/review/skills/{skill.id}",
+            json={
+                "review_status": "approved",
+                "expected_review_version": stale_version,
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.get_json()["error"],
+            "This review item was changed by another admin. Refresh to continue.",
+        )
+
+        db.session.refresh(skill)
+        self.assertEqual(skill.review_status, "pending")
+        self.assertEqual(skill.description, "Changed by another admin.")
+
+    def test_review_update_increments_review_metadata(self):
+        skill = self.create_pending_skill()
+
+        response = self.client.patch(
+            f"/api/admin/review/skills/{skill.id}",
+            json={
+                "review_status": "approved",
+                "expected_review_version": skill.review_version,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()["data"]
+        self.assertEqual(body["review_status"], "approved")
+        self.assertEqual(body["review_version"], 1)
+        self.assertEqual(body["last_review_action"], "approved")
+        self.assertIsNotNone(body["last_reviewed_at"])
+
+    def test_extracted_data_revision_rejects_stale_review_update(self):
+        skill = self.create_pending_skill()
+        extracted_data = get_extracted_data(self.novel)
+        queue_skill = next(row for row in extracted_data["skills"] if row["id"] == skill.id)
+
+        self.assertEqual(queue_skill.get("review_version"), 0)
+
+        skill.description = "Changed by another admin."
+        skill.review_version += 1
+        skill.last_review_action = "edited"
+        db.session.commit()
+
+        response = self.client.patch(
+            f"/api/admin/review/skills/{skill.id}",
+            json={
+                "review_status": "approved",
+                "expected_review_version": queue_skill["review_version"],
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+
+        db.session.refresh(skill)
+        self.assertEqual(skill.review_status, "pending")
+        self.assertEqual(skill.description, "Changed by another admin.")
+
+    def test_rejects_stale_review_conversion(self):
+        item = self.create_pending_item()
+        stale_version = item.review_version
+
+        item.description = "Changed by another admin."
+        item.review_version += 1
+        item.last_review_action = "edited"
+        db.session.commit()
+
+        response = self.client.post(
+            f"/api/admin/review/items/{item.id}/convert",
+            json={
+                "target_entity_type": "skills",
+                "name": "Time Sword",
+                "category": "Technique",
+                "description": "A technique produced through Time refinement.",
+                "expected_review_version": stale_version,
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIsNotNone(db.session.get(Item, item.id))
+        self.assertEqual(Skill.query.count(), 0)
 
 
 if __name__ == "__main__":

@@ -45,7 +45,10 @@ export async function fetchJson(url, options) {
   const body = await response.json();
 
   if (!response.ok) {
-    throw new Error(body.error || "Request failed");
+    const error = new Error(body.error || "Request failed");
+    error.status = response.status;
+    error.data = body.data;
+    throw error;
   }
 
   return body.data;

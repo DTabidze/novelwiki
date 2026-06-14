@@ -21,8 +21,11 @@ def ensure_development_schema(app):
         "skills",
         "items",
         "wiki_events",
+        "character_progression_events",
+        "character_metadata_proposals",
         "character_skills",
         "character_items",
+        "character_life_events",
     }
 
     with db.engine.connect() as connection:
@@ -125,6 +128,19 @@ def ensure_development_schema(app):
 
             if "admin_notes" not in column_names:
                 connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN admin_notes TEXT"))
+
+            review_metadata_columns = {
+                "review_version": "INTEGER NOT NULL DEFAULT 0",
+                "last_reviewed_by_user_id": "INTEGER",
+                "last_review_action": "VARCHAR(50)",
+                "last_reviewed_at": "DATETIME",
+            }
+
+            for column_name, column_type in review_metadata_columns.items():
+                if column_name not in column_names:
+                    connection.execute(
+                        text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+                    )
 
         character_columns = connection.execute(text("PRAGMA table_info(characters)")).fetchall()
         character_column_names = {column[1] for column in character_columns}

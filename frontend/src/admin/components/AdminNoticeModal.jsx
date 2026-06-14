@@ -1,7 +1,7 @@
 import React from "react";
 import { TriangleAlert, X } from "lucide-react";
 
-export default function AdminNoticeModal({ title = "Something went wrong", message, onClose }) {
+export default function AdminNoticeModal({ title = "Something went wrong", message, actionLabel, onAction, onClose }) {
   if (!message) {
     return null;
   }
@@ -29,6 +29,13 @@ export default function AdminNoticeModal({ title = "Something went wrong", messa
             <X aria-hidden="true" size={17} />
           </button>
         </div>
+        {actionLabel && onAction ? (
+          <footer className="admin-modal-actions">
+            <button type="button" className="admin-primary-button" onClick={onAction}>
+              {actionLabel}
+            </button>
+          </footer>
+        ) : null}
       </section>
     </div>
   );
