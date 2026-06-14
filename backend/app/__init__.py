@@ -1,15 +1,18 @@
 from pathlib import Path
+import os
 
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 from sqlalchemy import text
 
+from app.api.auth import auth_bp
 from app.api.admin_novels import admin_novels_bp
 from app.api.admin_review import admin_review_bp
 from app.api.health import health_bp
 from app.api.wiki import wiki_bp
-from app.models import db
+from app.models import User, db
+from app.services.auth import install_auth_guards
 
 
 def ensure_development_schema(app):
@@ -194,6 +197,63 @@ def ensure_development_schema(app):
             )
         )
 
+        user_columns = connection.execute(text("PRAGMA table_info(users)")).fetchall()
+        user_column_names = {column[1] for column in user_columns}
+
+        if user_columns and "must_set_password" not in user_column_names:
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN must_set_password BOOLEAN NOT NULL DEFAULT 0")
+            )
+            user_columns = connection.execute(text("PRAGMA table_info(users)")).fetchall()
+
+        password_hash_column = next((column for column in user_columns if column[1] == "password_hash"), None)
+
+        if password_hash_column and password_hash_column[3]:
+            connection.execute(text("PRAGMA foreign_keys=OFF"))
+            connection.execute(
+                text(
+                    "CREATE TABLE users_new ("
+                    "id INTEGER PRIMARY KEY, "
+                    "username VARCHAR(80) NOT NULL UNIQUE, "
+                    "email VARCHAR(255) NOT NULL UNIQUE, "
+                    "password_hash VARCHAR(255), "
+                    "role VARCHAR(50) NOT NULL DEFAULT 'user', "
+                    "is_active BOOLEAN NOT NULL DEFAULT 1, "
+                    "must_set_password BOOLEAN NOT NULL DEFAULT 0, "
+                    "created_at DATETIME NOT NULL, "
+                    "updated_at DATETIME NOT NULL, "
+                    "last_login_at DATETIME"
+                    ")"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO users_new "
+                    "(id, username, email, password_hash, role, is_active, must_set_password, "
+                    "created_at, updated_at, last_login_at) "
+                    "SELECT id, username, email, password_hash, role, is_active, "
+                    "COALESCE(must_set_password, 0), created_at, updated_at, last_login_at "
+                    "FROM users"
+                )
+            )
+            connection.execute(text("DROP TABLE users"))
+            connection.execute(text("ALTER TABLE users_new RENAME TO users"))
+            connection.execute(text("PRAGMA foreign_keys=ON"))
+
+        connection.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS password_setup_tokens ("
+                "id INTEGER PRIMARY KEY, "
+                "user_id INTEGER NOT NULL, "
+                "token_hash VARCHAR(128) NOT NULL UNIQUE, "
+                "expires_at DATETIME NOT NULL, "
+                "used_at DATETIME, "
+                "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                "FOREIGN KEY(user_id) REFERENCES users (id)"
+                ")"
+            )
+        )
+
         character_skill_columns = connection.execute(
             text("PRAGMA table_info(character_skills)")
         ).fetchall()
@@ -362,22 +422,60 @@ def ensure_development_schema(app):
 def create_app():
     backend_dir = Path(__file__).resolve().parents[1]
     load_dotenv(backend_dir / ".env")
+    frontend_origins = [
+        origin.strip()
+        for origin in os.getenv("FRONTEND_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+        if origin.strip()
+    ]
 
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
-        SQLALCHEMY_DATABASE_URI="sqlite:///novelwiki.db",
+        SECRET_KEY=os.getenv("SECRET_KEY", "dev-only-change-me"),
+        SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///novelwiki.db"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        UPLOAD_FOLDER="uploads",
+        UPLOAD_FOLDER=os.getenv("UPLOAD_FOLDER", "uploads"),
         MAX_CONTENT_LENGTH=50 * 1024 * 1024,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE=os.getenv("SESSION_COOKIE_SAMESITE", "Lax"),
+        SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
     )
 
-    CORS(app)
+    CORS(app, origins=frontend_origins, supports_credentials=True)
     db.init_app(app)
 
     app.register_blueprint(health_bp, url_prefix="/api")
+    app.register_blueprint(auth_bp, url_prefix="/api")
     app.register_blueprint(admin_novels_bp, url_prefix="/api/admin")
     app.register_blueprint(admin_review_bp, url_prefix="/api/admin/review")
     app.register_blueprint(wiki_bp, url_prefix="/api/wiki")
+    install_auth_guards(app)
+
+    @app.cli.command("create-superadmin")
+    def create_superadmin():
+        username = os.getenv("SUPERADMIN_USERNAME") or input("Username: ").strip()
+        email = os.getenv("SUPERADMIN_EMAIL") or input("Email: ").strip().lower()
+        password = os.getenv("SUPERADMIN_PASSWORD") or input("Password: ")
+
+        if not username or not email or len(password) < 8:
+            raise SystemExit("Username/email are required and password must be at least 8 characters.")
+
+        existing = User.query.filter((User.username == username) | (User.email == email)).first()
+
+        if existing:
+            existing.username = username
+            existing.email = email
+            existing.role = User.ROLE_SUPERADMIN
+            existing.is_active = True
+            existing.set_password(password)
+            db.session.commit()
+            print(f"Updated superadmin user: {email}")
+            return
+
+        user = User(username=username, email=email, role=User.ROLE_SUPERADMIN, is_active=True)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        print(f"Created superadmin user: {email}")
 
     with app.app_context():
         db.create_all()

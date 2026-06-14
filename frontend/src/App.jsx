@@ -2,6 +2,8 @@ import React from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { API_BASE_URL, fetchJson } from "./api.js";
 import AdminApp from "./admin/AdminApp.jsx";
+import { AuthProvider } from "./auth/AuthContext.jsx";
+import { WikiLoginPage, WikiProfilePage, WikiRegisterPage, WikiSetPasswordPage } from "./components/wiki/WikiAuthPages.jsx";
 import WikiPanel from "./components/wiki/WikiPanel.jsx";
 import WikiNovelRoute from "./components/wiki/WikiNovelRoute.jsx";
 
@@ -111,11 +113,14 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    <AuthProvider>
       <PublicWikiScrollReset />
-      {message ? <p className="message">{message}</p> : null}
       <Routes>
         <Route path="/" element={<Navigate to="/wiki/novels" replace />} />
+        <Route path="/login" element={<WikiLoginPage />} />
+        <Route path="/register" element={<WikiRegisterPage />} />
+        <Route path="/set-password" element={<WikiSetPasswordPage />} />
+        <Route path="/profile" element={<WikiProfilePage />} />
         <Route path="/admin/*" element={<AdminApp />} />
         <Route path="/wiki" element={<Navigate to="/wiki/novels" replace />} />
         <Route
@@ -391,6 +396,6 @@ export default function App() {
           }
         />
       </Routes>
-    </>
+    </AuthProvider>
   );
 }

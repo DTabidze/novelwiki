@@ -3,6 +3,7 @@ import re
 from datetime import datetime, time, timezone
 
 from app.models import Character, Item, Skill, WikiEditLog, db
+from app.services.auth import current_user
 from app.services.wiki_editor_payloads import PayloadValidationError
 
 
@@ -85,6 +86,9 @@ def add_wiki_edit_log(
     parent_entity_id=None,
     summary=None,
 ):
+    user = current_user()
+    edited_by = user.username if user else "Admin"
+
     db.session.add(
         WikiEditLog(
             novel_id=novel_id,
@@ -98,7 +102,7 @@ def add_wiki_edit_log(
             old_value_json=edit_log_json(normalize_log_value(old_value)),
             new_value_json=edit_log_json(normalize_log_value(new_value)),
             summary=summary,
-            edited_by="Admin",
+            edited_by=edited_by,
         )
     )
 
