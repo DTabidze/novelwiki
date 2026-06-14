@@ -2174,6 +2174,16 @@ button:disabled {
   font-weight: 800;
 }
 
+.wiki-novel-row-detail {
+  min-width: 0;
+}
+
+.wiki-novel-row-detail-icon,
+.wiki-novel-row-detail-label,
+.wiki-novel-row-action-label {
+  display: none;
+}
+
 .wiki-status-tag {
   display: inline-flex;
   width: fit-content;
@@ -2187,9 +2197,10 @@ button:disabled {
 }
 
 .wiki-row-action {
+  display: inline-grid;
+  place-items: center;
   justify-self: end;
   color: var(--wiki-primary);
-  font-size: 24px;
   transition: transform 140ms ease;
 }
 
@@ -5056,6 +5067,21 @@ button:disabled {
   .wiki-global-search-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .wiki-library-toolbar {
+    grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(145px, auto));
+  }
+
+  .wiki-library-toolbar > span {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .wiki-novel-table-head,
+  .wiki-novel-row {
+    grid-template-columns: minmax(240px, 1.4fr) minmax(110px, 0.65fr) minmax(100px, 0.5fr) minmax(82px, 0.42fr) minmax(112px, 0.58fr) 36px;
+    gap: 12px;
+  }
 }
 
 @media (max-width: 820px) {
@@ -5080,18 +5106,57 @@ button:disabled {
     margin-left: 0;
   }
 
-  .wiki-global-search {
-    width: 100%;
-    flex: 1 1 100%;
+  .wiki-topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px 18px;
+  }
+
+  .wiki-breadcrumb {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .wiki-breadcrumb > * {
+    flex: 0 0 auto;
+  }
+
+  .wiki-breadcrumb a,
+  .wiki-breadcrumb strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .wiki-breadcrumb a:last-of-type,
+  .wiki-breadcrumb strong {
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   .wiki-topbar-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
     width: 100%;
-    flex-wrap: wrap;
+    margin-left: 0;
+  }
+
+  .wiki-global-search {
+    width: 100%;
+    min-width: 0;
+    flex: initial;
   }
 
   .wiki-header-actions {
     margin-left: auto;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .wiki-account-trigger {
+    gap: 4px;
   }
 
   .wiki-global-search-overlay {
@@ -5195,6 +5260,142 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .wiki-library-toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .wiki-library-toolbar .wiki-local-search-field {
+    grid-column: 1 / -1;
+  }
+
+  .wiki-library-toolbar > span {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .wiki-novel-table-card {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .wiki-novel-table {
+    gap: 14px;
+  }
+
+  .wiki-novel-table-head {
+    display: none;
+  }
+
+  .wiki-novel-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0;
+    min-height: 0;
+    border: 1px solid var(--wiki-border);
+    border-radius: 12px;
+    padding: 22px 24px;
+    background: #ffffff;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+  }
+
+  .wiki-novel-row::before {
+    content: "";
+    position: absolute;
+    inset: 18px auto 18px 0;
+    width: 3px;
+    border-radius: 999px;
+    background: transparent;
+    transition: background 140ms ease;
+  }
+
+  .wiki-novel-row:hover::before {
+    background: var(--wiki-primary);
+  }
+
+  .wiki-novel-row-title {
+    grid-column: 1 / -1;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 16px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--wiki-border-soft);
+  }
+
+  .wiki-novel-row-title .wiki-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 22px;
+  }
+
+  .wiki-novel-row-title strong {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 20px;
+  }
+
+  .wiki-novel-row-title small {
+    margin-top: 7px;
+    font-size: 13px;
+  }
+
+  .wiki-novel-row-detail {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 42px minmax(110px, 0.7fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    min-height: 64px;
+    border-bottom: 1px solid var(--wiki-border-soft);
+    color: var(--wiki-muted);
+  }
+
+  .wiki-novel-row-detail-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: var(--wiki-primary);
+  }
+
+  .wiki-novel-row-detail.status .wiki-novel-row-detail-icon {
+    background: #dcfce7;
+    color: #047857;
+  }
+
+  .wiki-novel-row-detail.updated .wiki-novel-row-detail-icon {
+    background: #f1edff;
+    color: #6d4de8;
+  }
+
+  .wiki-novel-row-detail-label {
+    display: inline;
+    font-weight: 850;
+  }
+
+  .wiki-novel-row-detail > strong {
+    min-width: 0;
+    color: var(--wiki-text);
+    font-weight: 850;
+  }
+
+  .wiki-novel-row-action-label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 46px;
+    color: var(--wiki-primary);
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  .wiki-novel-row > .wiki-row-action {
+    align-self: center;
+  }
+
   .wiki-skill-hero-art {
     min-height: 220px;
   }
@@ -5248,5 +5449,51 @@ button:disabled {
 
   .wiki-title-row h1 {
     font-size: 42px;
+  }
+}
+
+@media (max-width: 560px) {
+  .wiki-content {
+    padding: 22px 16px 36px;
+  }
+
+  .wiki-library-header {
+    padding-top: 18px;
+  }
+
+  .wiki-library-header h1 {
+    font-size: 42px;
+  }
+
+  .wiki-library-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .wiki-library-toolbar select {
+    width: 100%;
+  }
+
+  .wiki-novel-row {
+    padding: 20px 18px;
+  }
+
+  .wiki-novel-row-detail {
+    grid-template-columns: 38px minmax(88px, 0.65fr) minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .wiki-topbar {
+    padding-inline: 14px;
+  }
+
+  .wiki-header-icon-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .wiki-account-trigger > span:first-child,
+  .wiki-account-avatar {
+    width: 38px;
+    height: 38px;
   }
 }

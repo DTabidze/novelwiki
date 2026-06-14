@@ -1,5 +1,5 @@
 import React from "react";
-import { Search } from "lucide-react";
+import { BookOpen, CalendarDays, CheckCircle2, ChevronRight, Search, UserRound } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { formatDate, formatNumber } from "../../utils/wikiFormat.js";
 
@@ -58,11 +58,38 @@ export default function WikiLandingPage({ novels, onLoadNovel }) {
                   <small>Cultivation Novel</small>
                 </div>
               </div>
-              <span>{wikiNovel.author || "Unknown"}</span>
-              <span className="wiki-status-tag">Completed</span>
-              <strong>{formatNumber(wikiNovel.chapter_count)}</strong>
-              <span>{formatDate(wikiNovel.updated_at)}</span>
-              <span className="wiki-row-action">›</span>
+              <span className="wiki-novel-row-detail author">
+                <span className="wiki-novel-row-detail-icon">
+                  <UserRound aria-hidden="true" size={16} strokeWidth={1.9} />
+                </span>
+                <span className="wiki-novel-row-detail-label">Author</span>
+                <strong>{wikiNovel.author || "Unknown"}</strong>
+              </span>
+              <span className="wiki-novel-row-detail status">
+                <span className="wiki-novel-row-detail-icon">
+                  <CheckCircle2 aria-hidden="true" size={16} strokeWidth={1.9} />
+                </span>
+                <span className="wiki-novel-row-detail-label">Status</span>
+                <span className="wiki-status-tag">Completed</span>
+              </span>
+              <span className="wiki-novel-row-detail chapters">
+                <span className="wiki-novel-row-detail-icon">
+                  <BookOpen aria-hidden="true" size={16} strokeWidth={1.9} />
+                </span>
+                <span className="wiki-novel-row-detail-label">Chapters</span>
+                <strong>{formatNumber(wikiNovel.chapter_count)}</strong>
+              </span>
+              <span className="wiki-novel-row-detail updated">
+                <span className="wiki-novel-row-detail-icon">
+                  <CalendarDays aria-hidden="true" size={16} strokeWidth={1.9} />
+                </span>
+                <span className="wiki-novel-row-detail-label">Last Updated</span>
+                <strong>{formatDate(wikiNovel.updated_at)}</strong>
+              </span>
+              <span className="wiki-novel-row-action-label">View Details</span>
+              <span className="wiki-row-action">
+                <ChevronRight aria-hidden="true" size={20} strokeWidth={2.3} />
+              </span>
             </button>
           ))}
         </div>
