@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { API_BASE_URL, fetchJson } from "../../api.js";
+import AdminNoticeModal from "../components/AdminNoticeModal.jsx";
 import ReviewChapterGroup from "./ReviewChapterGroup.jsx";
 import ReviewContextModal from "./ReviewContextModal.jsx";
 import ReviewDetailPanel from "./ReviewDetailPanel.jsx";
@@ -35,6 +36,18 @@ const DEFAULT_REVIEW_FILTERS = {
   warningsOnly: false,
   search: "",
 };
+
+function isReviewConflict(error) {
+  return error?.status === 409 || error?.status === 404;
+}
+
+function reviewConflictMessage(error) {
+  if (error?.status === 404) {
+    return "This review item is no longer available. Refresh to continue.";
+  }
+
+  return error?.message || "This review item was changed by another admin. Refresh to continue.";
+}
 
 function filtersFromSearchParams(searchParams) {
   const chapterStart = searchParams.get("chapter_start");
@@ -264,6 +277,7 @@ export default function ReviewQueuePage({
   const [contextEvidence, setContextEvidence] = React.useState(null);
   const [editingItem, setEditingItem] = React.useState(null);
   const [editError, setEditError] = React.useState("");
+  const [reviewConflict, setReviewConflict] = React.useState(null);
   const feedListRef = React.useRef(null);
   const scrollModeRef = React.useRef("nearest");
   const pendingSelectionKeyRef = React.useRef(undefined);
@@ -655,9 +669,19 @@ export default function ReviewQueuePage({
       await fetchJson(`${API_BASE_URL}/admin/review/${item.entityType}/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ review_status: reviewStatus }),
+        body: JSON.stringify({
+          review_status: reviewStatus,
+          expected_review_version: item.review_version,
+        }),
       });
       await onRefresh?.({ showLoading: false });
+    } catch (err) {
+      if (isReviewConflict(err)) {
+        setReviewConflict({ message: reviewConflictMessage(err) });
+        return;
+      }
+
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -673,10 +697,14 @@ export default function ReviewQueuePage({
     const isConversion = targetEntityType && targetEntityType !== editingItem.entityType;
 
     try {
+      const requestPayload = {
+        ...payload,
+        expected_review_version: editingItem.review_version,
+      };
       const savedItem = await fetchJson(`${API_BASE_URL}/admin/review/${editingItem.entityType}/${editingItem.id}${isConversion ? "/convert" : ""}`, {
         method: isConversion ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isConversion ? { ...payload, target_entity_type: targetEntityType } : payload),
+        body: JSON.stringify(isConversion ? { ...requestPayload, target_entity_type: targetEntityType } : requestPayload),
       });
 
       if (isConversion && savedItem?.entity_type && savedItem?.review_item?.id) {
@@ -686,10 +714,22 @@ export default function ReviewQueuePage({
       await onRefresh?.({ showLoading: false });
       setEditingItem(null);
     } catch (err) {
+      if (isReviewConflict(err)) {
+        setReviewConflict({ message: reviewConflictMessage(err) });
+        return;
+      }
+
       setEditError(err.message || "Could not save proposal changes.");
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function refreshAfterReviewConflict() {
+    setReviewConflict(null);
+    setEditError("");
+    setEditingItem(null);
+    await onRefresh?.({ showLoading: false });
   }
 
   const summaryCards = [
@@ -865,6 +905,15 @@ export default function ReviewQueuePage({
           }}
           onSave={saveReviewProposalEdits}
           onViewContext={setContextEvidence}
+        />
+      ) : null}
+      {reviewConflict ? (
+        <AdminNoticeModal
+          title="Review item changed"
+          message={reviewConflict.message}
+          actionLabel="Refresh Review Queue"
+          onAction={refreshAfterReviewConflict}
+          onClose={refreshAfterReviewConflict}
         />
       ) : null}
     </section>
