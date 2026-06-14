@@ -9,6 +9,12 @@
   font-family: var(--font-body);
 }
 
+.admin-mobile-topbar,
+.admin-mobile-drawer,
+.admin-mobile-drawer-scrim {
+  display: none;
+}
+
 .admin-sidebar,
 .workspace-sidebar {
   height: 100vh;
@@ -158,6 +164,20 @@
   margin-top: 28px;
   border-top: 1px solid rgba(148, 163, 184, 0.14);
   padding-top: 20px;
+}
+
+.admin-user-card > div:nth-child(2) {
+  min-width: 0;
+}
+
+.admin-user-logout {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .admin-main {

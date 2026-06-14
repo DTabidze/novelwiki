@@ -1,5 +1,6 @@
 import React from "react";
 import { Routes, Route, useNavigate, useParams } from "react-router-dom";
+import { Menu, X } from "lucide-react";
 import { API_BASE_URL, fetchJson } from "../../api.js";
 import BooksPage from "../books/BooksPage.jsx";
 import ChaptersPage from "../chapters/ChaptersPage.jsx";
@@ -21,7 +22,7 @@ function WorkspacePlaceholder({ title, message }) {
   );
 }
 
-export default function NovelWorkspaceLayout({ message, setMessage }) {
+export default function NovelWorkspaceLayout({ currentUser, message, setMessage }) {
   const { novelId } = useParams();
   const navigate = useNavigate();
   const [books, setBooks] = React.useState([]);
@@ -33,7 +34,9 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
   const [isRunningExtraction, setIsRunningExtraction] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isNovelSettingsOpen, setIsNovelSettingsOpen] = React.useState(false);
+  const [isWorkspaceNavOpen, setIsWorkspaceNavOpen] = React.useState(false);
   const [novel, setNovel] = React.useState(null);
+  const userInitials = (currentUser?.username || "Admin").slice(0, 1).toUpperCase();
 
   function recordsForChapter(reviewData, chapterId) {
     const reviewKeys = [
@@ -253,6 +256,67 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
     loadWorkspace();
   }, [novelId]);
 
+  function renderWorkspaceShell(content) {
+    const renderSidebar = () => <WorkspaceSidebar currentUser={currentUser} novel={novel} />;
+
+    return (
+      <main className="workspace-shell single-sidebar">
+        <header className="admin-mobile-topbar workspace-mobile-topbar">
+          <button
+            className="admin-mobile-menu-button"
+            type="button"
+            aria-label="Open workspace navigation"
+            aria-expanded={isWorkspaceNavOpen}
+            onClick={() => setIsWorkspaceNavOpen(true)}
+          >
+            <Menu aria-hidden="true" size={22} strokeWidth={1.9} />
+          </button>
+          <div className="admin-mobile-brand">
+            <div>
+              <strong>{novel?.title || "Novel Workspace"}</strong>
+              <span>Editorial workspace</span>
+            </div>
+          </div>
+          <div className="admin-mobile-avatar">{userInitials}</div>
+        </header>
+
+        {isWorkspaceNavOpen ? (
+          <button
+            className="admin-mobile-drawer-scrim"
+            type="button"
+            aria-label="Close workspace navigation"
+            onClick={() => setIsWorkspaceNavOpen(false)}
+          />
+        ) : null}
+        <div className={isWorkspaceNavOpen ? "admin-mobile-drawer open" : "admin-mobile-drawer"}>
+          <div className="admin-mobile-drawer-header">
+            <div>
+              <strong>{novel?.title || "Novel Workspace"}</strong>
+              <span>Editorial workspace</span>
+            </div>
+            <button
+              className="admin-mobile-drawer-close"
+              type="button"
+              aria-label="Close workspace navigation"
+              onClick={() => setIsWorkspaceNavOpen(false)}
+            >
+              <X aria-hidden="true" size={20} strokeWidth={1.9} />
+            </button>
+          </div>
+          <div onClick={(event) => event.target.closest("a") && setIsWorkspaceNavOpen(false)}>
+            {renderSidebar()}
+          </div>
+        </div>
+
+        {renderSidebar()}
+        <section className="workspace-main">
+          {message ? <div className="admin-message">{message}</div> : null}
+          {content}
+        </section>
+      </main>
+    );
+  }
+
   React.useEffect(() => {
     const hasActiveRun = extractionRuns.some((run) => ["queued", "running"].includes(run.status));
 
@@ -277,23 +341,14 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
   }, [extractionRuns, isRunningExtraction, novelId]);
 
   if (isLoading) {
-    return (
-      <main className="workspace-shell single-sidebar">
-        <WorkspaceSidebar novel={novel} />
-        <section className="workspace-main">
-          {message ? <div className="admin-message">{message}</div> : null}
-          <EmptyState title="Loading workspace" message="Fetching novel books and review data." />
-        </section>
-      </main>
+    return renderWorkspaceShell(
+      <EmptyState title="Loading workspace" message="Fetching novel books and review data." />
     );
   }
 
-  return (
-    <main className="workspace-shell single-sidebar">
-      <WorkspaceSidebar novel={novel} />
-      <section className="workspace-main">
-        {message ? <div className="admin-message">{message}</div> : null}
-        <Routes>
+  return renderWorkspaceShell(
+    <>
+      <Routes>
           <Route
             index
             element={
@@ -374,15 +429,14 @@ export default function NovelWorkspaceLayout({ message, setMessage }) {
             element={<WikiEditLogPage novel={novel} />}
           />
           <Route path="*" element={<WorkspacePlaceholder title="Workspace Section" message="This section is not implemented yet." />} />
-        </Routes>
-        {isNovelSettingsOpen && novel ? (
-          <EditNovelModal
-            novel={novel}
-            onClose={() => setIsNovelSettingsOpen(false)}
-            onSave={updateNovel}
-          />
-        ) : null}
-      </section>
-    </main>
+      </Routes>
+      {isNovelSettingsOpen && novel ? (
+        <EditNovelModal
+          novel={novel}
+          onClose={() => setIsNovelSettingsOpen(false)}
+          onSave={updateNovel}
+        />
+      ) : null}
+    </>
   );
 }

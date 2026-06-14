@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import check_password_hash, generate_password_hash
 
 
 db = SQLAlchemy()
@@ -83,6 +84,122 @@ class Novel(db.Model):
             "created_at": serialize_datetime(self.created_at),
             "updated_at": serialize_datetime(self.updated_at),
         }
+
+
+class User(db.Model):
+    __tablename__ = "users"
+
+    ROLE_SUPERADMIN = "superadmin"
+    ROLE_EDITOR = "editor"
+    ROLE_USER = "user"
+    ROLES = {ROLE_SUPERADMIN, ROLE_EDITOR, ROLE_USER}
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), nullable=False, unique=True)
+    email = db.Column(db.String(255), nullable=False, unique=True)
+    password_hash = db.Column(db.String(255), nullable=True)
+    role = db.Column(db.String(50), nullable=False, default=ROLE_USER)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    must_set_password = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+    )
+    last_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    permissions = db.relationship(
+        "NovelUserPermission",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="NovelUserPermission.novel_id",
+    )
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        self.must_set_password = False
+
+    def check_password(self, password):
+        if not self.password_hash:
+            return False
+
+        return check_password_hash(self.password_hash, password)
+
+    def is_admin(self):
+        return self.role in {self.ROLE_SUPERADMIN, self.ROLE_EDITOR}
+
+    def to_session_dict(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "role": self.role,
+            "is_active": self.is_active,
+            "must_set_password": self.must_set_password,
+            "permissions": [permission.to_admin_dict() for permission in self.permissions],
+            "last_login_at": serialize_datetime(self.last_login_at),
+        }
+
+    def to_admin_dict(self):
+        return {
+            **self.to_session_dict(),
+            "created_at": serialize_datetime(self.created_at),
+            "updated_at": serialize_datetime(self.updated_at),
+        }
+
+
+class NovelUserPermission(db.Model):
+    __tablename__ = "novel_user_permissions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    can_edit = db.Column(db.Boolean, nullable=False, default=False)
+    can_review = db.Column(db.Boolean, nullable=False, default=False)
+    can_approve = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
+    user = db.relationship("User", back_populates="permissions")
+    novel = db.relationship("Novel")
+
+    __table_args__ = (
+        db.UniqueConstraint("novel_id", "user_id", name="uq_novel_user_permission"),
+    )
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "novel_title": self.novel.title if self.novel else None,
+            "user_id": self.user_id,
+            "username": self.user.username if self.user else None,
+            "can_edit": self.can_edit,
+            "can_review": self.can_review,
+            "can_approve": self.can_approve,
+            "created_at": serialize_datetime(self.created_at),
+            "updated_at": serialize_datetime(self.updated_at),
+        }
+
+
+class PasswordSetupToken(db.Model):
+    __tablename__ = "password_setup_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    token_hash = db.Column(db.String(128), nullable=False, unique=True)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    used_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    user = db.relationship("User")
 
 
 class Book(db.Model):

@@ -21,6 +21,8 @@ from app.models import (
     ExtractionRun,
     ExtractionRunChapter,
     Novel,
+    NovelUserPermission,
+    User,
     WikiEvent,
     WikiEvidence,
     db,
@@ -28,6 +30,7 @@ from app.models import (
     utc_now,
 )
 from app.services.ai_extraction_service import ExtractionCancelled, extract_chapter_with_ai
+from app.services.auth import current_user
 from app.services.chapter_parser import split_txt_into_chapters
 from app.services.extraction_service import get_extracted_data, run_placeholder_extraction
 
@@ -815,7 +818,16 @@ def create_novel():
 
 @admin_novels_bp.get("/novels")
 def list_admin_novels():
-    novels = Novel.query.order_by(Novel.created_at.desc()).all()
+    user = current_user()
+    query = Novel.query
+
+    if user and user.role == User.ROLE_EDITOR:
+        query = query.join(
+            NovelUserPermission,
+            NovelUserPermission.novel_id == Novel.id,
+        ).filter(NovelUserPermission.user_id == user.id)
+
+    novels = query.order_by(Novel.created_at.desc()).all()
     return success([aggregate_novel_summary(novel) for novel in novels])
 
 

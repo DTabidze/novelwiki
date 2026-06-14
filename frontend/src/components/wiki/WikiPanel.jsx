@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import WikiAccountControls from "./WikiAccountControls.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
 import WikiCharacterBrowser from "./WikiCharacterBrowser.jsx";
 import WikiCharacterDetail from "./WikiCharacterDetail.jsx";
@@ -52,7 +53,6 @@ export default function WikiPanel({
   novel,
   novels,
   onLoadNovel,
-  onOpenAdmin,
   onSelectCharacter,
   selectedCharacter,
   selectedItem,
@@ -201,9 +201,6 @@ export default function WikiPanel({
         <div className="wiki-sidebar-section">
           <div className="wiki-sidebar-title">
             <span>{trackedNovel ? "Selected Novel" : "Novel Context"}</span>
-            <button type="button" onClick={onOpenAdmin}>
-              Admin
-            </button>
           </div>
           {trackedNovel ? (
             <button
@@ -302,15 +299,18 @@ export default function WikiPanel({
               </>
             ) : null}
           </div>
-          <WikiGlobalSearch
-            characters={characters}
-            items={items}
-            novel={trackedNovel}
-            skills={skills}
-            onSelectCharacter={openCharacter}
-            onSelectItem={openItem}
-            onSelectSkill={openSkill}
-          />
+          <div className="wiki-topbar-actions">
+            <WikiGlobalSearch
+              characters={characters}
+              items={items}
+              novel={trackedNovel}
+              skills={skills}
+              onSelectCharacter={openCharacter}
+              onSelectItem={openItem}
+              onSelectSkill={openSkill}
+            />
+            <WikiAccountControls />
+          </div>
         </header>
 
         <div className="wiki-content">

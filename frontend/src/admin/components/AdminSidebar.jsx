@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { FileText, LayoutDashboard, Settings, Users, BookOpen } from "lucide-react";
+import { BookOpen, FileText, LayoutDashboard, LogOut, Settings, Users } from "lucide-react";
+import { useAuth } from "../../auth/AuthContext.jsx";
 
 const globalLinks = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
@@ -10,7 +11,11 @@ const globalLinks = [
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ currentUser }) {
+  const { isSuperadmin, logout } = useAuth();
+  const visibleSystemLinks = isSuperadmin ? globalLinks.slice(2) : [];
+  const initials = (currentUser?.username || "Admin").slice(0, 1).toUpperCase();
+
   return (
     <aside className="admin-sidebar">
       <div className="admin-brand">
@@ -33,7 +38,7 @@ export default function AdminSidebar() {
         ))}
 
         <small>System</small>
-        {globalLinks.slice(2).map(({ label, path, icon: Icon }) => (
+        {visibleSystemLinks.map(({ label, path, icon: Icon }) => (
           <NavLink key={path} to={path}>
             <span>
               <Icon aria-hidden="true" size={17} strokeWidth={1.9} />
@@ -44,11 +49,14 @@ export default function AdminSidebar() {
       </nav>
 
       <div className="admin-user-card">
-        <div className="admin-user-avatar">A</div>
+        <div className="admin-user-avatar">{initials}</div>
         <div>
-          <strong>Admin</strong>
-          <span>Super Administrator</span>
+          <strong>{currentUser?.username || "Admin"}</strong>
+          <span>{currentUser?.role === "superadmin" ? "Super Administrator" : "Editor"}</span>
         </div>
+        <button className="admin-user-logout" type="button" onClick={logout} aria-label="Log out">
+          <LogOut aria-hidden="true" size={16} strokeWidth={1.9} />
+        </button>
       </div>
     </aside>
   );

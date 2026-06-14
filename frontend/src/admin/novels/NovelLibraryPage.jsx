@@ -29,7 +29,7 @@ function OperationStatCard({ action, detail, disabled, icon: Icon, label, onActi
   );
 }
 
-export default function NovelLibraryPage({ novels, loading, onCreateNovel, onOpenNovel, onUpdateNovel }) {
+export default function NovelLibraryPage({ canCreateNovel = true, novels, loading, onCreateNovel, onOpenNovel, onUpdateNovel }) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
@@ -78,10 +78,12 @@ export default function NovelLibraryPage({ novels, loading, onCreateNovel, onOpe
               placeholder="Search novels..."
             />
           </div>
-          <button type="button" onClick={() => setIsCreateOpen(true)}>
-            <Plus aria-hidden="true" size={17} strokeWidth={1.9} />
-            Create Novel
-          </button>
+          {canCreateNovel ? (
+            <button type="button" onClick={() => setIsCreateOpen(true)}>
+              <Plus aria-hidden="true" size={17} strokeWidth={1.9} />
+              Create Novel
+            </button>
+          ) : null}
         </div>
       </div>
 

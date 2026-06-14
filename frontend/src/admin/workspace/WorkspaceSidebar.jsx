@@ -41,7 +41,17 @@ const workspaceGroups = [
   ],
 ];
 
-export default function WorkspaceSidebar({ novel }) {
+export default function WorkspaceSidebar({ currentUser, novel }) {
+  const isSuperadmin = currentUser?.role === "superadmin";
+  const visibleGroups = workspaceGroups
+    .map(([groupLabel, links]) => [
+      groupLabel,
+      groupLabel === "System" && !isSuperadmin
+        ? links.filter((link) => link.label !== "Settings")
+        : links,
+    ])
+    .filter(([, links]) => links.length > 0);
+
   return (
     <aside className="workspace-sidebar">
       <div className="workspace-novel-switcher">
@@ -65,7 +75,7 @@ export default function WorkspaceSidebar({ novel }) {
           </span>
           Back to Novels
         </NavLink>
-        {workspaceGroups.map(([groupLabel, links]) => (
+        {visibleGroups.map(([groupLabel, links]) => (
           <div className="workspace-nav-group" key={groupLabel}>
             <small>{groupLabel}</small>
             {links.map(({ label, path, icon: Icon }) => (
