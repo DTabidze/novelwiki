@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify
+from sqlalchemy import func
 
 from app.models import (
     Character,
@@ -10,8 +11,11 @@ from app.models import (
     Item,
     Novel,
     Skill,
+    WikiEditLog,
     WikiEvidence,
     WikiEvent,
+    db,
+    serialize_datetime,
 )
 
 
@@ -22,6 +26,83 @@ APPROVED = "approved"
 
 def success(data, status=200):
     return jsonify({"data": data, "error": None}), status
+
+
+def chapter_numbers_for_ids(chapter_ids):
+    ids = [chapter_id for chapter_id in chapter_ids if chapter_id]
+
+    if not ids:
+        return []
+
+    return [
+        chapter.chapter_number
+        for chapter in Chapter.query.filter(Chapter.id.in_(ids)).all()
+        if chapter.chapter_number is not None
+    ]
+
+
+def wiki_coverage_for_novel(novel_id):
+    chapter_numbers = []
+
+    approved_characters = Character.query.filter_by(
+        novel_id=novel_id,
+        review_status=APPROVED,
+    ).all()
+    for character in approved_characters:
+        chapter_numbers.extend(
+            chapter_numbers_for_ids(
+                [
+                    character.first_mentioned_chapter_id,
+                    character.first_appeared_chapter_id,
+                    character.first_seen_chapter_id,
+                ]
+            )
+        )
+
+    approved_chapter_models = (
+        CharacterProgressionEvent,
+        CharacterSkill,
+        CharacterItem,
+        CharacterLifeEvent,
+        WikiEvent,
+    )
+    for model in approved_chapter_models:
+        rows = (
+            db.session.query(Chapter.chapter_number)
+            .join(model, model.chapter_id == Chapter.id)
+            .filter(model.novel_id == novel_id, model.review_status == APPROVED)
+            .all()
+        )
+        chapter_numbers.extend(number for (number,) in rows if number is not None)
+
+    evidence_rows = (
+        db.session.query(Chapter.chapter_number)
+        .join(WikiEvidence, WikiEvidence.chapter_id == Chapter.id)
+        .filter(WikiEvidence.novel_id == novel_id)
+        .all()
+    )
+    chapter_numbers.extend(number for (number,) in evidence_rows if number is not None)
+
+    if not chapter_numbers:
+        return {
+            "start_chapter": None,
+            "end_chapter": None,
+        }
+
+    return {
+        "start_chapter": min(chapter_numbers),
+        "end_chapter": max(chapter_numbers),
+    }
+
+
+def last_wiki_update_for_novel(novel):
+    edit_log_time = (
+        db.session.query(func.max(WikiEditLog.created_at))
+        .filter(WikiEditLog.novel_id == novel.id)
+        .scalar()
+    )
+
+    return edit_log_time or novel.updated_at
 
 
 def chapter_reference(chapter_id):
@@ -276,6 +357,8 @@ def public_novel(novel):
             WikiEvent,
         )
     )
+    coverage = wiki_coverage_for_novel(novel.id)
+    last_wiki_update = last_wiki_update_for_novel(novel)
 
     return {
         "id": novel.id,
@@ -303,6 +386,9 @@ def public_novel(novel):
         ).count(),
         "approved_entry_count": approved_entry_count,
         "pending_review_count": pending_review_count,
+        "wiki_coverage_start_chapter": coverage["start_chapter"],
+        "wiki_coverage_end_chapter": coverage["end_chapter"],
+        "last_wiki_updated_at": serialize_datetime(last_wiki_update),
         "updated_at": novel.updated_at.isoformat() if novel.updated_at else None,
     }
 

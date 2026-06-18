@@ -300,15 +300,17 @@ export default function WikiPanel({
             ) : null}
           </div>
           <div className="wiki-topbar-actions">
-            <WikiGlobalSearch
-              characters={characters}
-              items={items}
-              novel={trackedNovel}
-              skills={skills}
-              onSelectCharacter={openCharacter}
-              onSelectItem={openItem}
-              onSelectSkill={openSkill}
-            />
+            {trackedNovel ? (
+              <WikiGlobalSearch
+                characters={characters}
+                items={items}
+                novel={trackedNovel}
+                skills={skills}
+                onSelectCharacter={openCharacter}
+                onSelectItem={openItem}
+                onSelectSkill={openSkill}
+              />
+            ) : null}
             <WikiAccountControls />
           </div>
         </header>
