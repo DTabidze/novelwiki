@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, KeyRound, LogIn, Save, UserPlus } from "lucide-react";
+import { BookOpen, KeyRound, LogIn, Save, UserPlus, X } from "lucide-react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { API_BASE_URL, fetchJson } from "../../api.js";
 import { useAuth } from "../../auth/AuthContext.jsx";
@@ -293,6 +293,7 @@ export function WikiSetPasswordPage() {
 
 export function WikiProfilePage() {
   const { currentUser, refreshCurrentUser } = useAuth();
+  const navigate = useNavigate();
   const [displayName, setDisplayName] = React.useState(currentUser?.username || "");
   const [passwordForm, setPasswordForm] = React.useState({
     currentPassword: "",
@@ -350,15 +351,29 @@ export function WikiProfilePage() {
     }
   }
 
+  function closeProfile() {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/wiki/novels");
+  }
+
   return (
     <main className="wiki-auth-page">
       <section className="wiki-auth-card wiki-profile-card wide">
-        <div className="wiki-auth-mark">
-          <BookOpen aria-hidden="true" size={28} strokeWidth={1.9} />
-        </div>
-        <div>
-          <h1>Profile</h1>
-          <p>Your public wiki account details and password settings.</p>
+        <div className="wiki-profile-header">
+          <div className="wiki-auth-mark">
+            <BookOpen aria-hidden="true" size={28} strokeWidth={1.9} />
+          </div>
+          <div>
+            <h1>Profile</h1>
+            <p>Your public wiki account details and password settings.</p>
+          </div>
+          <button className="wiki-profile-close" type="button" onClick={closeProfile} aria-label="Close profile">
+            <X aria-hidden="true" size={22} strokeWidth={2} />
+          </button>
         </div>
         {message ? <div className="wiki-auth-success">{message}</div> : null}
         {error ? <div className="wiki-auth-error">{error}</div> : null}
@@ -415,7 +430,6 @@ export function WikiProfilePage() {
             Change Password
           </button>
         </form>
-        <Link className="wiki-auth-link-button" to="/wiki/novels">Back to Wiki</Link>
       </section>
     </main>
   );
