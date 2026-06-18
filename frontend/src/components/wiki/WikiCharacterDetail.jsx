@@ -233,10 +233,12 @@ export default function WikiCharacterDetail({
           <div className="wiki-quick-facts-list">
             {quickFacts.map(({ Icon, ...fact }) => (
               <div className={`wiki-quick-fact-row ${fact.className || ""}`} key={fact.label}>
-                <span className="wiki-fact-icon">
-                  <Icon aria-hidden="true" size={16} strokeWidth={2} />
-                </span>
-                <small>{fact.label}</small>
+                <div className="wiki-quick-fact-heading">
+                  <span className="wiki-fact-icon">
+                    <Icon aria-hidden="true" size={16} strokeWidth={2} />
+                  </span>
+                  <small>{fact.label}</small>
+                </div>
                 <strong>{fact.value}</strong>
               </div>
             ))}

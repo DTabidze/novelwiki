@@ -1,6 +1,7 @@
 import React from "react";
+import { Building2, MapPin, Package, Route, Sparkles, Timeline, Users } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
-import { formatCultivationValue, formatDate, formatNumber } from "../../utils/wikiFormat.js";
+import { formatCultivationValue, formatNumber } from "../../utils/wikiFormat.js";
 
 export default function WikiNovelOverview({
   characters,
@@ -12,14 +13,16 @@ export default function WikiNovelOverview({
   onSelectCharacter,
 }) {
   const featuredCharacters = characters.slice(0, 4);
+  const coveredChapters = novel.wiki_coverage_end_chapter || 0;
+  const totalChapters = novel.chapter_count || 0;
   const browseCards = [
-    ["Characters", novel.approved_character_count, "View all characters", onOpenCharacters],
-    ["Cultivation", novel.approved_progression_count, "Explore progression", onOpenCultivation],
-    ["Skills", novel.approved_skill_count, "View all skills", onOpenSkills],
-    ["Items", novel.approved_item_count, "View all items", onOpenItems],
-    ["Organizations", 0, "Coming later", null],
-    ["Places", 0, "Coming later", null],
-    ["Timeline", 0, "Major events later", null],
+    { label: "Characters", count: novel.approved_character_count, subtitle: "View all characters", action: onOpenCharacters, Icon: Users, tone: "character" },
+    { label: "Cultivation", count: novel.approved_progression_count, subtitle: "Explore progression", action: onOpenCultivation, Icon: Timeline, tone: "cultivation" },
+    { label: "Skills", count: novel.approved_skill_count, subtitle: "View all skills", action: onOpenSkills, Icon: Sparkles, tone: "skill" },
+    { label: "Items", count: novel.approved_item_count, subtitle: "View all items", action: onOpenItems, Icon: Package, tone: "item" },
+    { label: "Organizations", count: 0, subtitle: "Coming later", action: null, Icon: Building2, tone: "organization" },
+    { label: "Places", count: 0, subtitle: "Coming later", action: null, Icon: MapPin, tone: "place" },
+    { label: "Timeline", count: 0, subtitle: "Major events later", action: null, Icon: Route, tone: "timeline" },
   ];
 
   return (
@@ -32,8 +35,10 @@ export default function WikiNovelOverview({
           <h1>{novel.title}</h1>
           <span className="wiki-novel-tag">Cultivation Novel</span>
           <div className="wiki-novel-meta">
-            <span>Author: {novel.author || "Unknown"}</span>
-            <span>Chapters Tracked: {formatNumber(novel.chapter_count)}</span>
+            <span className="author">Author: {novel.author || "Unknown"}</span>
+            <span className="chapters" title={`The wiki currently covers data up to chapter ${formatNumber(coveredChapters)}.`}>
+              Wiki Coverage: {formatNumber(coveredChapters)} / {formatNumber(totalChapters)} chapters
+            </span>
           </div>
           <p>
             A structured public wiki built from reviewed extraction data. Browse approved
@@ -42,30 +47,32 @@ export default function WikiNovelOverview({
         </div>
       </section>
 
-      <section className="wiki-stats-bar">
-        <div>
-          <strong>{formatNumber(novel.chapter_count)}</strong>
-          <span>Chapters</span>
-        </div>
-        <div>
-          <strong>{formatNumber(novel.approved_character_count)}</strong>
-          <span>Approved Characters</span>
-        </div>
-        <div>
-          <strong>{formatNumber(novel.approved_progression_count)}</strong>
-          <span>Progression Facts</span>
-        </div>
-        <div>
-          <strong>{formatNumber(novel.approved_skill_count)}</strong>
-          <span>Skills</span>
-        </div>
-        <div>
-          <strong>{formatNumber(novel.approved_item_count)}</strong>
-          <span>Items</span>
+      <section className="wiki-card">
+        <h2>Browse This Novel</h2>
+        <div className="wiki-browse-grid">
+          {browseCards.map(({ label, count, subtitle, action, Icon, tone }) => (
+            <button
+              className="wiki-browse-card"
+              disabled={!action}
+              key={label}
+              type="button"
+              onClick={action || undefined}
+            >
+              <span className={`wiki-browse-icon ${tone}`}>
+                <Icon aria-hidden="true" size={20} strokeWidth={2.2} />
+              </span>
+              <div>
+                <strong>{label}</strong>
+                <small>
+                  {formatNumber(count)} {subtitle}
+                </small>
+              </div>
+            </button>
+          ))}
         </div>
       </section>
 
-      <section className="wiki-overview-grid">
+      <section className="wiki-overview-grid single">
         <div className="wiki-card">
           <div className="wiki-card-heading">
             <h2>Main Characters</h2>
@@ -91,51 +98,6 @@ export default function WikiNovelOverview({
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="wiki-card">
-          <h2>Data & Tracking Status</h2>
-          <div className="wiki-status-list">
-            <div>
-              <span>Last updated</span>
-              <strong>{formatDate(novel.updated_at)}</strong>
-            </div>
-            <div>
-              <span>Approved entries</span>
-              <strong>{formatNumber(novel.approved_entry_count)}</strong>
-            </div>
-            <div>
-              <span>Pending review</span>
-              <strong>{formatNumber(novel.pending_review_count)}</strong>
-            </div>
-            <div>
-              <span>Coverage</span>
-              <strong>Up to {formatNumber(novel.chapter_count)} chapters</strong>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="wiki-card">
-        <h2>Browse This Novel</h2>
-        <div className="wiki-browse-grid">
-          {browseCards.map(([label, count, subtitle, action]) => (
-            <button
-              className="wiki-browse-card"
-              disabled={!action}
-              key={label}
-              type="button"
-              onClick={action || undefined}
-            >
-              <span>{label.slice(0, 1)}</span>
-              <div>
-                <strong>{label}</strong>
-                <small>
-                  {formatNumber(count)} {subtitle}
-                </small>
-              </div>
-            </button>
-          ))}
         </div>
       </section>
 
