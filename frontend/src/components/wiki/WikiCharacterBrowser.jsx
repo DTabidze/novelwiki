@@ -89,7 +89,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
   const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-  function updateFilters(nextValues) {
+  function updateFilters(nextValues, options = {}) {
     const nextParams = new URLSearchParams(searchParams);
 
     Object.entries(nextValues).forEach(([key, value]) => {
@@ -100,7 +100,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
       }
     });
 
-    setSearchParams(nextParams, { replace: false });
+    setSearchParams(nextParams, { replace: Boolean(options.replace) });
   }
 
   function clearAllFilters() {
@@ -153,7 +153,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
             <input
               type="search"
               value={search}
-              onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
+              onChange={(event) => updateFilters({ q: event.target.value, page: 1 }, { replace: Boolean(search) })}
               placeholder="Search characters..."
             />
           </label>
@@ -164,7 +164,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
         <section className="wiki-active-filter-bar" aria-label="Active filters">
           <strong>Active Filters:</strong>
           {search ? (
-            <button type="button" onClick={() => updateFilters({ q: "", page: 1 })}>
+            <button type="button" onClick={() => updateFilters({ q: "", page: 1 }, { replace: true })}>
               Search: {search} <span aria-hidden="true">x</span>
             </button>
           ) : null}
