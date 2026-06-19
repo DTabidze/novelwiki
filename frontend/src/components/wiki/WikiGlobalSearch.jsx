@@ -240,6 +240,7 @@ export default function WikiGlobalSearch({
     if (!isSearchPage) return;
 
     const nextParams = new URLSearchParams(searchParams);
+    const previousQuery = searchParams.get("q") || "";
     const trimmedValue = value.trim();
 
     if (trimmedValue) {
@@ -249,7 +250,7 @@ export default function WikiGlobalSearch({
       nextParams.delete("type");
     }
 
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams(nextParams, { replace: Boolean(previousQuery) || !trimmedValue });
   }
 
   function viewAllPath(type = activeTab) {

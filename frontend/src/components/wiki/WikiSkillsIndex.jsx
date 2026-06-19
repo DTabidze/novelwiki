@@ -77,7 +77,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
     : null;
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-  function updateFilters(nextValues) {
+  function updateFilters(nextValues, options = {}) {
     const nextParams = new URLSearchParams(searchParams);
 
     Object.entries(nextValues).forEach(([key, value]) => {
@@ -88,7 +88,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
       }
     });
 
-    setSearchParams(nextParams, { replace: false });
+    setSearchParams(nextParams, { replace: Boolean(options.replace) });
   }
 
   function clearAllFilters() {
@@ -149,7 +149,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
               type="search"
               value={search}
               placeholder="Search skills..."
-              onChange={(event) => updateFilters({ q: event.target.value, page: 1 })}
+              onChange={(event) => updateFilters({ q: event.target.value, page: 1 }, { replace: Boolean(search) })}
             />
           </label>
           <select
@@ -174,7 +174,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
             </button>
           ) : null}
           {search ? (
-            <button type="button" onClick={() => updateFilters({ q: "", page: 1 })}>
+            <button type="button" onClick={() => updateFilters({ q: "", page: 1 }, { replace: true })}>
               Search: {search} <span aria-hidden="true">x</span>
             </button>
           ) : null}
