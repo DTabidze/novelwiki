@@ -78,7 +78,27 @@ function groupChronologically(events) {
   return groups;
 }
 
-export default function WikiProgressionView({ events }) {
+function shouldCoverEvent(event, spoilerLimit, revealAllSpoilers, revealedEventIds) {
+  if (revealAllSpoilers || revealedEventIds.has(event.id)) {
+    return false;
+  }
+
+  if (!spoilerLimit) {
+    return true;
+  }
+
+  const eventChapter = chapterNumber(event);
+
+  return !eventChapter || eventChapter > spoilerLimit;
+}
+
+export default function WikiProgressionView({
+  events,
+  onRevealEvent = () => {},
+  revealedEventIds = new Set(),
+  revealAllSpoilers = false,
+  spoilerLimit = null,
+}) {
   const timelineEvents = events.filter((event) =>
     ["cultivation_level", "position"].includes(event.progression_type)
   );
@@ -89,10 +109,15 @@ export default function WikiProgressionView({ events }) {
       {timelineEvents.length === 0 ? <p>No approved cultivation or position progression yet.</p> : null}
       {groups.map((group) => (
         <section className="wiki-timeline-realm" key={group.realm}>
-          <h2>{group.realm}</h2>
+          <h2>
+            {group.events.every((event) => shouldCoverEvent(event, spoilerLimit, revealAllSpoilers, revealedEventIds))
+              ? "Spoiler-covered realm"
+              : group.realm}
+          </h2>
           <div className="wiki-journey-timeline">
             {group.events.map((event) => {
               const isCultivation = event.progression_type === "cultivation_level";
+              const isCovered = shouldCoverEvent(event, spoilerLimit, revealAllSpoilers, revealedEventIds);
               const description = conciseDescription(event);
               const eventValue = isCultivation ? formatCultivationValue(event.new_value) : event.new_value;
               const oldValue = isCultivation ? formatCultivationValue(event.old_value) : event.old_value;
@@ -102,16 +127,30 @@ export default function WikiProgressionView({ events }) {
                   className={isCultivation ? "wiki-journey-event cultivation" : "wiki-journey-event position"}
                   key={event.id}
                 >
-                  <small>{chapterLabel(event.chapter)}</small>
+                  <small>{isCovered ? "Spoiler" : chapterLabel(event.chapter)}</small>
                   <span className="wiki-journey-node" />
-                  <div className="wiki-journey-card">
-                    <div>
-                      <strong>{eventValue}</strong>
-                      <span>{isCultivation ? "Cultivation Breakthrough" : "Position Advancement"}</span>
+                  {isCovered ? (
+                    <button
+                      className="wiki-journey-card wiki-journey-spoiler-cover"
+                      type="button"
+                      onClick={() => onRevealEvent(event.id)}
+                    >
+                      <div>
+                        <strong>Spoiler covered</strong>
+                        <span>{isCultivation ? "Cultivation Breakthrough" : "Position Advancement"}</span>
+                      </div>
+                      <p>Click to reveal this progression entry.</p>
+                    </button>
+                  ) : (
+                    <div className="wiki-journey-card">
+                      <div>
+                        <strong>{eventValue}</strong>
+                        <span>{isCultivation ? "Cultivation Breakthrough" : "Position Advancement"}</span>
+                      </div>
+                      {oldValue ? <p>From {oldValue}</p> : null}
+                      {description ? <p>{description}</p> : null}
                     </div>
-                    {oldValue ? <p>From {oldValue}</p> : null}
-                    {description ? <p>{description}</p> : null}
-                  </div>
+                  )}
                 </article>
               );
             })}

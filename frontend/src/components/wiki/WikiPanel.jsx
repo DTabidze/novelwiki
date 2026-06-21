@@ -360,7 +360,7 @@ export default function WikiPanel({
               ) : null}
 
               {page === "CharacterProgression" ? (
-                <WikiCharacterProgressionPage character={selectedCharacter} isLoading={loading} />
+                <WikiCharacterProgressionPage character={selectedCharacter} isLoading={loading} novel={trackedNovel} />
               ) : null}
 
               {page === "Characters" ? (

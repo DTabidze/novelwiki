@@ -1978,6 +1978,12 @@ button:disabled {
   margin-top: 6px;
 }
 
+.wiki-library-header p .wiki-inline-link {
+  margin-top: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
 .wiki-outline-link {
   display: inline-flex;
   align-items: center;
@@ -4113,6 +4119,62 @@ button:disabled {
   padding: 22px 24px;
 }
 
+.wiki-spoiler-limit-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--wiki-border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  background: #ffffff;
+  box-shadow: var(--wiki-shadow);
+}
+
+.wiki-spoiler-limit-card > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wiki-spoiler-limit-card strong {
+  color: #061449;
+  font-size: 16px;
+}
+
+.wiki-spoiler-limit-card span {
+  color: var(--wiki-muted);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.wiki-spoiler-limit-card form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  justify-content: flex-end;
+}
+
+.wiki-spoiler-limit-card label {
+  display: grid;
+  gap: 5px;
+  color: var(--wiki-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.wiki-spoiler-limit-card input {
+  width: 116px;
+  min-height: 38px;
+  border: 1px solid var(--wiki-border);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--wiki-text);
+  font: inherit;
+  font-weight: 800;
+}
+
 .wiki-progression-summary {
   width: fit-content;
   border-radius: 6px;
@@ -4243,6 +4305,20 @@ button:disabled {
   margin: 0;
   color: var(--wiki-muted);
   line-height: 1.55;
+}
+
+.wiki-journey-spoiler-cover {
+  cursor: pointer;
+  text-align: left;
+}
+
+.wiki-journey-spoiler-cover:hover {
+  border-color: var(--wiki-primary-border);
+  background: #f8fbff;
+}
+
+.wiki-journey-spoiler-cover strong {
+  color: #061449;
 }
 
 .wiki-local-search-field {
@@ -6264,6 +6340,20 @@ button:disabled {
 
   .wiki-library-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .wiki-spoiler-limit-card {
+    grid-template-columns: 1fr;
+  }
+
+  .wiki-spoiler-limit-card form {
+    justify-content: stretch;
+  }
+
+  .wiki-spoiler-limit-card label,
+  .wiki-spoiler-limit-card input,
+  .wiki-spoiler-limit-card .wiki-outline-link {
+    width: 100%;
   }
 
   .wiki-novel-card {
