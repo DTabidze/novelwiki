@@ -8,6 +8,7 @@ import {
 } from "../../utils/wikiFormat.js";
 
 const PAGE_SIZE = 20;
+const SKELETON_ROWS = Array.from({ length: 4 }, (_, index) => index);
 
 function pageWindow(currentPage, totalPages) {
   const pages = [];
@@ -21,8 +22,27 @@ function pageWindow(currentPage, totalPages) {
   return pages;
 }
 
+function CultivationSkeletonRows() {
+  return SKELETON_ROWS.map((index) => (
+    <div aria-hidden="true" className="wiki-cultivation-row wiki-index-skeleton-row" key={index}>
+      <span className="wiki-skeleton wiki-index-skeleton-icon" />
+      <span className="wiki-skeleton wiki-skeleton-title" />
+      <span className="wiki-skeleton wiki-skeleton-badge" />
+      <span className="wiki-cultivation-confirmed">
+        <span className="wiki-skeleton wiki-skeleton-meta-short" />
+        <span className="wiki-skeleton wiki-skeleton-meta-long" />
+      </span>
+      <span className="wiki-breakthrough-count">
+        <span className="wiki-skeleton wiki-skeleton-meta-short" />
+        <span className="wiki-skeleton wiki-skeleton-meta-short" />
+      </span>
+    </div>
+  ));
+}
+
 export default function WikiCultivationPage({
   characters,
+  isLoading = false,
   novel,
   onSelectCharacterProgression,
   progressionEvents,
@@ -61,28 +81,30 @@ export default function WikiCultivationPage({
     );
   }
 
-  const characterRows = characters
-    .map((character) => {
-      const cultivationEvents = progressionEvents.filter(
-        (event) =>
-          event.character_id === character.id &&
-          event.progression_type === "cultivation_level" &&
-          event.new_value
-      );
-      const latestEvent = latestCultivationEventFor(character);
-      const cultivationValue = formatCultivationValue(latestEvent?.new_value || character.current_cultivation_level);
+  const characterRows = isLoading
+    ? []
+    : characters
+      .map((character) => {
+        const cultivationEvents = progressionEvents.filter(
+          (event) =>
+            event.character_id === character.id &&
+            event.progression_type === "cultivation_level" &&
+            event.new_value
+        );
+        const latestEvent = latestCultivationEventFor(character);
+        const cultivationValue = formatCultivationValue(latestEvent?.new_value || character.current_cultivation_level);
 
-      return {
-        character,
-        breakthroughCount: cultivationEvents.length,
-        chapter: latestEvent?.chapter || null,
-        cultivationValue,
-        firstLetter: (character.name || "?").trim().slice(0, 1).toUpperCase(),
-        realmKey: cultivationValue.toLowerCase(),
-      };
-    })
-    .filter((row) => row.cultivationValue)
-    .sort((first, second) => first.character.name.localeCompare(second.character.name));
+        return {
+          character,
+          breakthroughCount: cultivationEvents.length,
+          chapter: latestEvent?.chapter || null,
+          cultivationValue,
+          firstLetter: (character.name || "?").trim().slice(0, 1).toUpperCase(),
+          realmKey: cultivationValue.toLowerCase(),
+        };
+      })
+      .filter((row) => row.cultivationValue)
+      .sort((first, second) => first.character.name.localeCompare(second.character.name));
 
   const realmOptions = [...new Set(characterRows.map((row) => row.cultivationValue))].sort((first, second) =>
     first.localeCompare(second)
@@ -105,14 +127,18 @@ export default function WikiCultivationPage({
   }, [activeLetter, realmFilter, searchTerm]);
 
   React.useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
     if (safeCurrentPage !== currentPage) {
       setCurrentPage(safeCurrentPage);
     }
-  }, [currentPage, safeCurrentPage]);
+  }, [currentPage, isLoading, safeCurrentPage]);
 
   return (
     <article className="wiki-index-page wiki-cultivation-page">
-      <section className="wiki-index-header">
+      <header className="wiki-index-header">
         <div>
           <h1>
             Cultivation
@@ -145,7 +171,7 @@ export default function WikiCultivationPage({
             ))}
           </select>
         </div>
-      </section>
+      </header>
 
       <nav className="wiki-index-alphabet" aria-label="Filter cultivation characters by first letter">
         <button
@@ -168,12 +194,22 @@ export default function WikiCultivationPage({
       </nav>
 
       <section className="wiki-index-toolbar">
-        <strong>{formatNumber(filteredRows.length)} characters found</strong>
+        <strong>
+          {isLoading ? (
+            <span className="wiki-inline-loading">
+              <span aria-hidden="true" />
+              Loading cultivation...
+            </span>
+          ) : (
+            `${formatNumber(filteredRows.length)} characters found`
+          )}
+        </strong>
       </section>
 
       <section className="wiki-cultivation-index">
         <div className="wiki-cultivation-rows">
-          {visibleRows.length ? visibleRows.map((row) => {
+          {isLoading ? <CultivationSkeletonRows /> : null}
+          {!isLoading && visibleRows.length ? visibleRows.map((row) => {
             const chapterTitle = cleanChapterTitle(row.chapter);
 
             return (
@@ -199,32 +235,35 @@ export default function WikiCultivationPage({
                 <span className="wiki-row-action">›</span>
               </button>
             );
-          }) : (
+          }) : null}
+          {!isLoading && !visibleRows.length ? (
             <p className="wiki-muted-copy">No matching characters found.</p>
-          )}
+          ) : null}
         </div>
       </section>
 
-      <footer className="wiki-index-pagination">
-        <div>
-          {pageWindow(safeCurrentPage, totalPages).map((page) => (
-            <button
-              className={page === safeCurrentPage ? "active" : ""}
-              key={page}
-              type="button"
-              onClick={() => setCurrentPage(page)}
-            >
-              {page}
-            </button>
-          ))}
-          {safeCurrentPage < totalPages ? (
-            <button type="button" onClick={() => setCurrentPage(safeCurrentPage + 1)}>›</button>
-          ) : null}
-        </div>
-        <span>
-          Showing {filteredRows.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredRows.length)} characters
-        </span>
-      </footer>
+      {!isLoading ? (
+        <footer className="wiki-index-pagination">
+          <div>
+            {pageWindow(safeCurrentPage, totalPages).map((page) => (
+              <button
+                className={page === safeCurrentPage ? "active" : ""}
+                key={page}
+                type="button"
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </button>
+            ))}
+            {safeCurrentPage < totalPages ? (
+              <button type="button" onClick={() => setCurrentPage(safeCurrentPage + 1)}>›</button>
+            ) : null}
+          </div>
+          <span>
+            Showing {filteredRows.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredRows.length)} characters
+          </span>
+        </footer>
+      ) : null}
     </article>
   );
 }

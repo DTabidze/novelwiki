@@ -6,6 +6,7 @@ import { formatNumber } from "../../utils/wikiFormat.js";
 import { ITEM_TYPES, ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
 
 const PAGE_SIZE = 20;
+const SKELETON_ROWS = Array.from({ length: 4 }, (_, index) => index);
 
 function itemMatchesCharacter(item, characterId) {
   if (!characterId) return true;
@@ -32,7 +33,18 @@ function pageWindow(currentPage, totalPages) {
   return pages;
 }
 
-export default function WikiItemsIndex({ characters, items, novel, onSelectCharacter, onSelectItem }) {
+function ItemSkeletonRows() {
+  return SKELETON_ROWS.map((index) => (
+    <div aria-hidden="true" className="wiki-entity-row item-index-row wiki-index-skeleton-row" key={index}>
+      <span className="wiki-skeleton wiki-index-skeleton-icon" />
+      <span className="wiki-skeleton wiki-skeleton-title" />
+      <span className="wiki-skeleton wiki-skeleton-badge" />
+      <span className="wiki-skeleton wiki-skeleton-line" />
+    </div>
+  ));
+}
+
+export default function WikiItemsIndex({ characters, isLoading = false, items, novel, onSelectCharacter, onSelectItem }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const characterId = Number(searchParams.get("character_id")) || null;
   const search = searchParams.get("q") || "";
@@ -73,6 +85,10 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
   }
 
   const filteredItems = React.useMemo(() => {
+    if (isLoading) {
+      return [];
+    }
+
     const rows = items
       .filter((item) => itemMatchesCharacter(item, characterId))
       .filter((item) => itemMatchesSearch(item, search))
@@ -90,7 +106,7 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
 
       return first.name.localeCompare(second.name);
     });
-  }, [bookmarked, characterId, items, letter, search, sort, type]);
+  }, [bookmarked, characterId, isLoading, items, letter, search, sort, type]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
@@ -100,11 +116,15 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
   const hasActiveFilters = Boolean(characterId || search || type !== "all" || letter !== "All" || bookmarked);
 
   React.useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
     if (requestedPage !== currentPage) {
       updateFilters({ page: currentPage });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, requestedPage]);
+  }, [currentPage, isLoading, requestedPage]);
 
   return (
     <article className="wiki-index-page wiki-items-index">
@@ -206,7 +226,16 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
       </nav>
 
       <section className="wiki-index-toolbar">
-        <strong>{formatNumber(filteredItems.length)} items found</strong>
+        <strong>
+          {isLoading ? (
+            <span className="wiki-inline-loading">
+              <span aria-hidden="true" />
+              Loading items...
+            </span>
+          ) : (
+            `${formatNumber(filteredItems.length)} items found`
+          )}
+        </strong>
         <div>
           <label>
             <span>Sort by:</span>
@@ -231,7 +260,8 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
 
       <section className={view === "grid" ? "wiki-entity-index grid" : "wiki-entity-index"}>
         <div className="wiki-entity-rows">
-          {visibleItems.length ? visibleItems.map((item) => {
+          {isLoading ? <ItemSkeletonRows /> : null}
+          {!isLoading && visibleItems.length ? visibleItems.map((item) => {
             const itemType = itemTypeFor(item);
             const description = (item.description || "No description recorded yet.").replace(/\s+/g, " ");
 
@@ -251,32 +281,35 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
                 <span className="wiki-row-action">›</span>
               </button>
             );
-          }) : (
+          }) : null}
+          {!isLoading && !visibleItems.length ? (
             <p className="wiki-muted-copy">No matching items found.</p>
-          )}
+          ) : null}
         </div>
       </section>
 
-      <footer className="wiki-index-pagination">
-        <div>
-          {pageWindow(currentPage, totalPages).map((page) => (
-            <button
-              className={page === currentPage ? "active" : ""}
-              key={page}
-              type="button"
-              onClick={() => updateFilters({ page })}
-            >
-              {page}
-            </button>
-          ))}
-          {currentPage < totalPages ? (
-            <button type="button" onClick={() => updateFilters({ page: currentPage + 1 })}>›</button>
-          ) : null}
-        </div>
-        <span>
-          Showing {filteredItems.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredItems.length)} items
-        </span>
-      </footer>
+      {!isLoading ? (
+        <footer className="wiki-index-pagination">
+          <div>
+            {pageWindow(currentPage, totalPages).map((page) => (
+              <button
+                className={page === currentPage ? "active" : ""}
+                key={page}
+                type="button"
+                onClick={() => updateFilters({ page })}
+              >
+                {page}
+              </button>
+            ))}
+            {currentPage < totalPages ? (
+              <button type="button" onClick={() => updateFilters({ page: currentPage + 1 })}>›</button>
+            ) : null}
+          </div>
+          <span>
+            Showing {filteredItems.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredItems.length)} items
+          </span>
+        </footer>
+      ) : null}
     </article>
   );
 }

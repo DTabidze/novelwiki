@@ -35,7 +35,7 @@ export default function WikiNovelRoute({
     ? novel
     : {
         id: numericNovelId,
-        title: "Loading...",
+        title: "Novel",
         approved_character_count: 0,
       };
 

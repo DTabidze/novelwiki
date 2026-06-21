@@ -2854,7 +2854,7 @@ button:disabled {
   align-items: center;
   width: 100%;
   min-width: 0;
-  padding: 18px 0 8px;
+  padding: 0 0 8px;
 }
 
 .wiki-index-header > div {
@@ -3536,6 +3536,117 @@ button:disabled {
   box-shadow: inset 3px 0 0 var(--wiki-primary-border);
 }
 
+.wiki-skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9edf3;
+}
+
+.wiki-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), transparent);
+  animation: wiki-skeleton-shimmer 1.45s ease-in-out infinite;
+}
+
+@keyframes wiki-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.wiki-inline-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--wiki-muted);
+}
+
+.wiki-inline-loading > span {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #bfdbfe;
+  border-top-color: var(--wiki-primary);
+  border-radius: 999px;
+  animation: wiki-inline-loading-spin 800ms linear infinite;
+}
+
+@keyframes wiki-inline-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.wiki-character-skeleton-row,
+.wiki-character-skeleton-card,
+.wiki-index-skeleton-row {
+  pointer-events: none;
+}
+
+.wiki-character-skeleton-row:hover,
+.wiki-character-skeleton-card:hover,
+.wiki-index-skeleton-row:hover {
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.wiki-character-skeleton-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+}
+
+.wiki-character-skeleton-row .wiki-character-skeleton-avatar {
+  margin-left: 2px;
+}
+
+.wiki-index-skeleton-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+}
+
+.wiki-skeleton-title {
+  width: min(320px, 70%);
+  height: 18px;
+  border-radius: 5px;
+}
+
+.wiki-skeleton-badge {
+  width: 128px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.wiki-skeleton-subtitle {
+  width: min(220px, 52%);
+  height: 13px;
+  border-radius: 5px;
+}
+
+.wiki-skeleton-line {
+  width: min(100%, 360px);
+  height: 14px;
+  border-radius: 5px;
+}
+
+.wiki-skeleton-meta-short {
+  width: 112px;
+  height: 12px;
+  border-radius: 5px;
+}
+
+.wiki-skeleton-meta-long {
+  width: 172px;
+  max-width: 100%;
+  height: 13px;
+  border-radius: 5px;
+}
+
 .wiki-character-rows.grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3555,6 +3666,11 @@ button:disabled {
 
 .wiki-character-rows.grid .wiki-character-first-appearance {
   grid-column: 2 / 3;
+}
+
+.wiki-character-rows.grid .wiki-character-skeleton-card {
+  align-items: start;
+  min-height: 142px;
 }
 
 .wiki-character-initials {

@@ -1,6 +1,5 @@
 import React from "react";
 import { Search } from "lucide-react";
-import { formatNumber } from "../../utils/wikiFormat.js";
 import { ITEM_TYPES, ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
 
 export default function WikiEntityBrowser({ entities, iconLabel, onSelectEntity, pageTitle }) {
@@ -29,12 +28,9 @@ export default function WikiEntityBrowser({ entities, iconLabel, onSelectEntity,
 
   return (
     <article className="wiki-index-page wiki-entity-browser">
-      <section className="wiki-index-header">
+      <header className="wiki-index-header">
         <div>
           <h1>{pageTitle}</h1>
-          <p>
-            {formatNumber(entities.length)} {entityLabel}
-          </p>
         </div>
         <div className="wiki-index-tools single">
           <label className="wiki-local-search-field">
@@ -47,7 +43,7 @@ export default function WikiEntityBrowser({ entities, iconLabel, onSelectEntity,
             />
           </label>
         </div>
-      </section>
+      </header>
 
       <nav className={isItemsPage ? "wiki-index-alphabet has-secondary-filter" : "wiki-index-alphabet"} aria-label={`Filter ${entityLabel} by first letter`}>
         <button

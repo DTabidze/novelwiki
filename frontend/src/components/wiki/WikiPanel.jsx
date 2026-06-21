@@ -342,8 +342,6 @@ export default function WikiPanel({
             <WikiBookmarksPage onRemoveBookmark={onRemoveBookmark} />
           ) : null}
 
-          {loading ? <p className="wiki-loading">Loading wiki data...</p> : null}
-
           {trackedNovel ? (
             <>
               {page === "Character" && selectedCharacter ? (
@@ -367,6 +365,7 @@ export default function WikiPanel({
               {page === "Characters" ? (
                 <WikiCharacterBrowser
                   characters={characters}
+                  isLoading={loading}
                   novel={trackedNovel}
                   onSelectCharacter={openCharacter}
                 />
@@ -375,6 +374,7 @@ export default function WikiPanel({
               {page === "Skills" ? (
                 <WikiSkillsIndex
                   characters={characters}
+                  isLoading={loading}
                   novel={trackedNovel}
                   onSelectCharacter={openCharacter}
                   onSelectSkill={openSkill}
@@ -386,6 +386,7 @@ export default function WikiPanel({
               {page === "Cultivation" ? (
                 <WikiCultivationPage
                   characters={characters}
+                  isLoading={loading}
                   novel={trackedNovel}
                   progressionEvents={progressionEvents}
                   selectedCharacter={null}
@@ -404,6 +405,7 @@ export default function WikiPanel({
               {page === "Items" ? (
                 <WikiItemsIndex
                   characters={characters}
+                  isLoading={loading}
                   items={items}
                   novel={trackedNovel}
                   onSelectCharacter={openCharacter}

@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { chapterLabel, formatCultivationValue, formatNumber } from "../../utils/wikiFormat.js";
 
 const PAGE_SIZE = 20;
+const SKELETON_ROWS = Array.from({ length: 4 }, (_, index) => index);
 const QUICK_FILTERS = [
   { key: "gender", value: "male", label: "Male" },
   { key: "gender", value: "female", label: "Female" },
@@ -79,7 +80,30 @@ function pageWindow(currentPage, totalPages) {
   return pages;
 }
 
-export default function WikiCharacterBrowser({ characters, novel, onSelectCharacter }) {
+function CharacterSkeletonRows({ view }) {
+  return SKELETON_ROWS.map((index) => (
+    <div
+      aria-hidden="true"
+      className={view === "grid" ? "wiki-character-row wiki-character-skeleton-card" : "wiki-character-row wiki-character-skeleton-row"}
+      key={index}
+    >
+      <span className="wiki-skeleton wiki-character-skeleton-avatar" />
+      <span className="wiki-character-row-main">
+        <span>
+          <span className="wiki-skeleton wiki-skeleton-title" />
+          <span className="wiki-skeleton wiki-skeleton-badge" />
+        </span>
+        <span className="wiki-skeleton wiki-skeleton-subtitle" />
+      </span>
+      <span className="wiki-character-first-appearance">
+        <span className="wiki-skeleton wiki-skeleton-meta-short" />
+        <span className="wiki-skeleton wiki-skeleton-meta-long" />
+      </span>
+    </div>
+  ));
+}
+
+export default function WikiCharacterBrowser({ characters, isLoading = false, novel, onSelectCharacter }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("q") || "";
   const letter = searchParams.get("letter") || "All";
@@ -110,6 +134,10 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
   }
 
   const filteredCharacters = React.useMemo(() => {
+    if (isLoading) {
+      return [];
+    }
+
     const rows = characters
       .filter((character) => characterMatchesSearch(character, search))
       .filter((character) => gender === "all" || String(character.gender || "").toLowerCase() === gender)
@@ -127,7 +155,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
 
       return first.name.localeCompare(second.name);
     });
-  }, [bookmarked, characters, gender, letter, search, sort, status]);
+  }, [bookmarked, characters, gender, isLoading, letter, search, sort, status]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCharacters.length / PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
@@ -137,15 +165,19 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
   const hasActiveFilters = Boolean(search || letter !== "All" || gender !== "all" || status !== "all" || bookmarked);
 
   React.useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
     if (requestedPage !== currentPage) {
       updateFilters({ page: currentPage });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, requestedPage]);
+  }, [currentPage, isLoading, requestedPage]);
 
   return (
     <article className="wiki-index-page wiki-character-browser">
-      <section className="wiki-index-header">
+      <header className="wiki-index-header">
         <div>
           <h1>Characters</h1>
         </div>
@@ -160,7 +192,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
             />
           </label>
         </div>
-      </section>
+      </header>
 
       {hasActiveFilters ? (
         <section className="wiki-active-filter-bar" aria-label="Active filters">
@@ -239,7 +271,16 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
       </nav>
 
       <section className="wiki-index-toolbar">
-        <strong>{formatNumber(filteredCharacters.length)} characters found</strong>
+        <strong>
+          {isLoading ? (
+            <span className="wiki-inline-loading">
+              <span aria-hidden="true" />
+              Loading characters...
+            </span>
+          ) : (
+            `${formatNumber(filteredCharacters.length)} characters found`
+          )}
+        </strong>
         <div>
           <label>
             <span>Sort by:</span>
@@ -264,7 +305,8 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
 
       <section className="wiki-character-index">
         <div className={view === "grid" ? "wiki-character-rows grid" : "wiki-character-rows"}>
-          {visibleCharacters.length ? visibleCharacters.map((character) => {
+          {isLoading ? <CharacterSkeletonRows view={view} /> : null}
+          {!isLoading && visibleCharacters.length ? visibleCharacters.map((character) => {
             const cultivation = character.current_cultivation_level
               ? formatCultivationValue(character.current_cultivation_level)
               : "";
@@ -297,32 +339,35 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
                 <span className="wiki-row-action">›</span>
               </button>
             );
-          }) : (
+          }) : null}
+          {!isLoading && !visibleCharacters.length ? (
             <p className="wiki-muted-copy">No matching characters found.</p>
-          )}
+          ) : null}
         </div>
       </section>
 
-      <footer className="wiki-index-pagination">
-        <div>
-          {pageWindow(currentPage, totalPages).map((page) => (
-            <button
-              className={page === currentPage ? "active" : ""}
-              key={page}
-              type="button"
-              onClick={() => updateFilters({ page })}
-            >
-              {page}
-            </button>
-          ))}
-          {currentPage < totalPages ? (
-            <button type="button" onClick={() => updateFilters({ page: currentPage + 1 })}>›</button>
-          ) : null}
-        </div>
-        <span>
-          Showing {filteredCharacters.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredCharacters.length)} characters
-        </span>
-      </footer>
+      {!isLoading ? (
+        <footer className="wiki-index-pagination">
+          <div>
+            {pageWindow(currentPage, totalPages).map((page) => (
+              <button
+                className={page === currentPage ? "active" : ""}
+                key={page}
+                type="button"
+                onClick={() => updateFilters({ page })}
+              >
+                {page}
+              </button>
+            ))}
+            {currentPage < totalPages ? (
+              <button type="button" onClick={() => updateFilters({ page: currentPage + 1 })}>›</button>
+            ) : null}
+          </div>
+          <span>
+            Showing {filteredCharacters.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredCharacters.length)} characters
+          </span>
+        </footer>
+      ) : null}
     </article>
   );
 }

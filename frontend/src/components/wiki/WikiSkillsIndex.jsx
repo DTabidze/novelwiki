@@ -21,6 +21,7 @@ const SKILL_CATEGORIES = [
 ];
 
 const PAGE_SIZE = 20;
+const SKELETON_ROWS = Array.from({ length: 4 }, (_, index) => index);
 
 function skillChapter(skill, characterId) {
   const characterRelationship = characterId
@@ -63,7 +64,28 @@ function pageWindow(currentPage, totalPages) {
   return pages;
 }
 
-export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, onSelectSkill, skills }) {
+function SkillSkeletonRows({ view }) {
+  return SKELETON_ROWS.map((index) => (
+    <div
+      aria-hidden="true"
+      className={view === "grid" ? "wiki-skill-index-row wiki-index-skeleton-row" : "wiki-skill-index-row wiki-index-skeleton-row"}
+      key={index}
+    >
+      <span className="wiki-skeleton wiki-index-skeleton-icon" />
+      <span className="wiki-skill-index-main">
+        <span className="wiki-skeleton wiki-skeleton-title" />
+        <span className="wiki-skeleton wiki-skeleton-badge" />
+      </span>
+      <span className="wiki-skeleton wiki-skeleton-line" />
+      <span className="wiki-skill-index-chapter">
+        <span className="wiki-skeleton wiki-skeleton-meta-short" />
+        <span className="wiki-skeleton wiki-skeleton-meta-long" />
+      </span>
+    </div>
+  ));
+}
+
+export default function WikiSkillsIndex({ characters, isLoading = false, novel, onSelectCharacter, onSelectSkill, skills }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const characterId = Number(searchParams.get("character_id")) || null;
   const search = searchParams.get("q") || "";
@@ -104,6 +126,10 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
   }
 
   const filteredSkills = React.useMemo(() => {
+    if (isLoading) {
+      return [];
+    }
+
     const rows = skills
       .filter((skill) => skillMatchesCharacter(skill, characterId))
       .filter((skill) => skillMatchesSearch(skill, search))
@@ -121,7 +147,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
 
       return first.name.localeCompare(second.name);
     });
-  }, [bookmarked, category, characterId, letter, search, skills, sort]);
+  }, [bookmarked, category, characterId, isLoading, letter, search, skills, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredSkills.length / PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
@@ -131,11 +157,15 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
   const hasActiveFilters = Boolean(characterId || search || category !== "all" || letter !== "All" || bookmarked);
 
   React.useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
     if (requestedPage !== currentPage) {
       updateFilters({ page: currentPage });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, requestedPage]);
+  }, [currentPage, isLoading, requestedPage]);
 
   return (
     <article className="wiki-index-page wiki-skills-index">
@@ -233,7 +263,16 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
       </nav>
 
       <section className="wiki-index-toolbar">
-        <strong>{formatNumber(filteredSkills.length)} skills found</strong>
+        <strong>
+          {isLoading ? (
+            <span className="wiki-inline-loading">
+              <span aria-hidden="true" />
+              Loading skills...
+            </span>
+          ) : (
+            `${formatNumber(filteredSkills.length)} skills found`
+          )}
+        </strong>
         <div>
           <label>
             <span>Sort by:</span>
@@ -257,7 +296,8 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
       </section>
 
       <section className={view === "grid" ? "wiki-skill-results grid" : "wiki-skill-results"}>
-        {visibleSkills.length ? visibleSkills.map((skill) => {
+        {isLoading ? <SkillSkeletonRows view={view} /> : null}
+        {!isLoading && visibleSkills.length ? visibleSkills.map((skill) => {
           const firstChapter = skillChapter(skill, characterId);
           const description = (skill.description || "No description recorded yet.").replace(/\s+/g, " ");
 
@@ -278,31 +318,34 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
               <span className="wiki-row-action">›</span>
             </button>
           );
-        }) : (
+        }) : null}
+        {!isLoading && !visibleSkills.length ? (
           <p className="wiki-muted-copy">No matching skills found.</p>
-        )}
+        ) : null}
       </section>
 
-      <footer className="wiki-index-pagination">
-        <div>
-          {pageWindow(currentPage, totalPages).map((page) => (
-            <button
-              className={page === currentPage ? "active" : ""}
-              key={page}
-              type="button"
-              onClick={() => updateFilters({ page })}
-            >
-              {page}
-            </button>
-          ))}
-          {currentPage < totalPages ? (
-            <button type="button" onClick={() => updateFilters({ page: currentPage + 1 })}>›</button>
-          ) : null}
-        </div>
-        <span>
-          Showing {filteredSkills.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredSkills.length)} skills
-        </span>
-      </footer>
+      {!isLoading ? (
+        <footer className="wiki-index-pagination">
+          <div>
+            {pageWindow(currentPage, totalPages).map((page) => (
+              <button
+                className={page === currentPage ? "active" : ""}
+                key={page}
+                type="button"
+                onClick={() => updateFilters({ page })}
+              >
+                {page}
+              </button>
+            ))}
+            {currentPage < totalPages ? (
+              <button type="button" onClick={() => updateFilters({ page: currentPage + 1 })}>›</button>
+            ) : null}
+          </div>
+          <span>
+            Showing {filteredSkills.length ? startIndex + 1 : 0} to {endIndex} of {formatNumber(filteredSkills.length)} skills
+          </span>
+        </footer>
+      ) : null}
     </article>
   );
 }
