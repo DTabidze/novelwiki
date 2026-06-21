@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from sqlalchemy import func
 
 from app.models import (
@@ -11,11 +11,19 @@ from app.models import (
     Item,
     Novel,
     Skill,
+    UserBookmark,
     WikiEditLog,
     WikiEvidence,
     WikiEvent,
     db,
     serialize_datetime,
+)
+from app.services.auth import current_user, login_required
+from app.services.wiki_bookmarks import (
+    add_bookmark,
+    bookmarked_entity_keys,
+    list_bookmarks,
+    remove_bookmark,
 )
 
 
@@ -26,6 +34,10 @@ APPROVED = "approved"
 
 def success(data, status=200):
     return jsonify({"data": data, "error": None}), status
+
+
+def failure(message, status=400):
+    return jsonify({"data": None, "error": message}), status
 
 
 def chapter_numbers_for_ids(chapter_ids):
@@ -181,7 +193,8 @@ def public_alias(alias):
     }
 
 
-def public_character_summary(character):
+def public_character_summary(character, bookmarked_keys=None):
+    bookmarked_keys = bookmarked_keys or set()
     return {
         "id": character.id,
         "novel_id": character.novel_id,
@@ -199,6 +212,7 @@ def public_character_summary(character):
         "titles": character.titles,
         "first_mentioned_chapter": chapter_reference(character.first_mentioned_chapter_id),
         "first_appeared_chapter": chapter_reference(character.first_appeared_chapter_id),
+        "is_bookmarked": (UserBookmark.ENTITY_CHARACTER, character.id) in bookmarked_keys,
         **current_values_from_progression(character.id),
     }
 
@@ -230,26 +244,26 @@ def public_life_event(life_event):
     }
 
 
-def public_character_skill(relationship):
+def public_character_skill(relationship, bookmarked_keys=None):
     return {
         "id": relationship.id,
         "character_id": relationship.character_id,
         "character_name": relationship.character.name if relationship.character else None,
         "skill_id": relationship.skill_id,
-        "skill": public_skill(relationship.skill) if relationship.skill else None,
+        "skill": public_skill(relationship.skill, bookmarked_keys) if relationship.skill else None,
         "chapter": chapter_reference(relationship.chapter_id),
         "description": relationship.description,
         "evidence": evidence_for("character_skill", relationship.id),
     }
 
 
-def public_character_item(relationship):
+def public_character_item(relationship, bookmarked_keys=None):
     return {
         "id": relationship.id,
         "character_id": relationship.character_id,
         "character_name": relationship.character.name if relationship.character else None,
         "item_id": relationship.item_id,
-        "item": public_item(relationship.item) if relationship.item else None,
+        "item": public_item(relationship.item, bookmarked_keys) if relationship.item else None,
         "chapter": chapter_reference(relationship.chapter_id),
         "relationship_type": relationship.relationship_type,
         "description": relationship.description,
@@ -257,7 +271,8 @@ def public_character_item(relationship):
     }
 
 
-def public_skill(skill):
+def public_skill(skill, bookmarked_keys=None):
+    bookmarked_keys = bookmarked_keys or set()
     character_rows = (
         CharacterSkill.query.filter_by(
             skill_id=skill.id,
@@ -273,6 +288,7 @@ def public_skill(skill):
         "name": skill.name,
         "category": skill.category,
         "description": skill.description,
+        "is_bookmarked": (UserBookmark.ENTITY_SKILL, skill.id) in bookmarked_keys,
         "aliases": [
             {
                 "id": alias.id,
@@ -295,7 +311,8 @@ def public_skill(skill):
     }
 
 
-def public_item(item):
+def public_item(item, bookmarked_keys=None):
+    bookmarked_keys = bookmarked_keys or set()
     character_rows = (
         CharacterItem.query.filter_by(
             item_id=item.id,
@@ -311,6 +328,7 @@ def public_item(item):
         "name": item.name,
         "category": item.category,
         "description": item.description,
+        "is_bookmarked": (UserBookmark.ENTITY_ITEM, item.id) in bookmarked_keys,
         "evidence": evidence_for("item", item.id),
         "characters": [
             {
@@ -330,7 +348,8 @@ def review_count(model, novel_id, status):
     return model.query.filter_by(novel_id=novel_id, review_status=status).count()
 
 
-def public_novel(novel):
+def public_novel(novel, bookmarked_keys=None):
+    bookmarked_keys = bookmarked_keys or set()
     approved_entry_count = sum(
         review_count(model, novel.id, APPROVED)
         for model in (
@@ -388,6 +407,7 @@ def public_novel(novel):
         "pending_review_count": pending_review_count,
         "wiki_coverage_start_chapter": coverage["start_chapter"],
         "wiki_coverage_end_chapter": coverage["end_chapter"],
+        "is_bookmarked": (UserBookmark.ENTITY_NOVEL, novel.id) in bookmarked_keys,
         "last_wiki_updated_at": serialize_datetime(last_wiki_update),
         "updated_at": novel.updated_at.isoformat() if novel.updated_at else None,
     }
@@ -396,13 +416,140 @@ def public_novel(novel):
 @wiki_bp.get("/novels")
 def list_public_novels():
     novels = Novel.query.order_by(Novel.title).all()
-    return success([public_novel(novel) for novel in novels])
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id) if user else set()
+    return success([public_novel(novel, bookmarked_keys) for novel in novels])
 
 
 @wiki_bp.get("/novels/<int:novel_id>")
 def get_public_novel(novel_id):
     novel = Novel.query.get_or_404(novel_id)
-    return success(public_novel(novel))
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id) if user else set()
+    return success(public_novel(novel, bookmarked_keys))
+
+
+def public_bookmark_entity(bookmark, bookmarked_keys):
+    if bookmark.entity_type == UserBookmark.ENTITY_NOVEL:
+        novel = db.session.get(Novel, bookmark.entity_id)
+        return public_novel(novel, bookmarked_keys) if novel else None
+
+    if bookmark.entity_type == UserBookmark.ENTITY_CHARACTER:
+        character = Character.query.filter_by(
+            id=bookmark.entity_id,
+            review_status=APPROVED,
+        ).first()
+        return public_character_summary(character, bookmarked_keys) if character else None
+
+    if bookmark.entity_type == UserBookmark.ENTITY_SKILL:
+        skill = Skill.query.filter_by(
+            id=bookmark.entity_id,
+            review_status=APPROVED,
+        ).first()
+        return public_skill(skill, bookmarked_keys) if skill else None
+
+    if bookmark.entity_type == UserBookmark.ENTITY_ITEM:
+        item = Item.query.filter_by(
+            id=bookmark.entity_id,
+            review_status=APPROVED,
+        ).first()
+        return public_item(item, bookmarked_keys) if item else None
+
+    return None
+
+
+def public_bookmark_novel(bookmark):
+    novel = db.session.get(Novel, bookmark.novel_id)
+
+    if not novel:
+        return None
+
+    return {
+        "id": novel.id,
+        "title": novel.title,
+    }
+
+
+def public_bookmark(bookmark, bookmarked_keys, created=None):
+    data = {
+        "id": bookmark.id,
+        "novel_id": bookmark.novel_id,
+        "novel": public_bookmark_novel(bookmark),
+        "entity_type": bookmark.entity_type,
+        "entity_id": bookmark.entity_id,
+        "created_at": serialize_datetime(bookmark.created_at),
+        "entity": public_bookmark_entity(bookmark, bookmarked_keys),
+    }
+
+    if created is not None:
+        data["created"] = created
+
+    return data
+
+
+@wiki_bp.get("/me/bookmarks")
+@login_required
+def list_my_bookmarks():
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id)
+    bookmarks = list_bookmarks(user.id)
+    return success([public_bookmark(bookmark, bookmarked_keys) for bookmark in bookmarks])
+
+
+@wiki_bp.post("/me/bookmarks")
+@login_required
+def create_my_bookmark_from_payload():
+    payload = request.get_json(silent=True) or {}
+    entity_type = payload.get("entity_type")
+    entity_id = payload.get("entity_id")
+
+    try:
+        entity_id = int(entity_id)
+    except (TypeError, ValueError):
+        return failure("Bookmark target is required.", status=400)
+
+    return create_my_bookmark_for_entity(entity_type, entity_id)
+
+
+@wiki_bp.post("/me/bookmarks/<entity_type>/<int:entity_id>")
+@login_required
+def create_my_bookmark_for_entity(entity_type, entity_id):
+    user = current_user()
+    bookmark, created, error = add_bookmark(user.id, entity_type, entity_id)
+
+    if not bookmark:
+        status = 400 if error == "Unsupported bookmark type." else 404
+        return failure(error, status=status)
+
+    bookmarked_keys = bookmarked_entity_keys(user.id)
+
+    return success(
+        public_bookmark(bookmark, bookmarked_keys, created=created),
+        status=201 if created else 200,
+    )
+
+
+@wiki_bp.post("/me/bookmarks/<int:novel_id>")
+@login_required
+def create_my_novel_bookmark(novel_id):
+    return create_my_bookmark_for_entity(UserBookmark.ENTITY_NOVEL, novel_id)
+
+
+@wiki_bp.delete("/me/bookmarks/<entity_type>/<int:entity_id>")
+@login_required
+def delete_my_bookmark(entity_type, entity_id):
+    removed = remove_bookmark(current_user().id, entity_type, entity_id)
+
+    if not removed:
+        return failure("Bookmark not found.", status=404)
+
+    return success({"ok": True, "entity_type": entity_type, "entity_id": entity_id})
+
+
+@wiki_bp.delete("/me/bookmarks/<int:novel_id>")
+@login_required
+def delete_my_novel_bookmark(novel_id):
+    return delete_my_bookmark(UserBookmark.ENTITY_NOVEL, novel_id)
 
 
 @wiki_bp.get("/novels/<int:novel_id>/characters")
@@ -413,8 +560,10 @@ def list_public_characters(novel_id):
         .order_by(Character.name)
         .all()
     )
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id) if user else set()
 
-    return success([public_character_summary(character) for character in characters])
+    return success([public_character_summary(character, bookmarked_keys) for character in characters])
 
 
 @wiki_bp.get("/characters/<int:character_id>")
@@ -449,16 +598,19 @@ def get_public_character(character_id):
         .all()
     )
 
-    data = public_character_summary(character)
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id) if user else set()
+
+    data = public_character_summary(character, bookmarked_keys)
     data["evidence"] = evidence_for("character", character.id)
     data["progression_events"] = [
         public_progression(progression) for progression in progression_rows
     ]
     data["skills"] = [
-        public_character_skill(relationship) for relationship in character_skill_rows
+        public_character_skill(relationship, bookmarked_keys) for relationship in character_skill_rows
     ]
     data["items"] = [
-        public_character_item(relationship) for relationship in character_item_rows
+        public_character_item(relationship, bookmarked_keys) for relationship in character_item_rows
     ]
     data["life_events"] = [public_life_event(life_event) for life_event in life_event_rows]
 
@@ -473,8 +625,10 @@ def list_public_skills(novel_id):
         .order_by(Skill.name)
         .all()
     )
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id) if user else set()
 
-    return success([public_skill(skill) for skill in skills])
+    return success([public_skill(skill, bookmarked_keys) for skill in skills])
 
 
 @wiki_bp.get("/novels/<int:novel_id>/progression")
@@ -511,11 +665,14 @@ def get_public_skill(skill_id):
         .all()
     )
 
-    data = public_skill(skill)
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id) if user else set()
+
+    data = public_skill(skill, bookmarked_keys)
     data["characters"] = [
         {
             "id": relationship.id,
-            "character": public_character_summary(relationship.character)
+            "character": public_character_summary(relationship.character, bookmarked_keys)
             if relationship.character
             else None,
             "chapter": chapter_reference(relationship.chapter_id),
@@ -536,8 +693,10 @@ def list_public_items(novel_id):
         .order_by(Item.name)
         .all()
     )
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id) if user else set()
 
-    return success([public_item(item) for item in items])
+    return success([public_item(item, bookmarked_keys) for item in items])
 
 
 @wiki_bp.get("/items/<int:item_id>")
@@ -555,11 +714,14 @@ def get_public_item(item_id):
         .all()
     )
 
-    data = public_item(item)
+    user = current_user()
+    bookmarked_keys = bookmarked_entity_keys(user.id) if user else set()
+
+    data = public_item(item, bookmarked_keys)
     data["characters"] = [
         {
             "id": relationship.id,
-            "character": public_character_summary(relationship.character)
+            "character": public_character_summary(relationship.character, bookmarked_keys)
             if relationship.character
             else None,
             "chapter": chapter_reference(relationship.chapter_id),

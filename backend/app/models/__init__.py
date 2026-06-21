@@ -131,6 +131,12 @@ class User(db.Model):
         cascade="all, delete-orphan",
         order_by="NovelUserPermission.novel_id",
     )
+    bookmarks = db.relationship(
+        "UserBookmark",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="UserBookmark.created_at.desc()",
+    )
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -215,6 +221,32 @@ class PasswordSetupToken(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     user = db.relationship("User")
+
+
+class UserBookmark(db.Model):
+    __tablename__ = "user_bookmarks"
+
+    ENTITY_NOVEL = "novel"
+    ENTITY_CHARACTER = "character"
+    ENTITY_SKILL = "skill"
+    ENTITY_ITEM = "item"
+    ENTITY_TYPES = {ENTITY_NOVEL, ENTITY_CHARACTER, ENTITY_SKILL, ENTITY_ITEM}
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    entity_type = db.Column(db.String(50), nullable=False)
+    entity_id = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    user = db.relationship("User", back_populates="bookmarks")
+    novel = db.relationship("Novel")
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "entity_type", "entity_id", name="uq_user_bookmark_entity"),
+        db.Index("ix_user_bookmarks_user_created", "user_id", "created_at"),
+        db.Index("ix_user_bookmarks_novel", "novel_id"),
+    )
 
 
 class Book(db.Model):

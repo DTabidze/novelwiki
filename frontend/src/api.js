@@ -53,3 +53,24 @@ export async function fetchJson(url, options) {
 
   return body.data;
 }
+
+export function createWikiBookmark(entityType, entityId) {
+  return fetchJson(`${API_BASE_URL}/wiki/me/bookmarks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      entity_type: entityType,
+      entity_id: entityId,
+    }),
+  });
+}
+
+export function listWikiBookmarks() {
+  return fetchJson(`${API_BASE_URL}/wiki/me/bookmarks`);
+}
+
+export function deleteWikiBookmark(entityType, entityId) {
+  return fetchJson(`${API_BASE_URL}/wiki/me/bookmarks/${entityType}/${entityId}`, {
+    method: "DELETE",
+  });
+}

@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { API_BASE_URL, fetchJson } from "./api.js";
+import { API_BASE_URL, createWikiBookmark, deleteWikiBookmark, fetchJson } from "./api.js";
 import AdminApp from "./admin/AdminApp.jsx";
 import { AuthProvider } from "./auth/AuthContext.jsx";
 import { WikiLoginPage, WikiProfilePage, WikiRegisterPage, WikiSetPasswordPage } from "./components/wiki/WikiAuthPages.jsx";
@@ -108,6 +108,99 @@ export default function App() {
     }
   }
 
+  function applyWikiBookmarkState(entityType, entityId, isBookmarked) {
+    const patchEntity = (entity) => (
+      entity?.id === entityId ? { ...entity, is_bookmarked: isBookmarked } : entity
+    );
+
+    if (entityType === "novel") {
+      setWikiNovels((current) => current.map(patchEntity));
+      setWikiNovel((current) => patchEntity(current));
+      return;
+    }
+
+    if (entityType === "character") {
+      setWikiCharacters((current) => current.map(patchEntity));
+      setWikiSelectedCharacter((current) => patchEntity(current));
+      setWikiSelectedSkill((current) => current ? {
+        ...current,
+        characters: (current.characters || []).map((row) => ({
+          ...row,
+          character: row.character ? patchEntity(row.character) : row.character,
+        })),
+      } : current);
+      setWikiSelectedItem((current) => current ? {
+        ...current,
+        characters: (current.characters || []).map((row) => ({
+          ...row,
+          character: row.character ? patchEntity(row.character) : row.character,
+        })),
+      } : current);
+      return;
+    }
+
+    if (entityType === "skill") {
+      setWikiSkills((current) => current.map(patchEntity));
+      setWikiSelectedSkill((current) => patchEntity(current));
+      setWikiSelectedCharacter((current) => current ? {
+        ...current,
+        skills: (current.skills || []).map((row) => ({
+          ...row,
+          skill: row.skill ? patchEntity(row.skill) : row.skill,
+        })),
+      } : current);
+      return;
+    }
+
+    if (entityType === "item") {
+      setWikiItems((current) => current.map(patchEntity));
+      setWikiSelectedItem((current) => patchEntity(current));
+      setWikiSelectedCharacter((current) => current ? {
+        ...current,
+        items: (current.items || []).map((row) => ({
+          ...row,
+          item: row.item ? patchEntity(row.item) : row.item,
+        })),
+      } : current);
+    }
+  }
+
+  async function toggleWikiBookmark(entityType, entity) {
+    if (!entity?.id) {
+      return;
+    }
+
+    const nextValue = !entity.is_bookmarked;
+    applyWikiBookmarkState(entityType, entity.id, nextValue);
+
+    try {
+      if (nextValue) {
+        await createWikiBookmark(entityType, entity.id);
+      } else {
+        await deleteWikiBookmark(entityType, entity.id);
+      }
+    } catch (error) {
+      applyWikiBookmarkState(entityType, entity.id, !nextValue);
+      setMessage(error.status === 401 ? "Log in to bookmark wiki pages." : error.message);
+    }
+  }
+
+  async function removeWikiBookmark(entityType, entity) {
+    if (!entity?.id) {
+      return;
+    }
+
+    applyWikiBookmarkState(entityType, entity.id, false);
+
+    try {
+      await deleteWikiBookmark(entityType, entity.id);
+    } catch (error) {
+      applyWikiBookmarkState(entityType, entity.id, true);
+      setMessage(error.status === 401 ? "Log in to manage wiki bookmarks." : error.message);
+      throw error;
+    }
+  }
+
   React.useEffect(() => {
     loadWikiNovels().catch((error) => setMessage(error.message));
   }, []);
@@ -135,7 +228,32 @@ export default function App() {
               onLoadNovel={loadWikiNovel}
               onOpenAdmin={() => navigate("/admin")}
               onSelectCharacter={loadWikiCharacter}
+              onToggleBookmark={toggleWikiBookmark}
               page="Novels"
+              progressionEvents={[]}
+              selectedCharacter={null}
+              selectedItem={null}
+              selectedNovelId={null}
+              selectedSkill={null}
+              skills={[]}
+            />
+          }
+        />
+        <Route
+          path="/wiki/bookmarks"
+          element={
+            <WikiPanel
+              characters={[]}
+              items={[]}
+              loading={wikiLoading}
+              novel={null}
+              novels={wikiNovels}
+              onLoadNovel={loadWikiNovel}
+              onOpenAdmin={() => navigate("/admin")}
+              onRemoveBookmark={removeWikiBookmark}
+              onSelectCharacter={loadWikiCharacter}
+              onToggleBookmark={toggleWikiBookmark}
+              page="Bookmarks"
               progressionEvents={[]}
               selectedCharacter={null}
               selectedItem={null}
@@ -166,6 +284,7 @@ export default function App() {
               selectedNovelId={wikiSelectedNovelId}
               selectedSkill={null}
               setMessage={setMessage}
+              onToggleBookmark={toggleWikiBookmark}
               skills={wikiSkills}
             />
           }
@@ -184,6 +303,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="Search"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={null}
@@ -209,6 +329,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="Characters"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={null}
@@ -234,6 +355,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="Characters"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={wikiSelectedCharacter}
@@ -259,6 +381,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="CharacterProgression"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={wikiSelectedCharacter}
@@ -284,6 +407,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="Cultivation"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={null}
@@ -309,6 +433,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="Skills"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={null}
@@ -334,6 +459,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="Skills"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={null}
@@ -359,6 +485,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="Items"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={null}
@@ -384,6 +511,7 @@ export default function App() {
               novel={wikiNovel}
               novels={wikiNovels}
               onOpenAdmin={() => navigate("/admin")}
+              onToggleBookmark={toggleWikiBookmark}
               page="Items"
               progressionEvents={wikiProgressionEvents}
               selectedCharacter={null}

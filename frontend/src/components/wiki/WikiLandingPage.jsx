@@ -3,7 +3,7 @@ import { Search } from "lucide-react";
 import WikiNovelCard from "./WikiNovelCard.jsx";
 import { formatNumber } from "../../utils/wikiFormat.js";
 
-export default function WikiLandingPage({ novels, onLoadNovel }) {
+export default function WikiLandingPage({ novels, onLoadNovel, onToggleBookmark }) {
   const [query, setQuery] = React.useState("");
 
   const visibleNovels = React.useMemo(() => {
@@ -45,7 +45,12 @@ export default function WikiLandingPage({ novels, onLoadNovel }) {
           </div>
         ) : null}
         {visibleNovels.map((wikiNovel) => (
-          <WikiNovelCard key={wikiNovel.id} novel={wikiNovel} onOpen={onLoadNovel} />
+          <WikiNovelCard
+            key={wikiNovel.id}
+            novel={wikiNovel}
+            onOpen={onLoadNovel}
+            onToggleBookmark={onToggleBookmark}
+          />
         ))}
       </section>
     </article>
