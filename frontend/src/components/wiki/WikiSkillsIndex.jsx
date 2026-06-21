@@ -138,13 +138,12 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
   }, [currentPage, requestedPage]);
 
   return (
-    <article className="wiki-skills-index">
-      <header className="wiki-cultivation-header">
+    <article className="wiki-index-page wiki-skills-index">
+      <header className="wiki-index-header">
         <div>
           <h1>Skills</h1>
-          <p>{formatNumber(filteredSkills.length)} skills</p>
         </div>
-        <div className="wiki-cultivation-tools">
+        <div className="wiki-index-tools">
           <label className="wiki-local-search-field">
             <Search aria-hidden="true" size={18} />
             <input
@@ -217,7 +216,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
         </section>
       ) : null}
 
-      <nav className="wiki-skill-alphabet" aria-label="Filter skills by first letter">
+      <nav className="wiki-index-alphabet" aria-label="Filter skills by first letter">
         <button className={letter === "All" ? "active" : ""} type="button" onClick={() => updateFilters({ letter: "All", page: 1 })}>
           All
         </button>
@@ -233,7 +232,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
         ))}
       </nav>
 
-      <section className="wiki-skill-list-toolbar">
+      <section className="wiki-index-toolbar">
         <strong>{formatNumber(filteredSkills.length)} skills found</strong>
         <div>
           <label>
@@ -284,7 +283,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
         )}
       </section>
 
-      <footer className="wiki-skill-pagination">
+      <footer className="wiki-index-pagination">
         <div>
           {pageWindow(currentPage, totalPages).map((page) => (
             <button

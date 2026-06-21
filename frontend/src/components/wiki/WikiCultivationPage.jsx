@@ -1,5 +1,5 @@
 import React from "react";
-import { Search } from "lucide-react";
+import { Info, Search } from "lucide-react";
 import {
   cleanChapterTitle,
   formatCultivationValue,
@@ -111,14 +111,22 @@ export default function WikiCultivationPage({
   }, [currentPage, safeCurrentPage]);
 
   return (
-    <article className="wiki-cultivation-page">
-      <section className="wiki-cultivation-header">
+    <article className="wiki-index-page wiki-cultivation-page">
+      <section className="wiki-index-header">
         <div>
-          <h1>Cultivation</h1>
-          <p>Current cultivation status of characters and their latest known realm.</p>
-          <p>{formatNumber(characterRows.length)} characters</p>
+          <h1>
+            Cultivation
+            <span
+              aria-label="Current cultivation status of characters and their latest known realm."
+              className="wiki-index-title-info"
+              role="img"
+              title="Current cultivation status of characters and their latest known realm."
+            >
+              <Info aria-hidden="true" size={17} strokeWidth={2.2} />
+            </span>
+          </h1>
         </div>
-        <div className="wiki-cultivation-tools">
+        <div className="wiki-index-tools">
           <label className="wiki-local-search-field">
             <Search aria-hidden="true" size={18} />
             <input
@@ -139,7 +147,7 @@ export default function WikiCultivationPage({
         </div>
       </section>
 
-      <nav className="wiki-alphabet-nav" aria-label="Filter cultivation characters by first letter">
+      <nav className="wiki-index-alphabet" aria-label="Filter cultivation characters by first letter">
         <button
           className={activeLetter === "All" ? "active" : ""}
           type="button"
@@ -159,7 +167,7 @@ export default function WikiCultivationPage({
         ))}
       </nav>
 
-      <section className="wiki-skill-list-toolbar">
+      <section className="wiki-index-toolbar">
         <strong>{formatNumber(filteredRows.length)} characters found</strong>
       </section>
 
@@ -197,7 +205,7 @@ export default function WikiCultivationPage({
         </div>
       </section>
 
-      <footer className="wiki-skill-pagination">
+      <footer className="wiki-index-pagination">
         <div>
           {pageWindow(safeCurrentPage, totalPages).map((page) => (
             <button

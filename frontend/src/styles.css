@@ -1833,6 +1833,7 @@ button:disabled {
 .wiki-content {
   display: grid;
   gap: 22px;
+  min-width: 0;
   width: 100%;
   padding: 14px 28px 24px;
 }
@@ -2835,31 +2836,66 @@ button:disabled {
   font-weight: 800;
 }
 
+.wiki-index-page,
 .wiki-skills-index,
-.wiki-items-index {
+.wiki-items-index,
+.wiki-character-browser,
+.wiki-cultivation-page {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .wiki-index-header {
   display: flex;
-  align-items: flex-end;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 18px 0 8px;
+}
+
+.wiki-index-header > div {
+  min-width: 0;
 }
 
 .wiki-index-header h1 {
-  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 10px 0 8px;
   color: #101936;
   font-family: var(--font-heading);
-  font-size: 48px;
-  line-height: 1;
+  font-size: 46px;
 }
 
-.wiki-index-header p {
-  margin: 9px 0 0;
-  color: #64748b;
-  font-weight: 800;
+.wiki-index-title-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wiki-primary);
+  cursor: help;
+}
+
+.wiki-index-tools {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 180px;
+  gap: 14px;
+  justify-content: end;
+  min-width: 0;
+  max-width: 100%;
+  width: min(560px, 100%);
+}
+
+.wiki-index-tools > * {
+  min-width: 0;
+}
+
+.wiki-index-tools.single {
+  width: min(420px, 100%);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .wiki-active-filter-bar {
@@ -2916,7 +2952,7 @@ button:disabled {
 .wiki-skill-filter-panel input,
 .wiki-skill-filter-panel select,
 .wiki-skill-filter-panel button,
-.wiki-skill-list-toolbar select {
+.wiki-index-toolbar select {
   min-height: 40px;
   border: 1px solid var(--wiki-border);
   border-radius: 7px;
@@ -2932,7 +2968,7 @@ button:disabled {
   padding: 0 12px;
 }
 
-.wiki-skill-list-toolbar select {
+.wiki-index-toolbar select {
   width: auto;
   min-width: 148px;
   height: 36px;
@@ -2943,13 +2979,13 @@ button:disabled {
 }
 
 .wiki-skill-filter-panel label,
-.wiki-skill-list-toolbar label {
+.wiki-index-toolbar label {
   display: grid;
   gap: 5px;
 }
 
 .wiki-skill-filter-panel label span,
-.wiki-skill-list-toolbar label span {
+.wiki-index-toolbar label span {
   color: #64748b;
   font-size: 12px;
   font-weight: 850;
@@ -3015,8 +3051,7 @@ button:disabled {
   background: transparent;
 }
 
-.wiki-skill-alphabet,
-.wiki-alphabet-nav {
+.wiki-index-alphabet {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -3024,14 +3059,13 @@ button:disabled {
   border-bottom: 1px solid var(--wiki-border-soft);
 }
 
-.wiki-skill-alphabet.has-secondary-filter {
+.wiki-index-alphabet.has-secondary-filter {
   padding-bottom: 8px;
   border-bottom: 0;
 }
 
-.wiki-skill-alphabet button,
-.wiki-alphabet-nav button,
-.wiki-skill-pagination button,
+.wiki-index-alphabet button,
+.wiki-index-pagination button,
 .wiki-view-toggle button {
   min-width: 34px;
   min-height: 34px;
@@ -3045,17 +3079,15 @@ button:disabled {
   line-height: 1;
 }
 
-.wiki-skill-alphabet button.active,
-.wiki-alphabet-nav button.active,
-.wiki-skill-pagination button.active,
+.wiki-index-alphabet button.active,
+.wiki-index-pagination button.active,
 .wiki-view-toggle button.active {
   border-color: rgba(37, 99, 235, 0.5);
   background: #eff6ff;
   color: var(--wiki-primary);
 }
 
-.wiki-skill-alphabet button,
-.wiki-alphabet-nav button {
+.wiki-index-alphabet button {
   min-width: 38px;
   min-height: 38px;
   border-radius: 8px;
@@ -3066,30 +3098,28 @@ button:disabled {
   line-height: 1;
 }
 
-.wiki-skill-alphabet button.active,
-.wiki-skill-alphabet button:hover,
-.wiki-alphabet-nav button.active,
-.wiki-alphabet-nav button:hover {
+.wiki-index-alphabet button.active,
+.wiki-index-alphabet button:hover {
   border-color: var(--wiki-primary);
   background: var(--wiki-primary-soft);
   color: var(--wiki-primary);
   font-weight: 600;
 }
 
-.wiki-skill-list-toolbar {
+.wiki-index-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
 }
 
-.wiki-skill-list-toolbar > strong {
+.wiki-index-toolbar > strong {
   color: #64748b;
   font-size: 13px;
   font-weight: 850;
 }
 
-.wiki-skill-list-toolbar > div {
+.wiki-index-toolbar > div {
   display: flex;
   gap: 12px;
   align-items: end;
@@ -3210,7 +3240,7 @@ button:disabled {
   grid-column: 2 / 3;
 }
 
-.wiki-skill-pagination {
+.wiki-index-pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3220,7 +3250,7 @@ button:disabled {
   font-weight: 800;
 }
 
-.wiki-skill-pagination > div {
+.wiki-index-pagination > div {
   display: flex;
   gap: 8px;
 }
@@ -3239,12 +3269,26 @@ button:disabled {
   }
 }
 
+@media (max-width: 920px) {
+  .wiki-index-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wiki-index-tools,
+  .wiki-index-tools.single {
+    justify-content: stretch;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 760px) {
   .wiki-index-header,
-  .wiki-skill-list-toolbar,
-  .wiki-skill-list-toolbar > div,
+  .wiki-index-toolbar,
+  .wiki-index-toolbar > div,
   .wiki-character-filter-card,
-  .wiki-skill-pagination {
+  .wiki-index-pagination {
     align-items: stretch;
     flex-direction: column;
   }
@@ -3941,48 +3985,12 @@ button:disabled {
   line-height: 1.55;
 }
 
-.wiki-cultivation-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: end;
-  padding: 18px 0 8px;
-}
-
-.wiki-cultivation-header h1 {
-  margin: 10px 0 8px;
-  color: #101936;
-  font-family: var(--font-heading);
-  font-size: 46px;
-}
-
-.wiki-cultivation-header p {
-  margin: 0;
-  color: var(--wiki-muted);
-  font-weight: 700;
-}
-
-.wiki-cultivation-header p + p {
-  margin-top: 12px;
-  font-weight: 850;
-}
-
-.wiki-cultivation-tools {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) 180px;
-  gap: 14px;
-  justify-content: end;
-  min-width: min(560px, 100%);
-}
-
-.wiki-cultivation-tools.single {
-  grid-template-columns: minmax(240px, 420px);
-}
-
 .wiki-local-search-field {
   position: relative;
   display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   color: var(--wiki-muted);
 }
 
@@ -3997,15 +4005,21 @@ button:disabled {
 
 .wiki-local-search-field input {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0 10px 0 40px;
 }
 
-.wiki-cultivation-tools input,
-.wiki-cultivation-tools select {
+.wiki-index-tools input,
+.wiki-index-tools select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border-color: var(--wiki-border);
   background: #ffffff;
 }
 
+.wiki-index-filter-row,
 .wiki-type-filter-nav {
   display: flex;
   flex-wrap: wrap;
@@ -5750,7 +5764,7 @@ button:disabled {
   }
 
   .wiki-topbar,
-  .wiki-cultivation-header,
+  .wiki-index-header,
   .wiki-landing-grid,
   .wiki-novel-hero,
   .wiki-stats-bar,
@@ -5805,7 +5819,7 @@ button:disabled {
   }
 
   .wiki-character-tools,
-  .wiki-cultivation-tools,
+  .wiki-index-tools,
   .wiki-character-row,
   .wiki-current-cultivation-card,
   .wiki-cultivation-row,
@@ -5815,6 +5829,10 @@ button:disabled {
   .wiki-skill-alias-row,
   .wiki-journey-event {
     grid-template-columns: 1fr;
+  }
+
+  .wiki-index-tools {
+    width: 100%;
   }
 
   .wiki-quick-fact-row {

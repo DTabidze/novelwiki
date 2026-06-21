@@ -144,13 +144,12 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
   }, [currentPage, requestedPage]);
 
   return (
-    <article className="wiki-character-browser">
-      <section className="wiki-cultivation-header">
+    <article className="wiki-index-page wiki-character-browser">
+      <section className="wiki-index-header">
         <div>
           <h1>Characters</h1>
-          <p>{formatNumber(filteredCharacters.length)} characters</p>
         </div>
-        <div className="wiki-cultivation-tools single">
+        <div className="wiki-index-tools single">
           <label className="wiki-local-search-field">
             <Search aria-hidden="true" size={18} />
             <input
@@ -195,7 +194,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
         </section>
       ) : null}
 
-      <nav className="wiki-skill-alphabet has-secondary-filter" aria-label="Filter characters by first letter">
+      <nav className="wiki-index-alphabet has-secondary-filter" aria-label="Filter characters by first letter">
         <button
           className={letter === "All" ? "active" : ""}
           type="button"
@@ -215,7 +214,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
         ))}
       </nav>
 
-      <nav className="wiki-character-quick-filters" aria-label="Quick character filters">
+      <nav className="wiki-index-filter-row wiki-character-quick-filters" aria-label="Quick character filters">
         <button
           className={gender === "all" ? "active" : ""}
           type="button"
@@ -239,7 +238,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
         })}
       </nav>
 
-      <section className="wiki-skill-list-toolbar">
+      <section className="wiki-index-toolbar">
         <strong>{formatNumber(filteredCharacters.length)} characters found</strong>
         <div>
           <label>
@@ -304,7 +303,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
         </div>
       </section>
 
-      <footer className="wiki-skill-pagination">
+      <footer className="wiki-index-pagination">
         <div>
           {pageWindow(currentPage, totalPages).map((page) => (
             <button

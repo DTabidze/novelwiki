@@ -28,15 +28,15 @@ export default function WikiEntityBrowser({ entities, iconLabel, onSelectEntity,
     .filter((group) => group.rows.length > 0);
 
   return (
-    <article className="wiki-entity-browser">
-      <section className="wiki-cultivation-header">
+    <article className="wiki-index-page wiki-entity-browser">
+      <section className="wiki-index-header">
         <div>
           <h1>{pageTitle}</h1>
           <p>
             {formatNumber(entities.length)} {entityLabel}
           </p>
         </div>
-        <div className="wiki-cultivation-tools single">
+        <div className="wiki-index-tools single">
           <label className="wiki-local-search-field">
             <Search aria-hidden="true" size={18} />
             <input
@@ -49,7 +49,7 @@ export default function WikiEntityBrowser({ entities, iconLabel, onSelectEntity,
         </div>
       </section>
 
-      <nav className="wiki-alphabet-nav" aria-label={`Filter ${entityLabel} by first letter`}>
+      <nav className={isItemsPage ? "wiki-index-alphabet has-secondary-filter" : "wiki-index-alphabet"} aria-label={`Filter ${entityLabel} by first letter`}>
         <button
           className={activeLetter === "All" ? "active" : ""}
           type="button"
@@ -70,7 +70,7 @@ export default function WikiEntityBrowser({ entities, iconLabel, onSelectEntity,
       </nav>
 
       {isItemsPage ? (
-        <nav className="wiki-type-filter-nav" aria-label="Filter items by type">
+        <nav className="wiki-index-filter-row wiki-type-filter-nav" aria-label="Filter items by type">
           {ITEM_TYPES.map((type) => (
             <button
               className={activeType === type.key ? `active ${type.key}` : type.key}
