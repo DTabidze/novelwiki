@@ -1,5 +1,6 @@
 import React from "react";
 import { BookOpen, FileText, Tags, Users } from "lucide-react";
+import WikiBookmarkButton from "./WikiBookmarkButton.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
 import {
   chapterBadge,
@@ -12,7 +13,7 @@ import {
   skillCategoryClass,
 } from "../../utils/wikiFormat.js";
 
-export default function WikiSkillPage({ onSelectCharacter, skill }) {
+export default function WikiSkillPage({ onSelectCharacter, onToggleBookmark, skill }) {
   const [showAllTimeline, setShowAllTimeline] = React.useState(false);
 
   if (!skill) {
@@ -57,7 +58,10 @@ export default function WikiSkillPage({ onSelectCharacter, skill }) {
         </div>
 
         <div className="wiki-skill-hero-main">
-          <h1>{skill.name}</h1>
+          <div className="wiki-title-row">
+            <h1>{skill.name}</h1>
+            <WikiBookmarkButton entity={skill} entityType="skill" onToggle={onToggleBookmark} />
+          </div>
           {skill.category ? <span className={skillBadgeClass}>{skill.category}</span> : null}
           {skill.description ? <p>{skill.description}</p> : null}
 

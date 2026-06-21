@@ -1548,7 +1548,7 @@ button:disabled {
 
 .wiki-search-results-header h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-heading);
   font-size: clamp(34px, 4vw, 48px);
   line-height: 1;
   color: #07183e;
@@ -1680,6 +1680,7 @@ button:disabled {
   padding: 12px 16px;
   background: #ffffff;
   color: var(--wiki-text);
+  font: inherit;
   text-align: left;
 }
 
@@ -1728,6 +1729,83 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  justify-self: end;
+}
+
+.wiki-bookmark-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(160px, auto) 40px;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 74px;
+  border: 0;
+  border-bottom: 1px solid var(--wiki-border-soft);
+  padding: 12px 16px;
+  background: #ffffff;
+  color: var(--wiki-text);
+  text-align: left;
+}
+
+.wiki-bookmark-row:last-child {
+  border-bottom: 0;
+}
+
+.wiki-bookmark-row:hover {
+  background: #f8fbff;
+  box-shadow: inset 3px 0 0 var(--wiki-primary-border);
+}
+
+.wiki-bookmark-main {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.wiki-bookmark-main > span {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.wiki-bookmark-main strong,
+.wiki-bookmark-main small,
+.wiki-bookmark-meta strong,
+.wiki-bookmark-meta small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-bookmark-main strong {
+  color: #061449;
+  font-size: 16px;
+}
+
+.wiki-bookmark-main small,
+.wiki-bookmark-meta small {
+  color: var(--wiki-muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.wiki-bookmark-meta {
+  display: grid;
+  min-width: 0;
+  justify-self: end;
+  gap: 3px;
+  text-align: right;
+}
+
+.wiki-bookmark-meta strong {
+  color: #1e3157;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.wiki-bookmark-row .wiki-bookmark-toggle {
   justify-self: end;
 }
 
@@ -2197,6 +2275,44 @@ button:disabled {
     border-color 140ms ease,
     box-shadow 140ms ease,
     transform 140ms ease;
+}
+
+.wiki-bookmark-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: #64748b;
+  box-shadow: none;
+  transition:
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.wiki-bookmark-toggle:hover {
+  color: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.wiki-bookmark-toggle.active {
+  color: #4f46e5;
+}
+
+.wiki-bookmark-toggle.active svg {
+  fill: currentColor;
+}
+
+.wiki-novel-card > .wiki-bookmark-toggle {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
 }
 
 .wiki-novel-card::before {
@@ -2811,10 +2927,19 @@ button:disabled {
 }
 
 .wiki-skill-filter-panel input,
-.wiki-skill-filter-panel select,
-.wiki-skill-list-toolbar select {
+.wiki-skill-filter-panel select {
   width: 100%;
   padding: 0 12px;
+}
+
+.wiki-skill-list-toolbar select {
+  width: auto;
+  min-width: 148px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 34px 0 12px;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .wiki-skill-filter-panel label,
@@ -2890,7 +3015,8 @@ button:disabled {
   background: transparent;
 }
 
-.wiki-skill-alphabet {
+.wiki-skill-alphabet,
+.wiki-alphabet-nav {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -2898,19 +3024,29 @@ button:disabled {
   border-bottom: 1px solid var(--wiki-border-soft);
 }
 
+.wiki-skill-alphabet.has-secondary-filter {
+  padding-bottom: 8px;
+  border-bottom: 0;
+}
+
 .wiki-skill-alphabet button,
+.wiki-alphabet-nav button,
 .wiki-skill-pagination button,
 .wiki-view-toggle button {
   min-width: 34px;
   min-height: 34px;
   border: 1px solid var(--wiki-border);
   border-radius: 7px;
+  padding: 0;
   background: #ffffff;
   color: #1e3157;
+  font-size: 14px;
   font-weight: 850;
+  line-height: 1;
 }
 
 .wiki-skill-alphabet button.active,
+.wiki-alphabet-nav button.active,
 .wiki-skill-pagination button.active,
 .wiki-view-toggle button.active {
   border-color: rgba(37, 99, 235, 0.5);
@@ -2918,7 +3054,8 @@ button:disabled {
   color: var(--wiki-primary);
 }
 
-.wiki-skill-alphabet button {
+.wiki-skill-alphabet button,
+.wiki-alphabet-nav button {
   min-width: 38px;
   min-height: 38px;
   border-radius: 8px;
@@ -2930,7 +3067,9 @@ button:disabled {
 }
 
 .wiki-skill-alphabet button.active,
-.wiki-skill-alphabet button:hover {
+.wiki-skill-alphabet button:hover,
+.wiki-alphabet-nav button.active,
+.wiki-alphabet-nav button:hover {
   border-color: var(--wiki-primary);
   background: var(--wiki-primary-soft);
   color: var(--wiki-primary);
@@ -2959,6 +3098,27 @@ button:disabled {
 .wiki-view-toggle {
   display: inline-flex;
   gap: 6px;
+}
+
+.wiki-bookmarked-filter {
+  height: 34px;
+  min-height: 34px;
+  border: 1px solid var(--wiki-border);
+  border-radius: 7px;
+  padding: 0 11px;
+  background: #ffffff;
+  color: #1e3157;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.wiki-bookmarked-filter.active,
+.wiki-bookmarked-filter:hover {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #4f46e5;
 }
 
 .wiki-skill-results {
@@ -3090,7 +3250,9 @@ button:disabled {
   }
 
   .wiki-skill-filter-panel,
-  .wiki-skill-results.grid {
+  .wiki-skill-results.grid,
+  .wiki-character-rows.grid,
+  .wiki-entity-index.grid .wiki-entity-rows {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -3264,7 +3426,7 @@ button:disabled {
 
 .wiki-character-browser {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
 .wiki-character-tools {
@@ -3328,6 +3490,27 @@ button:disabled {
 .wiki-character-row:hover {
   background: #f8fbff;
   box-shadow: inset 3px 0 0 var(--wiki-primary-border);
+}
+
+.wiki-character-rows.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wiki-character-rows.grid .wiki-character-row {
+  grid-template-columns: 42px minmax(0, 1fr) 24px;
+  border: 1px solid var(--wiki-border-soft);
+  border-radius: 8px;
+  box-shadow: var(--wiki-shadow);
+}
+
+.wiki-character-rows.grid .wiki-character-first-appearance {
+  grid-column: 2 / 3;
 }
 
 .wiki-character-initials {
@@ -3429,7 +3612,8 @@ button:disabled {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  padding-bottom: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--wiki-border-soft);
   border-bottom: 1px solid var(--wiki-border-soft);
 }
 
@@ -3570,7 +3754,7 @@ button:disabled {
 .wiki-entity-page,
 .wiki-cultivation-page {
   display: grid;
-  gap: 28px;
+  gap: 18px;
 }
 
 .wiki-progression-index {
@@ -3822,40 +4006,14 @@ button:disabled {
   background: #ffffff;
 }
 
-.wiki-alphabet-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 8px 0 14px;
-  border-bottom: 1px solid var(--wiki-border-soft);
-}
-
-.wiki-alphabet-nav button {
-  min-width: 38px;
-  min-height: 38px;
-  border: 1px solid var(--wiki-border);
-  border-radius: 8px;
-  padding: 0 10px;
-  background: #ffffff;
-  color: var(--wiki-text);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1;
-}
-
-.wiki-alphabet-nav button.active,
-.wiki-alphabet-nav button:hover {
-  border-color: var(--wiki-primary);
-  background: var(--wiki-primary-soft);
-  color: var(--wiki-primary);
-  font-weight: 600;
-}
-
 .wiki-type-filter-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: -14px;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 0;
+  border-top: 1px solid var(--wiki-border-soft);
+  border-bottom: 1px solid var(--wiki-border-soft);
 }
 
 .wiki-type-filter-nav button {
@@ -3864,7 +4022,7 @@ button:disabled {
   gap: 7px;
   min-height: 34px;
   border: 1px solid var(--wiki-border);
-  border-radius: 7px;
+  border-radius: 8px;
   background: #ffffff;
   color: var(--wiki-muted);
   font-size: 13px;
@@ -4080,6 +4238,28 @@ button:disabled {
 .wiki-entity-row:hover {
   background: #f8fbff;
   box-shadow: inset 3px 0 0 var(--wiki-primary-border);
+}
+
+.wiki-entity-index.grid .wiki-entity-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wiki-entity-index.grid .wiki-entity-row.item-index-row {
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  border: 1px solid var(--wiki-border-soft);
+  border-radius: 8px;
+  box-shadow: var(--wiki-shadow);
+}
+
+.wiki-entity-index.grid .wiki-entity-row.item-index-row > .wiki-type-badge,
+.wiki-entity-index.grid .wiki-entity-row.item-index-row > span:not(.wiki-row-action):not(.wiki-item-type-icon):not(.wiki-type-badge) {
+  grid-column: 2 / 3;
 }
 
 .wiki-entity-row span:not(.wiki-row-action):not(.wiki-item-type-icon) {
@@ -5154,9 +5334,12 @@ button:disabled {
   display: flex;
   gap: 14px;
   align-items: center;
+  justify-content: space-between;
+  min-width: 0;
 }
 
 .wiki-title-row h1 {
+  min-width: 0;
   margin: 0;
   color: #101936;
   font-family: var(--font-heading);
@@ -5545,6 +5728,17 @@ button:disabled {
 
   .wiki-search-result-row {
     grid-template-columns: 42px minmax(0, 1fr) 22px;
+  }
+
+  .wiki-bookmark-row {
+    grid-template-columns: 42px minmax(0, 1fr) 40px;
+  }
+
+  .wiki-bookmark-meta {
+    grid-column: 2 / 3;
+    justify-self: start;
+    max-width: 100%;
+    text-align: left;
   }
 
   .wiki-search-result-row > em {

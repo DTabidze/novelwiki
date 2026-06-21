@@ -16,6 +16,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import WikiAccountControls from "./WikiAccountControls.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
+import WikiBookmarksPage from "./WikiBookmarksPage.jsx";
 import WikiCharacterBrowser from "./WikiCharacterBrowser.jsx";
 import WikiCharacterDetail from "./WikiCharacterDetail.jsx";
 import WikiCharacterProgressionPage from "./WikiCharacterProgressionPage.jsx";
@@ -53,7 +54,9 @@ export default function WikiPanel({
   novel,
   novels,
   onLoadNovel,
+  onRemoveBookmark,
   onSelectCharacter,
+  onToggleBookmark,
   selectedCharacter,
   selectedItem,
   selectedNovelId,
@@ -62,7 +65,7 @@ export default function WikiPanel({
 }) {
   const navigate = useNavigate();
   const trackedNovel = novel;
-  const activeSection = !trackedNovel ? "Novels" : page === "Character" ? "Characters" : page;
+  const activeSection = !trackedNovel ? page : page === "Character" ? "Characters" : page;
   const globalNav = ["Novels", "Recent Updates", "Bookmarks", "About"];
   const novelNav = ["Novels", "Overview", "Characters", "Cultivation", "Skills", "Items", "Organizations", "Places", "Timeline"];
 
@@ -133,6 +136,11 @@ export default function WikiPanel({
   function handleNav(label) {
     if (label === "Novels") {
       navigate("/wiki/novels");
+      return;
+    }
+
+    if (label === "Bookmarks") {
+      navigate("/wiki/bookmarks");
       return;
     }
 
@@ -224,8 +232,12 @@ export default function WikiPanel({
         <header className="wiki-topbar">
           <div className="wiki-breadcrumb">
             <Link to="/wiki/novels">Home</Link>
-            <span>/</span>
-            <Link to="/wiki/novels">Novels</Link>
+            {page !== "Bookmarks" ? (
+              <>
+                <span>/</span>
+                <Link to="/wiki/novels">Novels</Link>
+              </>
+            ) : null}
             {trackedNovel ? (
               <>
                 <span>/</span>
@@ -254,6 +266,12 @@ export default function WikiPanel({
               <>
                 <span>/</span>
                 <strong>Search</strong>
+              </>
+            ) : null}
+            {page === "Bookmarks" ? (
+              <>
+                <span>/</span>
+                <strong>Bookmarks</strong>
               </>
             ) : null}
             {page === "Skill" && selectedSkill ? (
@@ -316,8 +334,12 @@ export default function WikiPanel({
         </header>
 
         <div className="wiki-content">
-          {!trackedNovel ? (
-            <WikiLandingPage novels={novels} onLoadNovel={openNovel} />
+          {!trackedNovel && page === "Novels" ? (
+            <WikiLandingPage novels={novels} onLoadNovel={openNovel} onToggleBookmark={onToggleBookmark} />
+          ) : null}
+
+          {!trackedNovel && page === "Bookmarks" ? (
+            <WikiBookmarksPage onRemoveBookmark={onRemoveBookmark} />
           ) : null}
 
           {loading ? <p className="wiki-loading">Loading wiki data...</p> : null}
@@ -331,6 +353,7 @@ export default function WikiPanel({
                   onOpenItems={() => openCharacterItems(selectedCharacter)}
                   onOpenSkills={() => openCharacterSkills(selectedCharacter)}
                   onSelectItem={openItem}
+                  onToggleBookmark={onToggleBookmark}
                   relatedCharacters={characters}
                   onSelectRelated={openCharacter}
                   onSelectSkill={openSkill}
@@ -355,6 +378,7 @@ export default function WikiPanel({
                   novel={trackedNovel}
                   onSelectCharacter={openCharacter}
                   onSelectSkill={openSkill}
+                  onToggleBookmark={onToggleBookmark}
                   skills={skills}
                 />
               ) : null}
@@ -373,6 +397,7 @@ export default function WikiPanel({
                 <WikiSkillPage
                   skill={selectedSkill}
                   onSelectCharacter={openCharacter}
+                  onToggleBookmark={onToggleBookmark}
                 />
               ) : null}
 
@@ -383,6 +408,7 @@ export default function WikiPanel({
                   novel={trackedNovel}
                   onSelectCharacter={openCharacter}
                   onSelectItem={openItem}
+                  onToggleBookmark={onToggleBookmark}
                 />
               ) : null}
 
@@ -402,6 +428,7 @@ export default function WikiPanel({
                 <WikiItemPage
                   item={selectedItem}
                   onSelectCharacter={openCharacter}
+                  onToggleBookmark={onToggleBookmark}
                 />
               ) : null}
 

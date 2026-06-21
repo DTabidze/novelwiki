@@ -1,5 +1,6 @@
 import React from "react";
 import { BookOpen, FileText, Users } from "lucide-react";
+import WikiBookmarkButton from "./WikiBookmarkButton.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
 import {
@@ -12,7 +13,7 @@ import {
   relationshipTypeLabel,
 } from "../../utils/wikiFormat.js";
 
-export default function WikiItemPage({ item, onSelectCharacter }) {
+export default function WikiItemPage({ item, onSelectCharacter, onToggleBookmark }) {
   const [showAllTimeline, setShowAllTimeline] = React.useState(false);
 
   if (!item) {
@@ -58,7 +59,10 @@ export default function WikiItemPage({ item, onSelectCharacter }) {
         </div>
 
         <div className="wiki-skill-hero-main">
-          <h1>{item.name}</h1>
+          <div className="wiki-title-row">
+            <h1>{item.name}</h1>
+            <WikiBookmarkButton entity={item} entityType="item" onToggle={onToggleBookmark} />
+          </div>
           {item.category ? (
             <span className={`wiki-type-badge ${itemType}`}>
               <ItemTypeIcon type={itemType} />

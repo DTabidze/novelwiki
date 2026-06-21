@@ -86,6 +86,8 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
   const gender = searchParams.get("gender") || "all";
   const status = searchParams.get("status") || "all";
   const sort = searchParams.get("sort") || "name_asc";
+  const view = searchParams.get("view") || "list";
+  const bookmarked = searchParams.get("bookmarked") === "1";
   const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -112,6 +114,7 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
       .filter((character) => characterMatchesSearch(character, search))
       .filter((character) => gender === "all" || String(character.gender || "").toLowerCase() === gender)
       .filter((character) => status === "all" || normalizedStatus(character.status) === normalizedStatus(status))
+      .filter((character) => !bookmarked || character.is_bookmarked)
       .filter((character) => {
         const firstLetter = (character.name || "?").trim().slice(0, 1).toUpperCase();
         return letter === "All" || firstLetter === letter;
@@ -124,14 +127,14 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
 
       return first.name.localeCompare(second.name);
     });
-  }, [characters, gender, letter, search, sort, status]);
+  }, [bookmarked, characters, gender, letter, search, sort, status]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCharacters.length / PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
   const startIndex = filteredCharacters.length ? (currentPage - 1) * PAGE_SIZE : 0;
   const visibleCharacters = filteredCharacters.slice(startIndex, startIndex + PAGE_SIZE);
   const endIndex = Math.min(startIndex + visibleCharacters.length, filteredCharacters.length);
-  const hasActiveFilters = Boolean(search || letter !== "All" || gender !== "all" || status !== "all");
+  const hasActiveFilters = Boolean(search || letter !== "All" || gender !== "all" || status !== "all" || bookmarked);
 
   React.useEffect(() => {
     if (requestedPage !== currentPage) {
@@ -183,11 +186,16 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
               Status: {statusFilterLabel(status)} <span aria-hidden="true">x</span>
             </button>
           ) : null}
+          {bookmarked ? (
+            <button type="button" onClick={() => updateFilters({ bookmarked: "", page: 1 })}>
+              Bookmarked <span aria-hidden="true">x</span>
+            </button>
+          ) : null}
           <button className="clear" type="button" onClick={clearAllFilters}>Clear all</button>
         </section>
       ) : null}
 
-      <nav className="wiki-skill-alphabet" aria-label="Filter characters by first letter">
+      <nav className="wiki-skill-alphabet has-secondary-filter" aria-label="Filter characters by first letter">
         <button
           className={letter === "All" ? "active" : ""}
           type="button"
@@ -241,11 +249,22 @@ export default function WikiCharacterBrowser({ characters, novel, onSelectCharac
               <option value="name_desc">Name (Z-A)</option>
             </select>
           </label>
+          <button
+            className={bookmarked ? "wiki-bookmarked-filter active" : "wiki-bookmarked-filter"}
+            type="button"
+            onClick={() => updateFilters({ bookmarked: bookmarked ? "" : "1", page: 1 })}
+          >
+            Bookmarked
+          </button>
+          <div className="wiki-view-toggle" aria-label="View mode">
+            <button className={view === "list" ? "active" : ""} type="button" onClick={() => updateFilters({ view: "list" })}>☰</button>
+            <button className={view === "grid" ? "active" : ""} type="button" onClick={() => updateFilters({ view: "grid" })}>▦</button>
+          </div>
         </div>
       </section>
 
       <section className="wiki-character-index">
-        <div className="wiki-character-rows">
+        <div className={view === "grid" ? "wiki-character-rows grid" : "wiki-character-rows"}>
           {visibleCharacters.length ? visibleCharacters.map((character) => {
             const cultivation = character.current_cultivation_level
               ? formatCultivationValue(character.current_cultivation_level)

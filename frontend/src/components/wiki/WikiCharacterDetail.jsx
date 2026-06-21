@@ -13,6 +13,7 @@ import {
   UserRound,
   Zap,
 } from "lucide-react";
+import WikiBookmarkButton from "./WikiBookmarkButton.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
 import {
@@ -31,6 +32,7 @@ export default function WikiCharacterDetail({
   onOpenSkills,
   onSelectItem,
   onSelectSkill,
+  onToggleBookmark,
 }) {
   if (!character) {
     return (
@@ -142,6 +144,7 @@ export default function WikiCharacterDetail({
         <div className="wiki-character-hero-main">
           <div className="wiki-title-row">
             <h1>{character.name}</h1>
+            <WikiBookmarkButton entity={character} entityType="character" onToggle={onToggleBookmark} />
           </div>
 
           {heroBadges.length ? (

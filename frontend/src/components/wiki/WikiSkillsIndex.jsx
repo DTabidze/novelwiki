@@ -71,6 +71,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
   const letter = searchParams.get("letter") || "All";
   const sort = searchParams.get("sort") || "name_asc";
   const view = searchParams.get("view") || "list";
+  const bookmarked = searchParams.get("bookmarked") === "1";
   const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
   const selectedCharacter = characterId
     ? characters.find((character) => character.id === characterId)
@@ -106,6 +107,7 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
     const rows = skills
       .filter((skill) => skillMatchesCharacter(skill, characterId))
       .filter((skill) => skillMatchesSearch(skill, search))
+      .filter((skill) => !bookmarked || skill.is_bookmarked)
       .filter((skill) => category === "all" || String(skill.category || "").toLowerCase() === category.toLowerCase())
       .filter((skill) => {
         const firstLetter = (skill.name || "?").trim().slice(0, 1).toUpperCase();
@@ -119,14 +121,14 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
 
       return first.name.localeCompare(second.name);
     });
-  }, [category, characterId, letter, search, skills, sort]);
+  }, [bookmarked, category, characterId, letter, search, skills, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredSkills.length / PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
   const startIndex = filteredSkills.length ? (currentPage - 1) * PAGE_SIZE : 0;
   const visibleSkills = filteredSkills.slice(startIndex, startIndex + PAGE_SIZE);
   const endIndex = Math.min(startIndex + visibleSkills.length, filteredSkills.length);
-  const hasActiveFilters = Boolean(characterId || search || category !== "all" || letter !== "All");
+  const hasActiveFilters = Boolean(characterId || search || category !== "all" || letter !== "All" || bookmarked);
 
   React.useEffect(() => {
     if (requestedPage !== currentPage) {
@@ -188,6 +190,11 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
               Letter: {letter} <span aria-hidden="true">x</span>
             </button>
           ) : null}
+          {bookmarked ? (
+            <button type="button" onClick={() => updateFilters({ bookmarked: "", page: 1 })}>
+              Bookmarked <span aria-hidden="true">x</span>
+            </button>
+          ) : null}
           <button className="clear" type="button" onClick={clearAllFilters}>Clear all</button>
         </section>
       ) : null}
@@ -236,6 +243,13 @@ export default function WikiSkillsIndex({ characters, novel, onSelectCharacter, 
               <option value="name_desc">Name (Z-A)</option>
             </select>
           </label>
+          <button
+            className={bookmarked ? "wiki-bookmarked-filter active" : "wiki-bookmarked-filter"}
+            type="button"
+            onClick={() => updateFilters({ bookmarked: bookmarked ? "" : "1", page: 1 })}
+          >
+            Bookmarked
+          </button>
           <div className="wiki-view-toggle" aria-label="View mode">
             <button className={view === "list" ? "active" : ""} type="button" onClick={() => updateFilters({ view: "list" })}>☰</button>
             <button className={view === "grid" ? "active" : ""} type="button" onClick={() => updateFilters({ view: "grid" })}>▦</button>

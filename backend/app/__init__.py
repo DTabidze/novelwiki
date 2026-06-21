@@ -270,6 +270,51 @@ def ensure_development_schema(app):
             )
         )
 
+        connection.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS user_bookmarks ("
+                "id INTEGER PRIMARY KEY, "
+                "user_id INTEGER NOT NULL, "
+                "novel_id INTEGER NOT NULL, "
+                "entity_type VARCHAR(50) NOT NULL, "
+                "entity_id INTEGER NOT NULL, "
+                "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                "FOREIGN KEY(user_id) REFERENCES users (id), "
+                "FOREIGN KEY(novel_id) REFERENCES novels (id), "
+                "CONSTRAINT uq_user_bookmark_entity UNIQUE (user_id, entity_type, entity_id)"
+                ")"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_user_bookmarks_user_created "
+                "ON user_bookmarks (user_id, created_at)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_user_bookmarks_novel "
+                "ON user_bookmarks (novel_id)"
+            )
+        )
+
+        old_bookmark_table = connection.execute(
+            text(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name='user_novel_bookmarks'"
+            )
+        ).fetchone()
+
+        if old_bookmark_table:
+            connection.execute(
+                text(
+                    "INSERT OR IGNORE INTO user_bookmarks "
+                    "(user_id, novel_id, entity_type, entity_id, created_at) "
+                    "SELECT user_id, novel_id, 'novel', novel_id, created_at "
+                    "FROM user_novel_bookmarks"
+                )
+            )
+
         character_skill_columns = connection.execute(
             text("PRAGMA table_info(character_skills)")
         ).fetchall()

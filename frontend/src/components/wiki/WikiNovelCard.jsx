@@ -1,5 +1,6 @@
 import React from "react";
 import { BadgeCheck, BookOpen, ChevronRight, Sprout } from "lucide-react";
+import WikiBookmarkButton from "./WikiBookmarkButton.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { formatNumber } from "../../utils/wikiFormat.js";
 
@@ -17,12 +18,14 @@ function coverageCount(novel) {
   return novel.wiki_coverage_end_chapter || 0;
 }
 
-export default function WikiNovelCard({ novel, onOpen }) {
+export default function WikiNovelCard({ novel, onOpen, onToggleBookmark }) {
   const statusLabel = publicNovelStatusLabel(novel.status);
   const totalChapters = novel.chapter_count || 0;
 
   return (
     <article className="wiki-novel-card">
+      <WikiBookmarkButton entity={novel} entityType="novel" onToggle={onToggleBookmark} />
+
       <div className="wiki-novel-card-cover">
         {novel.cover_image_url ? (
           <img src={novel.cover_image_url} alt="" />

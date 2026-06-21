@@ -38,6 +38,9 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
   const search = searchParams.get("q") || "";
   const type = searchParams.get("type") || "all";
   const letter = searchParams.get("letter") || "All";
+  const sort = searchParams.get("sort") || "name_asc";
+  const view = searchParams.get("view") || "list";
+  const bookmarked = searchParams.get("bookmarked") === "1";
   const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
   const selectedCharacter = characterId
     ? characters.find((character) => character.id === characterId)
@@ -73,21 +76,28 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
     const rows = items
       .filter((item) => itemMatchesCharacter(item, characterId))
       .filter((item) => itemMatchesSearch(item, search))
+      .filter((item) => !bookmarked || item.is_bookmarked)
       .filter((item) => type === "all" || itemTypeFor(item) === type)
       .filter((item) => {
         const firstLetter = (item.name || "?").trim().slice(0, 1).toUpperCase();
         return letter === "All" || firstLetter === letter;
       });
 
-    return rows.sort((first, second) => first.name.localeCompare(second.name));
-  }, [characterId, items, letter, search, type]);
+    return rows.sort((first, second) => {
+      if (sort === "name_desc") {
+        return second.name.localeCompare(first.name);
+      }
+
+      return first.name.localeCompare(second.name);
+    });
+  }, [bookmarked, characterId, items, letter, search, sort, type]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
   const startIndex = filteredItems.length ? (currentPage - 1) * PAGE_SIZE : 0;
   const visibleItems = filteredItems.slice(startIndex, startIndex + PAGE_SIZE);
   const endIndex = Math.min(startIndex + visibleItems.length, filteredItems.length);
-  const hasActiveFilters = Boolean(characterId || search || type !== "all" || letter !== "All");
+  const hasActiveFilters = Boolean(characterId || search || type !== "all" || letter !== "All" || bookmarked);
 
   React.useEffect(() => {
     if (requestedPage !== currentPage) {
@@ -139,6 +149,11 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
               Letter: {letter} <span aria-hidden="true">x</span>
             </button>
           ) : null}
+          {bookmarked ? (
+            <button type="button" onClick={() => updateFilters({ bookmarked: "", page: 1 })}>
+              Bookmarked <span aria-hidden="true">x</span>
+            </button>
+          ) : null}
           <button className="clear" type="button" onClick={clearAllFilters}>Clear all</button>
         </section>
       ) : null}
@@ -161,7 +176,7 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
         </section>
       ) : null}
 
-      <nav className="wiki-skill-alphabet" aria-label="Filter items by first letter">
+      <nav className="wiki-skill-alphabet has-secondary-filter" aria-label="Filter items by first letter">
         <button className={letter === "All" ? "active" : ""} type="button" onClick={() => updateFilters({ letter: "All", page: 1 })}>
           All
         </button>
@@ -193,9 +208,29 @@ export default function WikiItemsIndex({ characters, items, novel, onSelectChara
 
       <section className="wiki-skill-list-toolbar">
         <strong>{formatNumber(filteredItems.length)} items found</strong>
+        <div>
+          <label>
+            <span>Sort by:</span>
+            <select value={sort} onChange={(event) => updateFilters({ sort: event.target.value, page: 1 })}>
+              <option value="name_asc">Name (A-Z)</option>
+              <option value="name_desc">Name (Z-A)</option>
+            </select>
+          </label>
+          <button
+            className={bookmarked ? "wiki-bookmarked-filter active" : "wiki-bookmarked-filter"}
+            type="button"
+            onClick={() => updateFilters({ bookmarked: bookmarked ? "" : "1", page: 1 })}
+          >
+            Bookmarked
+          </button>
+          <div className="wiki-view-toggle" aria-label="View mode">
+            <button className={view === "list" ? "active" : ""} type="button" onClick={() => updateFilters({ view: "list" })}>☰</button>
+            <button className={view === "grid" ? "active" : ""} type="button" onClick={() => updateFilters({ view: "grid" })}>▦</button>
+          </div>
+        </div>
       </section>
 
-      <section className="wiki-entity-index">
+      <section className={view === "grid" ? "wiki-entity-index grid" : "wiki-entity-index"}>
         <div className="wiki-entity-rows">
           {visibleItems.length ? visibleItems.map((item) => {
             const itemType = itemTypeFor(item);
