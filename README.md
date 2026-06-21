@@ -31,6 +31,8 @@ Start with the docs in this order:
 4. `docs/api-endpoints.md`
 5. `docs/implementation-plan.md`
 
+For simple Render deployment, see `docs/deployment-render.md`.
+
 ## MVP Principle
 
 The app separates uncertain extraction from public wiki data:

@@ -15,6 +15,15 @@ from app.models import User, db
 from app.services.auth import install_auth_guards
 
 
+def env_bool(name, default=False):
+    value = os.getenv(name)
+
+    if value is None:
+        return default
+
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def ensure_development_schema(app):
     review_tables = {
         "characters",
@@ -498,7 +507,10 @@ def create_app():
         MAX_CONTENT_LENGTH=50 * 1024 * 1024,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE=os.getenv("SESSION_COOKIE_SAMESITE", "Lax"),
-        SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
+        SESSION_COOKIE_SECURE=env_bool(
+            "SESSION_COOKIE_SECURE",
+            os.getenv("FLASK_ENV") == "production",
+        ),
     )
 
     CORS(app, origins=frontend_origins, supports_credentials=True)
