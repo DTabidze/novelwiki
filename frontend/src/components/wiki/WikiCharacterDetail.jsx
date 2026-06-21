@@ -16,6 +16,7 @@ import {
 import WikiBookmarkButton from "./WikiBookmarkButton.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
+import { WikiDetailSkeleton } from "./WikiSkeletons.jsx";
 import {
   chapterLabel,
   cleanChapterTitle,
@@ -27,6 +28,7 @@ import {
 
 export default function WikiCharacterDetail({
   character,
+  isLoading = false,
   onOpenCultivation,
   onOpenItems,
   onOpenSkills,
@@ -34,6 +36,10 @@ export default function WikiCharacterDetail({
   onSelectSkill,
   onToggleBookmark,
 }) {
+  if (isLoading) {
+    return <WikiDetailSkeleton variant="character" />;
+  }
+
   if (!character) {
     return (
       <section className="wiki-empty-panel">

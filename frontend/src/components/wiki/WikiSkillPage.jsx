@@ -2,6 +2,7 @@ import React from "react";
 import { BookOpen, FileText, Tags, Users } from "lucide-react";
 import WikiBookmarkButton from "./WikiBookmarkButton.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
+import { WikiDetailSkeleton } from "./WikiSkeletons.jsx";
 import {
   chapterBadge,
   chapterLabel,
@@ -13,14 +14,18 @@ import {
   skillCategoryClass,
 } from "../../utils/wikiFormat.js";
 
-export default function WikiSkillPage({ onSelectCharacter, onToggleBookmark, skill }) {
+export default function WikiSkillPage({ isLoading = false, onSelectCharacter, onToggleBookmark, skill }) {
   const [showAllTimeline, setShowAllTimeline] = React.useState(false);
+
+  if (isLoading) {
+    return <WikiDetailSkeleton variant="skill" />;
+  }
 
   if (!skill) {
     return (
       <section className="wiki-empty-panel">
-        <h2>Loading skill</h2>
-        <p>The skill page will appear once the approved wiki data loads.</p>
+        <h2>Select a skill</h2>
+        <p>Choose an approved skill to view its public wiki page.</p>
       </section>
     );
   }
@@ -50,22 +55,26 @@ export default function WikiSkillPage({ onSelectCharacter, onToggleBookmark, ski
 
   return (
     <article className="wiki-skill-detail-page">
-      <section className="wiki-skill-hero-card">
-        <div className="wiki-skill-hero-art">
+      <section className="wiki-character-hero-card wiki-entity-detail-hero-card skill">
+        <div className="wiki-character-hero-avatar wiki-entity-detail-hero-avatar">
           <div className="wiki-skill-hero-avatar">
             <span>{initialsForName(skill.name)}</span>
           </div>
         </div>
 
-        <div className="wiki-skill-hero-main">
+        <div className="wiki-character-hero-main">
           <div className="wiki-title-row">
             <h1>{skill.name}</h1>
             <WikiBookmarkButton entity={skill} entityType="skill" onToggle={onToggleBookmark} />
           </div>
-          {skill.category ? <span className={skillBadgeClass}>{skill.category}</span> : null}
-          {skill.description ? <p>{skill.description}</p> : null}
+          {skill.category ? (
+            <div className="wiki-character-hero-badges">
+              <span className={skillBadgeClass}>{skill.category}</span>
+            </div>
+          ) : null}
+          {skill.description ? <p className="wiki-character-hero-description">{skill.description}</p> : null}
 
-          <div className="wiki-skill-stat-grid">
+          <div className="wiki-character-hero-stats">
             <span>
               <Users aria-hidden="true" size={18} strokeWidth={2} />
               <strong>{knownUsers.length}</strong>
@@ -113,7 +122,7 @@ export default function WikiSkillPage({ onSelectCharacter, onToggleBookmark, ski
 
               return (
                 <button
-                  className="wiki-skill-known-user-row"
+                  className="wiki-skill-known-user-row wiki-item-owner-row"
                   key={relationship.id}
                   type="button"
                   onClick={() => onSelectCharacter(relationship.character)}
@@ -121,7 +130,6 @@ export default function WikiSkillPage({ onSelectCharacter, onToggleBookmark, ski
                   <WikiAvatar name={relationship.character.name} size="small" />
                   <span>
                     <strong>{relationship.character.name}</strong>
-                    {relationship.description ? <small>{relationship.description}</small> : null}
                   </span>
                   <span className="wiki-skill-row-chapter" title={chapter}>{chapter}</span>
                   <span className="wiki-row-action">›</span>
@@ -135,29 +143,15 @@ export default function WikiSkillPage({ onSelectCharacter, onToggleBookmark, ski
       </section>
 
       {aliases.length ? (
-        <section className="wiki-card wiki-skill-section-card">
+        <section className="wiki-card">
           <div className="wiki-card-heading">
             <h2>Aliases</h2>
-            <button className="wiki-text-link" type="button">
-              View all aliases <span aria-hidden="true">→</span>
-            </button>
           </div>
 
-          <div className="wiki-skill-alias-list">
-            {aliases.map((alias) => {
-              const firstSeen = alias.first_seen_chapter ? chapterLabel(alias.first_seen_chapter) : "";
-
-              return (
-                <article className="wiki-skill-alias-row" key={alias.id}>
-                  <span className="wiki-skill-alias-icon">
-                    <BookOpen aria-hidden="true" size={18} strokeWidth={2} />
-                  </span>
-                  <strong>{alias.alias}</strong>
-                  <span>{firstSeen ? `First seen in ${firstSeen}` : ""}</span>
-                  <span className="wiki-row-action">›</span>
-                </article>
-              );
-            })}
+          <div className="wiki-alias-cloud">
+            {aliases.map((alias) => (
+              <span key={alias.id}>{alias.alias}</span>
+            ))}
           </div>
         </section>
       ) : null}

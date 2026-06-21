@@ -344,9 +344,10 @@ export default function WikiPanel({
 
           {trackedNovel ? (
             <>
-              {page === "Character" && selectedCharacter ? (
+              {page === "Character" ? (
                 <WikiCharacterDetail
                   character={selectedCharacter}
+                  isLoading={loading}
                   onOpenCultivation={() => openCharacterProgression(selectedCharacter)}
                   onOpenItems={() => openCharacterItems(selectedCharacter)}
                   onOpenSkills={() => openCharacterSkills(selectedCharacter)}
@@ -358,8 +359,8 @@ export default function WikiPanel({
                 />
               ) : null}
 
-              {page === "CharacterProgression" && selectedCharacter ? (
-                <WikiCharacterProgressionPage character={selectedCharacter} />
+              {page === "CharacterProgression" ? (
+                <WikiCharacterProgressionPage character={selectedCharacter} isLoading={loading} />
               ) : null}
 
               {page === "Characters" ? (
@@ -394,8 +395,9 @@ export default function WikiPanel({
                 />
               ) : null}
 
-              {page === "Skill" && selectedSkill ? (
+              {page === "Skill" ? (
                 <WikiSkillPage
+                  isLoading={loading}
                   skill={selectedSkill}
                   onSelectCharacter={openCharacter}
                   onToggleBookmark={onToggleBookmark}
@@ -426,8 +428,9 @@ export default function WikiPanel({
                 />
               ) : null}
 
-              {page === "Item" && selectedItem ? (
+              {page === "Item" ? (
                 <WikiItemPage
+                  isLoading={loading}
                   item={selectedItem}
                   onSelectCharacter={openCharacter}
                   onToggleBookmark={onToggleBookmark}
@@ -437,6 +440,7 @@ export default function WikiPanel({
               {page === "Overview" ? (
                 <WikiNovelOverview
                   characters={characters}
+                  isLoading={loading}
                   items={items}
                   novel={trackedNovel}
                   onOpenCharacters={openCharacters}

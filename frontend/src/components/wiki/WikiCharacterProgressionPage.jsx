@@ -1,12 +1,17 @@
 import React from "react";
 import WikiProgressionView from "./WikiProgressionView.jsx";
+import { WikiProgressionSkeleton } from "./WikiSkeletons.jsx";
 
-export default function WikiCharacterProgressionPage({ character }) {
+export default function WikiCharacterProgressionPage({ character, isLoading = false }) {
+  if (isLoading) {
+    return <WikiProgressionSkeleton />;
+  }
+
   if (!character) {
     return (
       <section className="wiki-empty-panel">
-        <h2>Loading progression</h2>
-        <p>The character progression page will appear once the approved wiki data loads.</p>
+        <h2>Select a character</h2>
+        <p>Choose a character to view their cultivation progression.</p>
       </section>
     );
   }

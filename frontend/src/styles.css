@@ -3631,10 +3631,22 @@ button:disabled {
   border-radius: 5px;
 }
 
+.wiki-skeleton-title.compact {
+  width: min(180px, 72%);
+}
+
 .wiki-skeleton-badge {
   width: 128px;
   height: 18px;
   border-radius: 5px;
+}
+
+.wiki-skeleton-badge.short {
+  width: 82px;
+}
+
+.wiki-skeleton-badge.long {
+  width: 152px;
 }
 
 .wiki-skeleton-subtitle {
@@ -3649,6 +3661,20 @@ button:disabled {
   border-radius: 5px;
 }
 
+.wiki-skeleton-paragraph {
+  width: min(100%, 620px);
+  height: 15px;
+  border-radius: 5px;
+}
+
+.wiki-skeleton-paragraph.wide {
+  width: min(100%, 680px);
+}
+
+.wiki-skeleton-paragraph.medium {
+  width: min(72%, 460px);
+}
+
 .wiki-skeleton-meta-short {
   width: 112px;
   height: 12px;
@@ -3660,6 +3686,109 @@ button:disabled {
   max-width: 100%;
   height: 13px;
   border-radius: 5px;
+}
+
+.wiki-detail-skeleton-title {
+  width: min(420px, 76%);
+  height: 42px;
+  border-radius: 8px;
+}
+
+.wiki-detail-skeleton-avatar {
+  width: 144px;
+  height: 144px;
+  border-radius: 999px;
+}
+
+.wiki-detail-skeleton-cover-avatar {
+  width: min(100%, 210px);
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+}
+
+.wiki-detail-skeleton-stat {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.wiki-skeleton-browse-card,
+.wiki-skeleton-feature-card,
+.wiki-skeleton-summary-row,
+.wiki-skeleton-timeline-row,
+.wiki-skeleton-evidence-row {
+  pointer-events: none;
+}
+
+.wiki-skeleton-browse-card:hover,
+.wiki-skeleton-feature-card:hover,
+.wiki-skeleton-summary-row:hover,
+.wiki-skeleton-timeline-row:hover,
+.wiki-skeleton-evidence-row:hover {
+  background: inherit;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.wiki-skeleton-section-card {
+  min-width: 0;
+}
+
+.wiki-character-hero-badges-skeleton {
+  max-width: 620px;
+}
+
+.wiki-character-hero-stats-skeleton-line {
+  width: min(100%, 520px);
+  height: 18px;
+  margin-top: 14px;
+  border-radius: 6px;
+}
+
+.wiki-detail-stats-skeleton-line {
+  width: min(100%, 520px);
+  height: 18px;
+  margin-top: 4px;
+  border-radius: 6px;
+}
+
+.wiki-skill-hero-avatar-skeleton {
+  width: 82px;
+  height: 82px;
+  border-radius: 999px;
+}
+
+.wiki-current-cultivation-skeleton-card {
+  min-height: 150px;
+}
+
+.wiki-current-cultivation-icon-skeleton,
+.wiki-quick-fact-icon-skeleton {
+  background: linear-gradient(90deg, #eef2f7 0%, #e5e9f0 48%, #eef2f7 100%);
+  background-size: 220% 100%;
+  color: transparent;
+}
+
+.wiki-current-cultivation-skeleton-card .wiki-skeleton-title.compact {
+  width: min(100%, 320px);
+  height: 24px;
+  margin-top: 24px;
+}
+
+.wiki-character-about-skeleton-card {
+  min-height: 150px;
+}
+
+.wiki-character-about-skeleton-card .wiki-skeleton-paragraph {
+  margin-top: 22px;
+}
+
+.wiki-quick-fact-skeleton-row .wiki-skeleton-meta-short {
+  width: 112px;
+}
+
+.wiki-quick-fact-skeleton-row .wiki-skeleton-meta-long {
+  width: min(100%, 220px);
 }
 
 .wiki-character-rows.grid {
@@ -4718,9 +4847,13 @@ button:disabled {
 }
 
 .wiki-skill-section-card .wiki-card-heading {
-  margin-bottom: 14px;
-  padding-bottom: 14px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--wiki-border-soft);
+}
+
+.wiki-skill-section-card .wiki-card-heading h2 {
+  margin: 0;
 }
 
 .wiki-skill-known-users,
@@ -4747,7 +4880,7 @@ button:disabled {
 }
 
 .wiki-skill-known-user-row {
-  grid-template-columns: 52px minmax(180px, 1fr) minmax(140px, 0.28fr) 24px;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(88px, 0.22fr) 24px;
 }
 
 .wiki-skill-alias-row {
@@ -4800,6 +4933,7 @@ button:disabled {
 
 .wiki-skill-row-chapter {
   justify-self: end;
+  max-width: 100%;
   white-space: nowrap;
 }
 
@@ -5005,6 +5139,45 @@ button:disabled {
   box-shadow: var(--wiki-shadow);
 }
 
+.wiki-entity-detail-hero-card.skill {
+  background:
+    radial-gradient(circle at 12% 85%, rgba(249, 115, 22, 0.1), transparent 16%),
+    linear-gradient(135deg, #ffffff 0%, #ffffff 58%, #fff7ed 100%);
+}
+
+.wiki-entity-detail-hero-card.item {
+  background:
+    radial-gradient(circle at 12% 85%, rgba(146, 100, 48, 0.12), transparent 16%),
+    linear-gradient(135deg, #ffffff 0%, #ffffff 58%, #fbf7ef 100%);
+}
+
+.wiki-entity-detail-hero-avatar .wiki-skill-hero-avatar {
+  width: 128px;
+  height: 128px;
+  font-size: 42px;
+  box-shadow:
+    16px 18px 0 rgba(37, 99, 235, 0.08),
+    28px 28px 0 rgba(37, 99, 235, 0.05);
+}
+
+.wiki-entity-detail-hero-card.skill .wiki-skill-hero-avatar {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.2), transparent 24%),
+    linear-gradient(145deg, #c2410c, #7c2d12);
+  box-shadow:
+    16px 18px 0 rgba(249, 115, 22, 0.08),
+    28px 28px 0 rgba(249, 115, 22, 0.05);
+}
+
+.wiki-entity-detail-hero-card.item .wiki-skill-hero-avatar {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.2), transparent 24%),
+    linear-gradient(145deg, #8b6f47, #111827);
+  box-shadow:
+    16px 18px 0 rgba(146, 100, 48, 0.08),
+    28px 28px 0 rgba(146, 100, 48, 0.05);
+}
+
 .wiki-character-hero-avatar {
   display: grid;
   place-items: center;
@@ -5022,6 +5195,10 @@ button:disabled {
 
 .wiki-character-hero-main {
   min-width: 0;
+}
+
+.wiki-character-hero-main > * + * {
+  margin-top: 12px;
 }
 
 .wiki-character-hero-main .wiki-title-row h1 {
@@ -5082,7 +5259,7 @@ button:disabled {
 }
 
 .wiki-character-hero-meta {
-  margin-top: 14px;
+  margin-top: 12px;
   color: #52637f;
   font-size: 14px;
   font-weight: 750;
@@ -5096,13 +5273,13 @@ button:disabled {
 
 .wiki-character-hero-description {
   max-width: 760px;
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   color: #17213a;
   line-height: 1.75;
 }
 
 .wiki-character-hero-stats {
-  margin-top: 24px;
+  margin-top: 12px;
 }
 
 .wiki-character-hero-stats span {

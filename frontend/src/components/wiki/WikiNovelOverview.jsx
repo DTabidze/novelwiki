@@ -1,10 +1,12 @@
 import React from "react";
 import { Building2, MapPin, Package, Route, Sparkles, Timeline, Users } from "lucide-react";
 import WikiAvatar from "./WikiAvatar.jsx";
+import { WikiNovelOverviewSkeleton } from "./WikiSkeletons.jsx";
 import { formatCultivationValue, formatNumber } from "../../utils/wikiFormat.js";
 
 export default function WikiNovelOverview({
   characters,
+  isLoading = false,
   novel,
   onOpenCharacters,
   onOpenCultivation,
@@ -12,6 +14,10 @@ export default function WikiNovelOverview({
   onOpenSkills,
   onSelectCharacter,
 }) {
+  if (isLoading) {
+    return <WikiNovelOverviewSkeleton />;
+  }
+
   const featuredCharacters = characters.slice(0, 4);
   const coveredChapters = novel.wiki_coverage_end_chapter || 0;
   const totalChapters = novel.chapter_count || 0;

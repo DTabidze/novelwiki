@@ -3,6 +3,7 @@ import { BookOpen, FileText, Users } from "lucide-react";
 import WikiBookmarkButton from "./WikiBookmarkButton.jsx";
 import WikiAvatar from "./WikiAvatar.jsx";
 import { ItemTypeIcon, itemTypeFor, itemTypeLabel } from "./WikiItemTypes.jsx";
+import { WikiDetailSkeleton } from "./WikiSkeletons.jsx";
 import {
   chapterBadge,
   chapterLabel,
@@ -13,14 +14,18 @@ import {
   relationshipTypeLabel,
 } from "../../utils/wikiFormat.js";
 
-export default function WikiItemPage({ item, onSelectCharacter, onToggleBookmark }) {
+export default function WikiItemPage({ isLoading = false, item, onSelectCharacter, onToggleBookmark }) {
   const [showAllTimeline, setShowAllTimeline] = React.useState(false);
+
+  if (isLoading) {
+    return <WikiDetailSkeleton variant="item" />;
+  }
 
   if (!item) {
     return (
       <section className="wiki-empty-panel">
-        <h2>Loading item</h2>
-        <p>The item page will appear once the approved wiki data loads.</p>
+        <h2>Select an item</h2>
+        <p>Choose an approved item to view its public wiki page.</p>
       </section>
     );
   }
@@ -51,27 +56,29 @@ export default function WikiItemPage({ item, onSelectCharacter, onToggleBookmark
 
   return (
     <article className="wiki-skill-detail-page wiki-item-detail-page">
-      <section className="wiki-skill-hero-card wiki-item-hero-card">
-        <div className="wiki-skill-hero-art wiki-item-hero-art">
+      <section className="wiki-character-hero-card wiki-entity-detail-hero-card item">
+        <div className="wiki-character-hero-avatar wiki-entity-detail-hero-avatar">
           <div className="wiki-skill-hero-avatar">
             <span>{initialsForName(item.name)}</span>
           </div>
         </div>
 
-        <div className="wiki-skill-hero-main">
+        <div className="wiki-character-hero-main">
           <div className="wiki-title-row">
             <h1>{item.name}</h1>
             <WikiBookmarkButton entity={item} entityType="item" onToggle={onToggleBookmark} />
           </div>
           {item.category ? (
-            <span className={`wiki-type-badge ${itemType}`}>
-              <ItemTypeIcon type={itemType} />
-              {item.category || itemTypeLabel(itemType)}
-            </span>
+            <div className="wiki-character-hero-badges">
+              <span className={`wiki-type-badge ${itemType}`}>
+                <ItemTypeIcon type={itemType} />
+                {item.category || itemTypeLabel(itemType)}
+              </span>
+            </div>
           ) : null}
-          {item.description ? <p>{item.description}</p> : null}
+          {item.description ? <p className="wiki-character-hero-description">{item.description}</p> : null}
 
-          <div className="wiki-skill-stat-grid">
+          <div className="wiki-character-hero-stats">
             <span>
               <Users aria-hidden="true" size={18} strokeWidth={2} />
               <strong>{relatedCharacters.length}</strong>
