@@ -16,6 +16,7 @@ const BOOKMARK_TABS = [
 ];
 
 const VALID_TABS = new Set(BOOKMARK_TABS.map((tab) => tab.id));
+const SKELETON_ROWS = Array.from({ length: 3 }, (_, index) => index);
 
 function isUnknown(value) {
   return !value || /^unknown/i.test(String(value).trim());
@@ -164,6 +165,37 @@ function BookmarkGroup({ bookmarks, label, onOpen, onRemove }) {
   );
 }
 
+function BookmarkSkeletonGroup({ label }) {
+  return (
+    <section className="wiki-search-result-group">
+      <header>
+        <h2>{label}</h2>
+        <span>
+          <span className="wiki-skeleton wiki-bookmark-skeleton-count" />
+        </span>
+      </header>
+      <div className="wiki-search-result-list">
+        {SKELETON_ROWS.map((index) => (
+          <div aria-hidden="true" className="wiki-bookmark-row wiki-bookmark-skeleton-row" key={index}>
+            <span className="wiki-skeleton wiki-index-skeleton-icon" />
+            <span className="wiki-bookmark-main">
+              <span>
+                <span className="wiki-skeleton wiki-skeleton-title" />
+                <span className="wiki-skeleton wiki-skeleton-badge" />
+              </span>
+              <span className="wiki-skeleton wiki-skeleton-subtitle" />
+            </span>
+            <span className="wiki-bookmark-meta">
+              <span className="wiki-skeleton wiki-skeleton-meta-short" />
+              <span className="wiki-skeleton wiki-skeleton-meta-long" />
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function WikiBookmarksPage({ onRemoveBookmark }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -243,7 +275,16 @@ export default function WikiBookmarksPage({ onRemoveBookmark }) {
       <header className="wiki-search-results-header">
         <div>
           <h1>Bookmarks</h1>
-          <p>{formatNumber(totalCount)} saved wiki {totalCount === 1 ? "page" : "pages"}</p>
+          <p>
+            {loading ? (
+              <span className="wiki-inline-loading">
+                <span aria-hidden="true" />
+                Loading bookmarks...
+              </span>
+            ) : (
+              `${formatNumber(totalCount)} saved wiki ${totalCount === 1 ? "page" : "pages"}`
+            )}
+          </p>
         </div>
       </header>
 
@@ -262,7 +303,12 @@ export default function WikiBookmarksPage({ onRemoveBookmark }) {
         ))}
       </nav>
 
-      {loading ? <p className="wiki-loading">Loading bookmarks...</p> : null}
+      {loading ? (
+        <div className="wiki-search-result-groups">
+          <BookmarkSkeletonGroup label={activeType === "all" ? "Novels" : BOOKMARK_TABS.find((tab) => tab.id === activeType)?.label || "Bookmarks"} />
+          {activeType === "all" ? <BookmarkSkeletonGroup label="Characters" /> : null}
+        </div>
+      ) : null}
 
       {!loading && error ? (
         <section className="wiki-search-results-empty">

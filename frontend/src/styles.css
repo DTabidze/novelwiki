@@ -1809,6 +1809,21 @@ button:disabled {
   justify-self: end;
 }
 
+.wiki-bookmark-skeleton-row {
+  pointer-events: none;
+}
+
+.wiki-bookmark-skeleton-row:hover {
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.wiki-bookmark-skeleton-count {
+  width: 20px;
+  height: 14px;
+  border-radius: 5px;
+}
+
 .wiki-search-results-empty {
   display: grid;
   place-items: center;
