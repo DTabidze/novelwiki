@@ -1,6 +1,9 @@
 from pathlib import Path
+import json
+import logging
 import os
 
+import click
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -134,6 +137,10 @@ def ensure_development_schema(app):
                 "last_reviewed_by_user_id": "INTEGER",
                 "last_review_action": "VARCHAR(50)",
                 "last_reviewed_at": "DATETIME",
+                "confidence_score": "FLOAT",
+                "risk_flags": "TEXT",
+                "source_extractor": "VARCHAR(100)",
+                "auto_approved": "BOOLEAN NOT NULL DEFAULT 0",
             }
 
             for column_name, column_type in review_metadata_columns.items():
@@ -141,6 +148,23 @@ def ensure_development_schema(app):
                     connection.execute(
                         text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
                     )
+
+        wiki_evidence_columns = connection.execute(
+            text("PRAGMA table_info(wiki_evidence)")
+        ).fetchall()
+        wiki_evidence_column_names = {column[1] for column in wiki_evidence_columns}
+        wiki_evidence_support_columns = {
+            "start_offset": "INTEGER",
+            "end_offset": "INTEGER",
+            "match_type": "VARCHAR(50)",
+            "evidence_source": "VARCHAR(50)",
+        }
+
+        for column_name, column_type in wiki_evidence_support_columns.items():
+            if wiki_evidence_columns and column_name not in wiki_evidence_column_names:
+                connection.execute(
+                    text(f"ALTER TABLE wiki_evidence ADD COLUMN {column_name} {column_type}")
+                )
 
         character_columns = connection.execute(text("PRAGMA table_info(characters)")).fetchall()
         character_column_names = {column[1] for column in character_columns}
@@ -490,6 +514,13 @@ def create_app():
     ]
 
     app = Flask(__name__, instance_relative_config=True)
+    log_level_name = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+    log_level = getattr(logging, log_level_name, logging.INFO)
+    app.logger.setLevel(log_level)
+
+    for handler in app.logger.handlers:
+        handler.setLevel(log_level)
+
     app.config.from_mapping(
         SECRET_KEY=os.getenv("SECRET_KEY", "dev-only-change-me"),
         SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///novelwiki.db"),
@@ -503,6 +534,13 @@ def create_app():
 
     CORS(app, origins=frontend_origins, supports_credentials=True)
     db.init_app(app)
+
+    extraction_pipeline_mode = os.getenv("AI_EXTRACTION_PIPELINE", "legacy").strip().lower()
+
+    if extraction_pipeline_mode not in {"legacy", "multi_stage"}:
+        extraction_pipeline_mode = "legacy"
+
+    app.logger.info("Active AI extraction pipeline mode: %s", extraction_pipeline_mode)
 
     app.register_blueprint(health_bp, url_prefix="/api")
     app.register_blueprint(auth_bp, url_prefix="/api")
@@ -537,6 +575,91 @@ def create_app():
         db.session.add(user)
         db.session.commit()
         print(f"Created superadmin user: {email}")
+
+    @app.cli.command("review-pending")
+    @click.option("--novel-id", type=int, required=True)
+    @click.option("--limit", type=int, default=None)
+    @click.option(
+        "--type",
+        "fact_type",
+        type=click.Choice(
+            [
+                "character",
+                "skill",
+                "item",
+                "character_skill",
+                "character_item",
+                "progression",
+                "metadata",
+                "life_event",
+                "all",
+            ]
+        ),
+        default="all",
+    )
+    @click.option("--character-id", type=int, default=None)
+    @click.option("--apply", "apply_changes", is_flag=True, default=False)
+    def review_pending(novel_id, limit, fact_type, character_id, apply_changes):
+        from app.services.gpt_review_service import run_gpt_review
+
+        result = run_gpt_review(
+            novel_id=novel_id,
+            limit=limit,
+            fact_type=fact_type,
+            character_id=character_id,
+            dry_run=not apply_changes,
+        )
+        mode = "APPLY" if apply_changes else "DRY RUN"
+        print(
+            f"GPT review {mode}: model={result['model']} "
+            f"candidates={len(result['batch']['candidates'])} "
+            f"decisions={len(result['decisions'])} payload_chars={result['payload_chars']}"
+        )
+
+        for decision in result["decisions"]:
+            print(
+                f"- {decision['candidate_id']}: {decision['decision']} "
+                f"confidence={decision['confidence']:.2f} {decision['reason']}"
+            )
+
+        if result["results"]:
+            print("Results:")
+            for item in result["results"]:
+                status = item.get("record_status") or item.get("reason")
+                print(f"- {item['candidate_id']}: applied={item['applied']} {status}")
+
+    @app.cli.command("trace-fact-validation")
+    @click.option("--novel-id", type=int, required=True)
+    @click.option(
+        "--type",
+        "fact_type",
+        type=click.Choice(
+            [
+                "character",
+                "skill",
+                "item",
+                "character_skill",
+                "character_item",
+                "progression",
+                "metadata",
+                "life_event",
+                "event",
+            ]
+        ),
+        required=True,
+    )
+    @click.option("--id", "record_id", type=int, required=True)
+    @click.option("--evidence", type=str, default=None)
+    def trace_fact_validation_command(novel_id, fact_type, record_id, evidence):
+        from app.services.ai_extraction_service import trace_fact_validation
+
+        trace = trace_fact_validation(
+            novel_id,
+            fact_type,
+            record_id,
+            incoming_evidence=evidence,
+        )
+        print(json.dumps(trace, indent=2, ensure_ascii=False, default=str))
 
     with app.app_context():
         db.create_all()

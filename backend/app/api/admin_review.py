@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from app.models import (
+    AIEvidenceAudit,
     Character,
     CharacterAlias,
     CharacterItem,
@@ -22,6 +23,7 @@ from app.models import (
     utc_now,
 )
 from app.services.auth import current_user
+from app.services.extraction.evidence import get_evidence_context
 from app.services.wiki_admin_responses import (
     admin_review_response,
     character_editor_response,
@@ -236,33 +238,6 @@ def normalize_text(value):
     return re.sub(r"\s+", " ", str(value or "")).strip().lower()
 
 
-def split_context_paragraphs(content):
-    paragraphs = [
-        paragraph.strip()
-        for paragraph in re.split(r"\n\s*\n+", content or "")
-        if paragraph.strip()
-    ]
-
-    if paragraphs:
-        return paragraphs
-
-    fallback = " ".join((content or "").split())
-    return [fallback] if fallback else []
-
-
-def locate_evidence_paragraph(paragraphs, evidence_text):
-    normalized_evidence = normalize_text(evidence_text)
-
-    if not normalized_evidence:
-        return None
-
-    for index, paragraph in enumerate(paragraphs):
-        if normalized_evidence in normalize_text(paragraph):
-            return index
-
-    return None
-
-
 def merge_text(target_text, source_text):
     if not source_text:
         return target_text
@@ -285,37 +260,46 @@ def earliest_chapter_id(*chapter_ids):
 def chapter_evidence_context(chapter_id):
     chapter = Chapter.query.get_or_404(chapter_id)
     evidence_text = request.args.get("evidence", "")
-    radius = request.args.get("radius", 1, type=int)
-    radius = max(1, min(radius, 2))
-    paragraphs = split_context_paragraphs(chapter.content)
-    evidence_index = locate_evidence_paragraph(paragraphs, evidence_text)
+    context = get_evidence_context(chapter.content, evidence_text)
 
-    if evidence_index is None:
+    if not context.found:
         return success(
             {
                 "chapter": chapter.to_reference_dict(),
                 "evidence_text": evidence_text,
                 "exact_match": False,
                 "paragraphs": [],
+                "context": None,
                 "message": "Could not locate exact paragraph in chapter text.",
             }
         )
 
-    start_index = max(0, evidence_index - radius)
-    end_index = min(len(paragraphs), evidence_index + radius + 1)
+    sentence_rows = [
+        ("previous", context.previous_sentence),
+        ("evidence", context.evidence_sentence),
+        ("next", context.next_sentence),
+    ]
 
     return success(
         {
             "chapter": chapter.to_reference_dict(),
             "evidence_text": evidence_text,
             "exact_match": True,
+            "context": {
+                "previous_sentence": context.previous_sentence,
+                "evidence_sentence": context.evidence_sentence,
+                "next_sentence": context.next_sentence,
+                "combined_context": context.combined_context,
+                "match_type": context.match_type,
+            },
             "paragraphs": [
                 {
                     "index": index,
-                    "text": paragraphs[index],
-                    "is_evidence": index == evidence_index,
+                    "text": sentence,
+                    "is_evidence": label == "evidence",
                 }
-                for index in range(start_index, end_index)
+                for index, (label, sentence) in enumerate(sentence_rows)
+                if sentence
             ],
         }
     )
@@ -1065,6 +1049,9 @@ def merge_character(source_id):
         )
 
     WikiEvidence.query.filter_by(entity_type="character", entity_id=source.id).update(
+        {"entity_id": target.id}
+    )
+    AIEvidenceAudit.query.filter_by(entity_type="character", entity_id=source.id).update(
         {"entity_id": target.id}
     )
     CharacterProgressionEvent.query.filter_by(character_id=source.id).update(

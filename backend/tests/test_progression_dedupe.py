@@ -3,7 +3,12 @@ import unittest
 from flask import Flask
 
 from app.models import Character, CharacterProgressionEvent, Chapter, Novel, db
-from app.services.extraction.progression import find_existing_progression
+from app.services.extraction.progression import (
+    find_existing_progression,
+    progression_compare_key,
+    progression_keys_match,
+    progression_values_match,
+)
 
 
 class ProgressionDedupeTest(unittest.TestCase):
@@ -71,16 +76,37 @@ class ProgressionDedupeTest(unittest.TestCase):
             )
         )
 
-    def test_pending_progression_still_blocks_duplicate_proposal(self):
-        pending_progression = CharacterProgressionEvent(
+    def test_pending_progression_does_not_block_confirmed_later_proposal(self):
+        db.session.add(
+            CharacterProgressionEvent(
+                novel_id=self.novel.id,
+                character_id=self.character.id,
+                chapter_id=self.chapter.id,
+                progression_type="cultivation_level",
+                new_value="ninth level of Qi condensation",
+                review_status="pending",
+            )
+        )
+        db.session.commit()
+
+        self.assertIsNone(
+            find_existing_progression(
+                self.character,
+                "cultivation_level",
+                "ninth level of Qi Condensation",
+            )
+        )
+
+    def test_approved_progression_blocks_duplicate_proposal(self):
+        approved_progression = CharacterProgressionEvent(
             novel_id=self.novel.id,
             character_id=self.character.id,
             chapter_id=self.chapter.id,
             progression_type="cultivation_level",
             new_value="ninth level of Qi condensation",
-            review_status="pending",
+            review_status="approved",
         )
-        db.session.add(pending_progression)
+        db.session.add(approved_progression)
         db.session.commit()
 
         self.assertEqual(
@@ -89,7 +115,103 @@ class ProgressionDedupeTest(unittest.TestCase):
                 "cultivation_level",
                 "ninth level of Qi Condensation",
             ).id,
-            pending_progression.id,
+            approved_progression.id,
+        )
+
+    def test_article_variation_matches_same_progression_state(self):
+        self.assertTrue(
+            progression_values_match(
+                "cultivation_level",
+                "peak of second level",
+                "peak of the second level",
+            )
+        )
+
+    def test_ordinal_and_numeric_level_variants_match(self):
+        self.assertTrue(
+            progression_values_match(
+                "power_rank",
+                "Level 2",
+                "second level",
+            )
+        )
+
+    def test_realm_present_and_omitted_match_when_unique(self):
+        approved_progression = CharacterProgressionEvent(
+            novel_id=self.novel.id,
+            character_id=self.character.id,
+            chapter_id=self.chapter.id,
+            progression_type="cultivation_level",
+            new_value="peak of the second level of Azure Realm",
+            review_status="approved",
+        )
+        db.session.add(approved_progression)
+        db.session.commit()
+
+        self.assertEqual(
+            find_existing_progression(
+                self.character,
+                "cultivation_level",
+                "peak second level",
+            ).id,
+            approved_progression.id,
+        )
+
+    def test_ambiguous_omitted_realm_does_not_match_existing_progression(self):
+        db.session.add_all(
+            [
+                CharacterProgressionEvent(
+                    novel_id=self.novel.id,
+                    character_id=self.character.id,
+                    chapter_id=self.chapter.id,
+                    progression_type="cultivation_level",
+                    new_value="second level of Azure Realm",
+                    review_status="approved",
+                ),
+                CharacterProgressionEvent(
+                    novel_id=self.novel.id,
+                    character_id=self.character.id,
+                    chapter_id=self.chapter.id,
+                    progression_type="cultivation_level",
+                    new_value="second level of Crimson Path",
+                    review_status="approved",
+                ),
+            ]
+        )
+        db.session.commit()
+
+        self.assertIsNone(
+            find_existing_progression(
+                self.character,
+                "cultivation_level",
+                "second level",
+            )
+        )
+
+    def test_peak_and_plain_level_do_not_match(self):
+        self.assertFalse(
+            progression_values_match(
+                "cultivation_level",
+                "second level",
+                "peak second level",
+            )
+        )
+
+    def test_near_breakthrough_and_peak_state_do_not_match(self):
+        self.assertFalse(
+            progression_values_match(
+                "cultivation_level",
+                "almost third level",
+                "peak second level",
+            )
+        )
+
+    def test_different_progression_dimensions_do_not_match(self):
+        self.assertFalse(
+            progression_keys_match(
+                progression_compare_key("cultivation_level", "second level"),
+                progression_compare_key("position", "second level"),
+            )
         )
 
 

@@ -156,10 +156,12 @@ function RecentProcessedChaptersList({ run }) {
       <h4>Recent Chapters</h4>
       <div className="extraction-stream-list">
         {visibleChapters.length ? visibleChapters.map((runChapter) => {
-          const status = runChapter.status;
+          const status = run.status === "cancelled" && runChapter.status === "processing"
+            ? "cancelled"
+            : runChapter.status;
           const chapter = runChapter.chapter || {};
           const displayTitle = cleanChapterTitle(chapter) || chapter.title;
-          const isFinished = status === "completed" || status === "failed";
+          const isFinished = ["completed", "failed", "cancelled"].includes(status);
           const recordsText = isFinished ? `${runChapter.records_created || 0} records` : "— records";
           const warningsText = isFinished ? `${runChapter.warning_count || 0} warnings` : "— warnings";
           const durationText = isFinished ? formatDuration(runChapter.started_at, runChapter.finished_at) : "—";
@@ -213,7 +215,7 @@ function ExtractionConfirmModal({ action, chapterNumber, onCancel, onConfirm }) 
             <p>
               {isRetry
                 ? `Continue extraction from Chapter ${chapterNumber} through the original run end?`
-                : "Stop this extraction run? The current chapter may finish, but later chapters will be skipped."}
+                : "Stop this extraction run? The current chapter will be marked canceled, and any late AI output will be discarded."}
             </p>
           </div>
         </header>
@@ -243,7 +245,9 @@ export default function ActiveExtractionProgress({ focusRun, isRunningExtraction
   const failedRunChapter = firstFailedRunChapter(focusRun);
   const failedChapterNumber = failedRunChapter?.chapter?.chapter_number || focusRun?.chapter_start;
   const canRetry = focusRun?.status === "failed" && failedRunChapter;
-  const currentRunChapter = focusRun?.run_chapters?.find((runChapter) => runChapter.status === "processing") ||
+  const currentRunChapter = (focusRun?.status === "cancelled"
+    ? null
+    : focusRun?.run_chapters?.find((runChapter) => runChapter.status === "processing")) ||
     focusRun?.run_chapters?.find((runChapter) => runChapter.chapter_id === focusRun.current_chapter_id) ||
     [...(focusRun?.run_chapters || [])].reverse().find((runChapter) =>
       ["completed", "failed"].includes(runChapter.status)

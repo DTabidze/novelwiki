@@ -7,9 +7,10 @@ export function runProgress(run) {
 export function statusTone(status) {
   if (status === "completed") return "success";
   if (status === "failed") return "danger";
+  if (status === "cancelled") return "danger";
   if (status === "running" || status === "processing") return "info";
   if (status === "queued") return "warning";
-  if (status === "cancelled" || status === "skipped") return "warning";
+  if (status === "skipped") return "warning";
   return "neutral";
 }
 

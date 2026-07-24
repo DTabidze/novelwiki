@@ -47,6 +47,12 @@ class ReviewMixin:
             "last_reviewed_by": last_reviewed_by,
             "last_review_action": self.last_review_action,
             "last_reviewed_at": serialize_datetime(self.last_reviewed_at),
+            "confidence_score": getattr(self, "confidence_score", None),
+            "risk_flags": json.loads(getattr(self, "risk_flags", None) or "[]")
+            if hasattr(self, "risk_flags")
+            else [],
+            "source_extractor": getattr(self, "source_extractor", None),
+            "auto_approved": getattr(self, "auto_approved", False),
         }
 
 
@@ -457,6 +463,10 @@ class Character(ReviewMixin, db.Model):
     current_position = db.Column(db.String(255), nullable=True)
     current_class_rank = db.Column(db.String(255), nullable=True)
     current_power_rank = db.Column(db.String(255), nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    risk_flags = db.Column(db.Text, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     aliases = db.relationship(
@@ -585,6 +595,10 @@ class Skill(ReviewMixin, db.Model):
     name = db.Column(db.String(255), nullable=False)
     category = db.Column(db.String(100), nullable=True)
     description = db.Column(db.Text, nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    risk_flags = db.Column(db.Text, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     aliases = db.relationship(
@@ -641,6 +655,10 @@ class Item(ReviewMixin, db.Model):
     name = db.Column(db.String(255), nullable=False)
     category = db.Column(db.String(100), nullable=True)
     description = db.Column(db.Text, nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    risk_flags = db.Column(db.Text, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     def to_admin_dict(self):
@@ -664,6 +682,10 @@ class WikiEvent(ReviewMixin, db.Model):
     event_type = db.Column(db.String(100), nullable=False)
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    risk_flags = db.Column(db.Text, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     def to_admin_dict(self):
@@ -688,6 +710,10 @@ class WikiEvidence(db.Model):
     entity_type = db.Column(db.String(100), nullable=False)
     entity_id = db.Column(db.Integer, nullable=False)
     evidence_text = db.Column(db.Text, nullable=False)
+    start_offset = db.Column(db.Integer, nullable=True)
+    end_offset = db.Column(db.Integer, nullable=True)
+    match_type = db.Column(db.String(50), nullable=True)
+    evidence_source = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     def to_admin_dict(self):
@@ -698,6 +724,45 @@ class WikiEvidence(db.Model):
             "entity_type": self.entity_type,
             "entity_id": self.entity_id,
             "evidence_text": self.evidence_text,
+            "start_offset": self.start_offset,
+            "end_offset": self.end_offset,
+            "match_type": self.match_type,
+            "evidence_source": self.evidence_source,
+        }
+
+
+class AIEvidenceAudit(db.Model):
+    __tablename__ = "ai_evidence_audits"
+
+    id = db.Column(db.Integer, primary_key=True)
+    novel_id = db.Column(db.Integer, db.ForeignKey("novels.id"), nullable=False)
+    chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=True)
+    entity_type = db.Column(db.String(100), nullable=False)
+    entity_id = db.Column(db.Integer, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    ai_proposed_evidence = db.Column(db.Text, nullable=True)
+    verification_status = db.Column(db.String(50), nullable=False)
+    failure_reason = db.Column(db.String(100), nullable=True)
+    evidence_source = db.Column(db.String(50), nullable=True)
+    canonical_evidence_text = db.Column(db.Text, nullable=True)
+    recovery_method = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+    def to_admin_dict(self):
+        return {
+            "id": self.id,
+            "novel_id": self.novel_id,
+            "chapter_id": self.chapter_id,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "source_extractor": self.source_extractor,
+            "ai_proposed_evidence": self.ai_proposed_evidence,
+            "verification_status": self.verification_status,
+            "failure_reason": self.failure_reason,
+            "evidence_source": self.evidence_source,
+            "canonical_evidence_text": self.canonical_evidence_text,
+            "recovery_method": self.recovery_method,
+            "created_at": serialize_datetime(self.created_at),
         }
 
 
@@ -758,6 +823,10 @@ class CharacterProgressionEvent(ReviewMixin, db.Model):
     new_value = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
     review_warnings = db.Column(db.Text, nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    risk_flags = db.Column(db.Text, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     character = db.relationship("Character")
@@ -789,6 +858,10 @@ class CharacterSkill(ReviewMixin, db.Model):
     chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
     relationship_type = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    risk_flags = db.Column(db.Text, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     character = db.relationship("Character")
@@ -827,6 +900,10 @@ class CharacterItem(ReviewMixin, db.Model):
     chapter_id = db.Column(db.Integer, db.ForeignKey("chapters.id"), nullable=False)
     relationship_type = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    risk_flags = db.Column(db.Text, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     character = db.relationship("Character")
@@ -867,6 +944,10 @@ class CharacterLifeEvent(ReviewMixin, db.Model):
     event_type = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=True)
     reason = db.Column(db.Text, nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    risk_flags = db.Column(db.Text, nullable=True)
+    source_extractor = db.Column(db.String(100), nullable=True)
+    auto_approved = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
 
     character = db.relationship("Character")

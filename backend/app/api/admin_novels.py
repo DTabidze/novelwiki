@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 
 from app.models import (
+    AIEvidenceAudit,
     Book,
     Chapter,
     Character,
@@ -107,6 +108,7 @@ def book_has_extraction_or_review_data(book):
 
     review_models = [
         CharacterMetadataProposal,
+        AIEvidenceAudit,
         WikiEvent,
         WikiEvidence,
         CharacterProgressionEvent,
@@ -559,6 +561,16 @@ def run_extraction_scope(novel, run):
         run.book.extraction_status = "running"
 
     db.session.commit()
+    current_app.logger.info(
+        "Extraction run %s started: novel_id=%s book_id=%s scope=%s chapters=%s-%s total=%s",
+        run.id,
+        run.novel_id,
+        run.book_id,
+        run.scope_type,
+        run.chapter_start,
+        run.chapter_end,
+        run.total_chapters,
+    )
 
     for run_chapter in run.run_chapters:
         db.session.refresh(run)
@@ -582,67 +594,82 @@ def run_extraction_scope(novel, run):
         run_chapter.started_at = utc_now()
         run.current_chapter_id = chapter.id
         db.session.commit()
+        current_app.logger.info(
+            "Extraction run %s chapter %s started: run_chapter_id=%s title=%s",
+            run.id,
+            chapter.chapter_number,
+            run_chapter.id,
+            chapter.title,
+        )
 
-        last_error = None
         run_id = run.id
         run_chapter_id = run_chapter.id
 
-        for attempt in range(2):
-            try:
-                summary = extract_chapter_with_ai(
-                    novel,
-                    chapter,
-                    should_continue=lambda: extraction_run_can_save_chapter(run_id, run_chapter_id),
-                )
-                break
-            except ExtractionCancelled:
-                db.session.rollback()
-                run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
-                run = ExtractionRun.query.get(run_id)
+        try:
+            current_app.logger.info(
+                "Extraction run %s chapter %s started with stage-scoped retries",
+                run.id,
+                chapter.chapter_number,
+            )
+            summary = extract_chapter_with_ai(
+                novel,
+                chapter,
+                should_continue=lambda: extraction_run_can_save_chapter(
+                    run_id,
+                    run_chapter_id,
+                ),
+            )
+        except ExtractionCancelled:
+            db.session.rollback()
+            run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
+            run = ExtractionRun.query.get(run_id)
 
-                if run_chapter:
-                    run_chapter.status = "cancelled"
-                    run_chapter.error_message = "Canceled before saving chapter output."
-                    run_chapter.finished_at = utc_now()
+            if run_chapter:
+                run_chapter.status = "cancelled"
+                run_chapter.error_message = "Canceled before saving chapter output."
+                run_chapter.finished_at = utc_now()
 
-                if run:
-                    run.status = "cancelled"
-                    run.error_message = "Canceled by user."
-                    run.finished_at = utc_now()
-                    run.current_chapter_id = None
-                    mark_pending_run_chapters_skipped(run)
-                    refresh_run_totals(run)
+            if run:
+                run.status = "cancelled"
+                run.error_message = "Canceled by user."
+                run.finished_at = utc_now()
+                run.current_chapter_id = None
+                mark_pending_run_chapters_skipped(run)
+                refresh_run_totals(run)
 
-                    if run.book:
-                        run.book.extraction_status = "cancelled"
+                if run.book:
+                    run.book.extraction_status = "cancelled"
 
-                novel.status = "ready"
-                novel.error_message = None
-                db.session.commit()
-                return aggregate_summary, chapter_summaries
-            except Exception as error:
-                last_error = error
-                db.session.rollback()
+            novel.status = "ready"
+            novel.error_message = None
+            db.session.commit()
+            return aggregate_summary, chapter_summaries
+        except Exception as error:
+            db.session.rollback()
+            run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
+            run = ExtractionRun.query.get(run_id)
 
-                if attempt == 0:
-                    current_app.logger.warning(
-                        "AI extraction failed for chapter %s; retrying once: %s",
-                        chapter.chapter_number,
-                        error,
-                    )
-                    run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
-                    run = ExtractionRun.query.get(run_id)
-                    continue
-
-                run_chapter = ExtractionRunChapter.query.get(run_chapter_id)
-                run = ExtractionRun.query.get(run_id)
+            if run_chapter:
                 run_chapter.status = "failed"
                 run_chapter.error_message = str(error)
                 run_chapter.finished_at = utc_now()
-                refresh_run_totals(run)
-                db.session.commit()
-                raise last_error
 
+            if run:
+                refresh_run_totals(run)
+
+            db.session.commit()
+            current_app.logger.exception(
+                "Extraction run %s chapter %s failed after stage-scoped retries",
+                run.id if run else run_id,
+                chapter.chapter_number,
+            )
+            raise
+
+        current_app.logger.info(
+            "Extraction run %s chapter %s post-save review summary started",
+            run.id,
+            chapter.chapter_number,
+        )
         review_data = get_extracted_data(novel)
         run_chapter.records_created = count_created_records(summary)
         run_chapter.warning_count = count_chapter_warnings(review_data, chapter.id)
@@ -656,6 +683,14 @@ def run_extraction_scope(novel, run):
 
         refresh_run_totals(run)
         db.session.commit()
+        current_app.logger.info(
+            "Extraction run %s chapter %s completed: records=%s warnings=%s summary=%s",
+            run.id,
+            chapter.chapter_number,
+            run_chapter.records_created,
+            run_chapter.warning_count,
+            summary,
+        )
 
         db.session.refresh(run)
 
@@ -1155,14 +1190,21 @@ def cancel_extraction_run(novel_id, run_id):
     if run.status not in {"queued", "running"}:
         return failure("Only queued or running extraction runs can be stopped.")
 
-    has_processing_chapter = any(
-        run_chapter.status == "processing" for run_chapter in run.run_chapters
-    )
+    processing_chapters = [
+        run_chapter
+        for run_chapter in run.run_chapters
+        if run_chapter.status == "processing"
+    ]
+
+    for run_chapter in processing_chapters:
+        run_chapter.status = "cancelled"
+        run_chapter.error_message = "Canceled by user."
+        run_chapter.finished_at = utc_now()
 
     run.status = "cancelled"
     run.error_message = "Canceled by user."
-    run.finished_at = None if has_processing_chapter else utc_now()
-    run.current_chapter_id = run.current_chapter_id if has_processing_chapter else None
+    run.finished_at = utc_now()
+    run.current_chapter_id = None
     novel.status = "ready"
     novel.error_message = None
 

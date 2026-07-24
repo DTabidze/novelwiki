@@ -1,4 +1,5 @@
 from app.models import (
+    AIEvidenceAudit,
     Character,
     CharacterAlias,
     CharacterItem,
@@ -59,6 +60,7 @@ def run_placeholder_extraction(novel):
     CharacterLifeEvent.query.filter_by(novel_id=novel.id).delete()
     WikiEvent.query.filter_by(novel_id=novel.id).delete()
     WikiEvidence.query.filter_by(novel_id=novel.id).delete()
+    AIEvidenceAudit.query.filter_by(novel_id=novel.id).delete()
     Character.query.filter_by(novel_id=novel.id).delete()
     Skill.query.filter_by(novel_id=novel.id).delete()
     Item.query.filter_by(novel_id=novel.id).delete()
@@ -122,6 +124,7 @@ def get_extracted_data(novel):
         for chapter in Chapter.query.filter_by(novel_id=novel.id).all()
     }
     evidence_by_entity = {}
+    ai_evidence_audit_by_entity = {}
 
     evidence_rows = (
         WikiEvidence.query.filter_by(novel_id=novel.id).order_by(WikiEvidence.id).all()
@@ -130,6 +133,16 @@ def get_extracted_data(novel):
     for evidence in evidence_rows:
         key = (evidence.entity_type, evidence.entity_id)
         evidence_by_entity.setdefault(key, []).append(evidence.to_admin_dict())
+
+    ai_evidence_audit_rows = (
+        AIEvidenceAudit.query.filter_by(novel_id=novel.id).order_by(AIEvidenceAudit.id).all()
+    )
+
+    for audit in ai_evidence_audit_rows:
+        key = (audit.entity_type, audit.entity_id)
+        audit_data = audit.to_admin_dict()
+        audit_data["chapter"] = chapters.get(audit.chapter_id)
+        ai_evidence_audit_by_entity.setdefault(key, []).append(audit_data)
 
     def with_source_and_evidence(entity_type, record):
         data = record.to_admin_dict()
@@ -155,6 +168,10 @@ def get_extracted_data(novel):
         data["first_mentioned_chapter"] = chapters.get(data.get("first_mentioned_chapter_id"))
         data["first_appeared_chapter"] = chapters.get(data.get("first_appeared_chapter_id"))
         data["evidence"] = unique_evidence
+        data["ai_evidence_audit"] = ai_evidence_audit_by_entity.get(
+            (entity_type, record.id),
+            [],
+        )
 
         if entity_type == "character":
             aliases = []

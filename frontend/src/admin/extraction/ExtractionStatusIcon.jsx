@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle2, Clock3, LoaderCircle, SkipForward, TriangleAlert } from "lucide-react";
+import { CheckCircle2, CircleX, Clock3, LoaderCircle, SkipForward, TriangleAlert } from "lucide-react";
 
 const STATUS_ICONS = {
   pending: Clock3,
@@ -9,7 +9,7 @@ const STATUS_ICONS = {
   completed: CheckCircle2,
   failed: TriangleAlert,
   skipped: SkipForward,
-  cancelled: SkipForward,
+  cancelled: CircleX,
 };
 
 export default function ExtractionStatusIcon({ className = "", status }) {

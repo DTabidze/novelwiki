@@ -47,6 +47,27 @@ NUMBER_WORDS = {
 }
 
 AGE_SCALE_WORDS = {"thousand", "million", "billion", "trillion"}
+TENS_NUMBER_WORDS = {
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+}
+UNIT_NUMBER_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+}
 
 MALE_TERMS = {
     "male",
@@ -191,6 +212,23 @@ def number_word_pattern():
     return "|".join(sorted(NUMBER_WORDS, key=len, reverse=True))
 
 
+def normalize_compound_number_words(value):
+    tens_pattern = "|".join(TENS_NUMBER_WORDS)
+    unit_pattern = "|".join(UNIT_NUMBER_WORDS)
+
+    def replace_compound(match):
+        return str(
+            TENS_NUMBER_WORDS[match.group("tens")]
+            + UNIT_NUMBER_WORDS[match.group("unit")]
+        )
+
+    return re.sub(
+        rf"\b(?P<tens>{tens_pattern})\s+(?P<unit>{unit_pattern})\b",
+        replace_compound,
+        value,
+    )
+
+
 def normalize_age_text(value):
     raw_value = normalize_whitespace(value)
 
@@ -202,6 +240,7 @@ def normalize_age_text(value):
     normalized = re.sub(r"\b(man|woman|boy|girl|youth|young man|young woman)\b", "", normalized)
     normalized = re.sub(r"\b(looked|appeared|seemed|looks|appears|seems|to be)\b", "", normalized)
     normalized = re.sub(r"\b(about|around|approximately|roughly|nearly)\b", "about", normalized)
+    normalized = normalize_compound_number_words(normalized)
 
     for word, number in NUMBER_WORDS.items():
         normalized = re.sub(rf"\b{word}\b", number, normalized)

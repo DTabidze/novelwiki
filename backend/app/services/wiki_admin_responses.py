@@ -1,4 +1,5 @@
 from app.models import (
+    AIEvidenceAudit,
     CharacterItem,
     CharacterLifeEvent,
     CharacterMetadataProposal,
@@ -9,6 +10,7 @@ from app.models import (
     db,
     serialize_datetime,
 )
+from app.services.extraction.evidence import get_evidence_context
 
 APPROVED_STATUS = "approved"
 
@@ -61,7 +63,11 @@ def admin_review_response(entity_type, record):
     data["source_chapter"] = chapter_reference(source_chapter_id)
     data["first_mentioned_chapter"] = chapter_reference(data.get("first_mentioned_chapter_id"))
     data["first_appeared_chapter"] = chapter_reference(data.get("first_appeared_chapter_id"))
-    data["evidence"] = [evidence.to_admin_dict() for evidence in evidence_rows]
+    data["evidence"] = [evidence_admin_dict(evidence) for evidence in evidence_rows]
+    data["ai_evidence_audit"] = ai_evidence_audit_response(
+        evidence_entity_type,
+        record.id,
+    )
 
     if entity_type == "characters":
         aliases = []
@@ -86,10 +92,28 @@ def admin_review_response(entity_type, record):
     return data
 
 
+def ai_evidence_audit_response(entity_type, entity_id):
+    if not entity_type:
+        return []
+
+    return [
+        {
+            **audit.to_admin_dict(),
+            "chapter": chapter_reference(audit.chapter_id),
+        }
+        for audit in AIEvidenceAudit.query.filter_by(
+            entity_type=entity_type,
+            entity_id=entity_id,
+        )
+        .order_by(AIEvidenceAudit.id)
+        .all()
+    ]
+
+
 def evidence_response(entity_type, entity_id):
     return [
         {
-            **evidence.to_admin_dict(),
+            **evidence_admin_dict(evidence),
             "chapter": chapter_reference(evidence.chapter_id),
             "created_at": serialize_datetime(evidence.created_at),
         }
@@ -100,6 +124,17 @@ def evidence_response(entity_type, entity_id):
         .order_by(WikiEvidence.id)
         .all()
     ]
+
+
+def evidence_admin_dict(evidence):
+    data = evidence.to_admin_dict()
+    chapter = db.session.get(Chapter, evidence.chapter_id)
+    context = get_evidence_context(
+        chapter.content if chapter else "",
+        evidence.evidence_text,
+    )
+    data["local_context"] = context.combined_context if context.found else ""
+    return data
 
 
 def approved_character_relation_rows(model, character_id):

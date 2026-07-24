@@ -34,6 +34,22 @@ class MetadataNormalizationTest(unittest.TestCase):
             normalize_age_text("about sixteen or seventeen").normalized_value,
             "about 16-17 years old",
         )
+        self.assertEqual(
+            normalize_age_text("about twenty-four or twenty-five years old").normalized_value,
+            "about 24-25 years old",
+        )
+        self.assertEqual(
+            normalize_age_text("thirty-one years old").normalized_value,
+            "31 years old",
+        )
+        self.assertEqual(
+            normalize_age_text("forty two years old").normalized_value,
+            "42 years old",
+        )
+        self.assertEqual(
+            normalize_age_text("24 or 25 years old").normalized_value,
+            "24-25 years old",
+        )
 
     def test_age_text_preserves_large_scale_words(self):
         self.assertEqual(

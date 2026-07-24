@@ -305,14 +305,15 @@
 }
 
 .extraction-stream-row.failed .extraction-stream-icon,
-.extraction-status-icon.failed {
+.extraction-stream-row.cancelled .extraction-stream-icon,
+.extraction-status-icon.failed,
+.extraction-status-icon.cancelled {
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
 }
 
 .extraction-stream-row.skipped .extraction-stream-icon,
-.extraction-status-icon.skipped,
-.extraction-status-icon.cancelled {
+.extraction-status-icon.skipped {
   background: rgba(148, 163, 184, 0.14);
   color: #94a3b8;
 }

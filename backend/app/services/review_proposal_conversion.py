@@ -1,4 +1,4 @@
-from app.models import CharacterItem, CharacterSkill, WikiEvidence, db
+from app.models import AIEvidenceAudit, CharacterItem, CharacterSkill, WikiEvidence, db
 from app.services.item_categories import normalize_item_category
 from app.services.skill_categories import normalize_skill_category
 from app.services.wiki_editor_payloads import validate_optional_text
@@ -22,6 +22,16 @@ def move_wiki_evidence(source_type, source_id, target_type, target_id):
             evidence_text=evidence.evidence_text,
         ))
         db.session.delete(evidence)
+
+    AIEvidenceAudit.query.filter_by(
+        entity_type=source_type,
+        entity_id=source_id,
+    ).update(
+        {
+            "entity_type": target_type,
+            "entity_id": target_id,
+        }
+    )
 
 
 def converted_review_payload(payload, source, target_entity_type):

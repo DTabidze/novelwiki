@@ -18,6 +18,7 @@ from app.models import (
     db,
     serialize_datetime,
 )
+from app.services.extraction.evidence import get_evidence_context
 from app.services.auth import current_user, login_required
 from app.services.wiki_bookmarks import (
     add_bookmark,
@@ -136,14 +137,24 @@ def evidence_for(entity_type, entity_id):
         .all()
     )
 
-    return [
-        {
-            "id": evidence.id,
-            "chapter": chapter_reference(evidence.chapter_id),
-            "evidence_text": evidence.evidence_text,
-        }
-        for evidence in evidence_rows
-    ]
+    evidence_payloads = []
+
+    for evidence in evidence_rows:
+        chapter = db.session.get(Chapter, evidence.chapter_id)
+        context = get_evidence_context(
+            chapter.content if chapter else "",
+            evidence.evidence_text,
+        )
+        evidence_payloads.append(
+            {
+                "id": evidence.id,
+                "chapter": chapter_reference(evidence.chapter_id),
+                "evidence_text": evidence.evidence_text,
+                "local_context": context.combined_context if context.found else "",
+            }
+        )
+
+    return evidence_payloads
 
 
 def approved_progression_for_character(character_id):
